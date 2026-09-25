@@ -1,0 +1,67 @@
+// import apiClient from './client';
+
+// export const sendOtp = (name: string, email: string, role: string) =>
+//   apiClient.post('/auth/register/send-otp', {name, email, role});
+
+// export const verifyOtp = (email: string, otp: string) =>
+//   apiClient.post('/auth/register/verify-otp', {email, otp});
+
+// export const resendOtp = (email: string) =>
+//   apiClient.post('/auth/register/resend-otp', {email});
+
+// export const completeRegistration = (email: string, password: string) =>
+//   apiClient.post('/auth/register/complete', {email, password});
+
+// export const loginUser = (email: string, password: string) =>
+//   apiClient.post('/auth/login', {email, password});
+
+// export const getPendingApprovals = () => apiClient.get('/auth/approvals/pending');
+
+// export const approveUser = (userId: string) =>
+//   apiClient.put(`/auth/approvals/${userId}/approve`);
+
+// export const rejectUser = (userId: string) =>
+//   apiClient.put(`/auth/approvals/${userId}/reject`);
+
+// export const getUsers = (status?: string) =>
+//   apiClient.get('/auth/users', {params: status ? {status} : {}});
+
+
+import apiClient from './client';
+
+export const sendOtp = (name: string, email: string, role: string) =>
+  apiClient.post('/auth/register/send-otp', {name, email, role});
+
+export const verifyOtp = (email: string, otp: string) =>
+  apiClient.post('/auth/register/verify-otp', {email, otp});
+
+export const resendOtp = (email: string) =>
+  apiClient.post('/auth/register/resend-otp', {email});
+
+export const completeRegistration = (email: string, password: string) =>
+  apiClient.post('/auth/register/complete', {email, password});
+
+export const loginUser = (email: string, password: string) =>
+  apiClient.post('/auth/login', {email, password});
+
+export const getPendingApprovals = () => apiClient.get('/auth/approvals/pending');
+
+export const approveUser = (userId: string) =>
+  apiClient.put(`/auth/approvals/${userId}/approve`);
+
+export const rejectUser = (userId: string) =>
+  apiClient.put(`/auth/approvals/${userId}/reject`);
+
+export const getUsers = (status?: string) =>
+  apiClient.get('/auth/users', {params: status ? {status} : {}});
+
+// --- NEW: not in the current backend yet ---
+// Ask backend to add:
+//   PUT /api/auth/users/{userId}/role   body: { role: string }
+export const updateUserRole = (userId: string, role: string) =>
+  apiClient.put(`/auth/users/${userId}/role`, {role});
+
+// Ask backend to add:
+//   DELETE /api/auth/users/{userId}
+export const deleteUser = (userId: string) =>
+  apiClient.delete(`/auth/users/${userId}`);
