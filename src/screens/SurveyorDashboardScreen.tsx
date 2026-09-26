@@ -11,6 +11,7 @@ import {
 import {getApiErrorMessage} from '../api/errors';
 import {
   getSurveyorProjects,
+  projectStatusLabel,
   SurveyorProjectSummary,
 } from '../api/projects';
 
@@ -20,7 +21,7 @@ type Props = {
 };
 
 const projectStatus = (project: SurveyorProjectSummary) =>
-  project.status || 'Assigned';
+  projectStatusLabel(project.status);
 
 export default function SurveyorDashboardScreen({
   userName,

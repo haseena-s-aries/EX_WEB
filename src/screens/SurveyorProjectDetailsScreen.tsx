@@ -12,6 +12,7 @@ import {
   getSurveyorProject,
   getSurveyorProjectAreas,
   getProjectAreaPhotos,
+  projectStatusLabel,
   SurveyorAreaSummary,
   SurveyorProjectDetails,
 } from '../api/projects';
@@ -113,7 +114,7 @@ export default function SurveyorProjectDetailsScreen({
           </View>
         </View>
         <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>{project.status || 'Assigned'}</Text>
+          <Text style={styles.statusText}>{projectStatusLabel(project.status)}</Text>
         </View>
       </View>
 

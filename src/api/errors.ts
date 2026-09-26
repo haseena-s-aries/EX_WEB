@@ -9,5 +9,14 @@ export function getApiErrorMessage(error: any, fallback: string) {
     return 'You do not have permission to view this project.';
   }
 
+  if (data?.errors && typeof data.errors === 'object') {
+    const validationMessages = Object.values(data.errors)
+      .flatMap(value => (Array.isArray(value) ? value : [value]))
+      .filter(value => typeof value === 'string') as string[];
+    if (validationMessages.length > 0) {
+      return validationMessages.join(' ');
+    }
+  }
+
   return data?.error || data?.message || fallback;
 }

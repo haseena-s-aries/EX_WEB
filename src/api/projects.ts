@@ -17,6 +17,41 @@
 
 import apiClient from './client';
 
+export type ProjectStatus =
+  | 'Pending'
+  | 'Active'
+  | 'InProgress'
+  | 'Completed'
+  | 'OnHold';
+
+export const normalizeProjectStatus = (value: unknown): ProjectStatus => {
+  if (typeof value === 'number') {
+    return ['Pending', 'Active', 'InProgress', 'Completed', 'OnHold'][value] as
+      | ProjectStatus
+      | undefined || 'Pending';
+  }
+
+  switch (String(value ?? '').replace(/\s+/g, '').toLowerCase()) {
+    case 'active':
+      return 'Active';
+    case 'inprogress':
+      return 'InProgress';
+    case 'completed':
+      return 'Completed';
+    case 'onhold':
+      return 'OnHold';
+    default:
+      return 'Pending';
+  }
+};
+
+export const projectStatusLabel = (value: unknown) => {
+  const status = normalizeProjectStatus(value);
+  if (status === 'InProgress') return 'In Progress';
+  if (status === 'OnHold') return 'On Hold';
+  return status;
+};
+
 export const getAssignmentOptions = () => apiClient.get('/projects/assignment-options');
 
 export const getProjects = () => apiClient.get('/projects');
@@ -36,9 +71,6 @@ export const createProject = (data: {
   assignedClientId: string;
 }) => apiClient.post('/projects', data);
 
-// NEW: not confirmed on the backend yet — ask backend to add:
-//   PUT /api/projects/{projectId}
-// body: same shape as createProject, plus `status`.
 export const updateProject = (
   projectId: string,
   data: {
@@ -50,7 +82,7 @@ export const updateProject = (
     assignedSurveyorId: string;
     assignedQcId: string;
     assignedClientId: string;
-    status: string;
+    status: ProjectStatus;
   },
 ) => apiClient.put(`/projects/${projectId}`, data);
 
@@ -158,16 +190,18 @@ export type AreaEquipment = {
   id: string;
   projectId: string;
   areaId: string;
+  sequenceNo: number;
   xPercent: number;
   yPercent: number;
   tagNumber: string;
-  equipmentCode?: string | null;
+  equipmentId?: string | null;
   type: string;
   circuitId?: string | null;
   location?: string | null;
   manufacturer?: string | null;
   protectionDetails?: string | null;
   certificateNumber?: string | null;
+  status: string;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
@@ -194,4 +228,49 @@ export const getSurveyorProjectAreas = (projectId: string) =>
 export const getSurveyorArea = (projectId: string, areaId: string) =>
   apiClient.get<SurveyorAreaDetails>(
     `/surveyor/projects/${projectId}/areas/${areaId}`,
+  );
+
+export type SaveAreaEquipmentRequest = {
+  xPercent: number;
+  yPercent: number;
+  tagNumber: string;
+  equipmentId?: string | null;
+  type: string;
+  circuitId?: string | null;
+  location?: string | null;
+  manufacturer?: string | null;
+  protectionDetails?: string | null;
+  certificateNumber?: string | null;
+};
+
+const surveyorEquipmentUrl = (projectId: string, areaId: string) =>
+  `/surveyor/projects/${projectId}/areas/${areaId}/equipment`;
+
+export const getSurveyorEquipment = (projectId: string, areaId: string) =>
+  apiClient.get<AreaEquipment[]>(surveyorEquipmentUrl(projectId, areaId));
+
+export const createSurveyorEquipment = (
+  projectId: string,
+  areaId: string,
+  data: SaveAreaEquipmentRequest,
+) => apiClient.post<AreaEquipment>(surveyorEquipmentUrl(projectId, areaId), data);
+
+export const updateSurveyorEquipment = (
+  projectId: string,
+  areaId: string,
+  equipmentId: string,
+  data: SaveAreaEquipmentRequest,
+) =>
+  apiClient.put<AreaEquipment>(
+    `${surveyorEquipmentUrl(projectId, areaId)}/${equipmentId}`,
+    data,
+  );
+
+export const deleteSurveyorEquipment = (
+  projectId: string,
+  areaId: string,
+  equipmentId: string,
+) =>
+  apiClient.delete(
+    `${surveyorEquipmentUrl(projectId, areaId)}/${equipmentId}`,
   );

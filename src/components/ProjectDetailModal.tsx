@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   Modal,
   View,
@@ -17,6 +17,8 @@ import {
   addProjectArea,
   updateProjectArea,
   deleteProjectArea,
+  normalizeProjectStatus,
+  ProjectStatus,
 } from '../api/projects';
 import {getApiErrorMessage} from '../api/errors';
 import AuthenticatedImage from './AuthenticatedImage';
@@ -36,7 +38,7 @@ type Props = {
     assignedSurveyorId: string;
     assignedQcId: string;
     assignedClientId: string;
-    status: string;
+    status: ProjectStatus;
   }) => void;
   onAreasChanged?: () => void;
   surveyors: UserOption[];
@@ -68,12 +70,12 @@ const SECTOR_OPTIONS = [
 ];
 
 const STATUS_OPTIONS = [
-  {label: 'Pending', icon: '⏳', color: '#b8770a', bg: '#fdf1e0'},
-  {label: 'Active', icon: '🟢', color: '#1f8a4c', bg: '#e2f7ec'},
-  {label: 'In Progress', icon: '⚙️', color: '#5a3fd6', bg: '#eae7fc'},
-  {label: 'Completed', icon: '✅', color: '#2a5fb0', bg: '#e6f0fb'},
-  {label: 'On Hold', icon: '⛔', color: '#c93838', bg: '#fde6e6'},
-];
+  {value: 'Pending', label: 'Pending', icon: '⏳', color: '#b8770a', bg: '#fdf1e0'},
+  {value: 'Active', label: 'Active', icon: '🟢', color: '#1f8a4c', bg: '#e2f7ec'},
+  {value: 'InProgress', label: 'In Progress', icon: '⚙️', color: '#5a3fd6', bg: '#eae7fc'},
+  {value: 'Completed', label: 'Completed', icon: '✅', color: '#2a5fb0', bg: '#e6f0fb'},
+  {value: 'OnHold', label: 'On Hold', icon: '⛔', color: '#c93838', bg: '#fde6e6'},
+] satisfies Array<{value: ProjectStatus; label: string; icon: string; color: string; bg: string}>;
 
 // TODO: confirm exact field names the backend uses once these responses are
 // checked directly in Swagger — falls back across a few likely names so the
@@ -129,13 +131,14 @@ export default function ProjectDetailModal({
   const [surveyorId, setSurveyorId] = useState('');
   const [qcId, setQcId] = useState('');
   const [clientId, setClientId] = useState('');
-  const [status, setStatus] = useState('Pending');
+  const [status, setStatus] = useState<ProjectStatus>('Pending');
   const [areas, setAreas] = useState<AreaRow[]>([]);
 
   const scale = useRef(new Animated.Value(0.9)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const projectId = project?.id || project?.projectId;
 
-  const applyDetail = (detail: any) => {
+  const applyDetail = useCallback((detail: any) => {
     setProjectName(pick(detail, 'projectName'));
     setSector(pick(detail, 'sector') || SECTOR_OPTIONS[0]);
     setJobNo(pick(detail, 'jobNo', 'jobNumber'));
@@ -144,7 +147,7 @@ export default function ProjectDetailModal({
     setSurveyorId(pick(detail, 'assignedSurveyorId', 'surveyorId'));
     setQcId(pick(detail, 'assignedQcId', 'qcId'));
     setClientId(pick(detail, 'assignedClientId', 'clientId'));
-    setStatus(pick(detail, 'status', 'projectStatus') || 'Pending');
+    setStatus(normalizeProjectStatus(pick(detail, 'status', 'projectStatus')));
 
     const rawAreas: any[] = detail.areas || [];
     setAreas(
@@ -163,9 +166,7 @@ export default function ProjectDetailModal({
         isNew: false,
       })),
     );
-  };
-
-  const projectId = project?.id || project?.projectId;
+  }, []);
 
   useEffect(() => {
     if (visible && project) {
@@ -190,7 +191,7 @@ export default function ProjectDetailModal({
         Animated.timing(opacity, {toValue: 1, duration: 220, useNativeDriver: Platform.OS !== 'web'}),
       ]).start();
     }
-  }, [visible, project]);
+  }, [applyDetail, opacity, project, projectId, scale, visible]);
 
   if (!project) return null;
 
@@ -302,7 +303,7 @@ export default function ProjectDetailModal({
     surveyors.find(s => s.id === surveyorId)?.displayName || (surveyorId ? surveyorId : '—');
   const qcName = qcUsers.find(u => u.id === qcId)?.displayName || (qcId ? qcId : '—');
   const clientName = clients.find(c => c.id === clientId)?.displayName || (clientId ? clientId : '—');
-  const statusMeta = STATUS_OPTIONS.find(s => s.label === status) ?? STATUS_OPTIONS[0];
+  const statusMeta = STATUS_OPTIONS.find(s => s.value === status) ?? STATUS_OPTIONS[0];
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -379,11 +380,11 @@ export default function ProjectDetailModal({
             {editing ? (
               <View style={styles.statusRow}>
                 {STATUS_OPTIONS.map(opt => {
-                  const active = status === opt.label;
+                  const active = status === opt.value;
                   return (
                     <TouchableOpacity
                       key={opt.label}
-                      onPress={() => setStatus(opt.label)}
+                      onPress={() => setStatus(opt.value)}
                       style={[
                         styles.statusChip,
                         {borderColor: active ? opt.color : '#e5e7f0'},

@@ -14,9 +14,16 @@ import apiClient, {getApiResourceUrl, getAuthToken} from '../api/client';
 type Props = {
   path?: string | null;
   style?: StyleProp<ImageStyle>;
+  resizeMode?: 'cover' | 'contain' | 'stretch' | 'repeat' | 'center';
+  onLoad?: (event: any) => void;
 };
 
-export default function AuthenticatedImage({path, style}: Props) {
+export default function AuthenticatedImage({
+  path,
+  style,
+  resizeMode = 'cover',
+  onLoad,
+}: Props) {
   const [uri, setUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(path));
 
@@ -83,13 +90,14 @@ export default function AuthenticatedImage({path, style}: Props) {
 
   return (
     <Image
-      resizeMode="cover"
+      resizeMode={resizeMode}
       source={{
         uri,
         ...(Platform.OS === 'web' || !getAuthToken()
           ? {}
           : {headers: {Authorization: `Bearer ${getAuthToken()}`}}),
       }}
+      onLoad={onLoad}
       style={style}
     />
   );
