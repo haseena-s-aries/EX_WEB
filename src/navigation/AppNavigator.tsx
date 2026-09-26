@@ -68,6 +68,9 @@ import SignupScreen from '../screens/SignupScreen';
 import OtpScreen from '../screens/OtpScreen';
 import LoginScreen from '../screens/LoginScreen';
 import DashboardScreen from '../screens/DashboardScreen';
+import SurveyorDashboardScreen from '../screens/SurveyorDashboardScreen';
+import SurveyorProjectDetailsScreen from '../screens/SurveyorProjectDetailsScreen';
+import SurveyorAreaDetailsScreen from '../screens/SurveyorAreaDetailsScreen';
 import {sendOtp, verifyOtp, completeRegistration, loginUser} from '../api/auth';
 import {getAssignmentOptions} from '../api/projects';
 import {setAuthToken} from '../api/client';
@@ -160,13 +163,17 @@ export default function AppNavigator() {
                   setAuthToken(accessToken);
                   setCurrentUser(user);
 
-                  try {
-                    const options = await getAssignmentOptions();
-                    setAssignmentOptions(options.data);
-                  } catch (optionsError: any) {
-                    console.error(
-                      optionsError?.response?.data || optionsError.message,
-                    );
+                  if (user.role === 'Admin' || user.role === 'Manager') {
+                    try {
+                      const options = await getAssignmentOptions();
+                      setAssignmentOptions(options.data);
+                    } catch (optionsError: any) {
+                      console.error(
+                        optionsError?.response?.data || optionsError.message,
+                      );
+                      setAssignmentOptions([]);
+                    }
+                  } else {
                     setAssignmentOptions([]);
                   }
 
@@ -209,17 +216,55 @@ export default function AppNavigator() {
                   <Text style={styles.logoutText}>Log out</Text>
                 </TouchableOpacity>
               </View>
-              <DashboardScreen
-                userName={currentUser?.displayName || 'User'}
-                surveyors={assignmentOptions.filter(
-                  user => user.role === 'Surveyor',
-                )}
-                qcUsers={assignmentOptions.filter(
-                  user => user.role === 'Qc' || user.role === 'QC',
-                )}
-                clients={assignmentOptions.filter(
-                  user => user.role === 'Client',
-                )}
+              {currentUser?.role?.toLowerCase() === 'surveyor' ? (
+                <SurveyorDashboardScreen
+                  userName={currentUser.displayName || 'Surveyor'}
+                  onProjectPress={projectId =>
+                    navigation.navigate('SurveyorProjectDetails', {projectId})
+                  }
+                />
+              ) : (
+                <DashboardScreen
+                  userName={currentUser?.displayName || 'User'}
+                  surveyors={assignmentOptions.filter(
+                    user => user.role === 'Surveyor',
+                  )}
+                  qcUsers={assignmentOptions.filter(
+                    user => user.role === 'Qc' || user.role === 'QC',
+                  )}
+                  clients={assignmentOptions.filter(
+                    user => user.role === 'Client',
+                  )}
+                />
+              )}
+            </SafeAreaView>
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen name="SurveyorProjectDetails">
+          {({navigation, route}: any) => (
+            <SafeAreaView style={styles.dashboardShell}>
+              <SurveyorProjectDetailsScreen
+                projectId={route.params.projectId}
+                onBack={() => navigation.goBack()}
+                onAreaPress={areaId =>
+                  navigation.navigate('SurveyorAreaDetails', {
+                    projectId: route.params.projectId,
+                    areaId,
+                  })
+                }
+              />
+            </SafeAreaView>
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen name="SurveyorAreaDetails">
+          {({navigation, route}: any) => (
+            <SafeAreaView style={styles.dashboardShell}>
+              <SurveyorAreaDetailsScreen
+                projectId={route.params.projectId}
+                areaId={route.params.areaId}
+                onBack={() => navigation.goBack()}
               />
             </SafeAreaView>
           )}

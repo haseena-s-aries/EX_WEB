@@ -165,13 +165,23 @@ import SignupScreen from '../screens/SignupScreen';
 import OtpScreen from '../screens/OtpScreen';
 import LoginScreen from '../screens/LoginScreen';
 import DashboardScreen from '../screens/DashboardScreen';
+import SurveyorDashboardScreen from '../screens/SurveyorDashboardScreen';
+import SurveyorProjectDetailsScreen from '../screens/SurveyorProjectDetailsScreen';
+import SurveyorAreaDetailsScreen from '../screens/SurveyorAreaDetailsScreen';
 import UserManagementScreen from '../screens/UserManagementScreen';
 import Sidebar from '../components/Sidebar';
 import {sendOtp, verifyOtp, completeRegistration, loginUser} from '../api/auth';
 import {getAssignmentOptions} from '../api/projects';
 import {setAuthToken} from '../api/client';
 
-type Screen = 'Signup' | 'Otp' | 'Login' | 'Dashboard' | 'UserManagement';
+type Screen =
+  | 'Signup'
+  | 'Otp'
+  | 'Login'
+  | 'Dashboard'
+  | 'UserManagement'
+  | 'SurveyorProjectDetails'
+  | 'SurveyorAreaDetails';
 
 export default function AppNavigator() {
   const {width} = useWindowDimensions();
@@ -182,6 +192,8 @@ export default function AppNavigator() {
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<{name: string; role: string} | null>(null);
   const [approvedUsers, setApprovedUsers] = useState<any[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [selectedAreaId, setSelectedAreaId] = useState('');
 
   if (screen === 'Otp') {
     return (
@@ -219,11 +231,15 @@ export default function AppNavigator() {
             setAuthToken(accessToken);
             setCurrentUser({name: user.displayName, role: user.role});
 
-            try {
-              const optionsRes = await getAssignmentOptions();
-              setApprovedUsers(optionsRes.data);
-            } catch (err) {
-              console.error('Could not load assignment options', err);
+            if (user.role === 'Admin' || user.role === 'Manager') {
+              try {
+                const optionsRes = await getAssignmentOptions();
+                setApprovedUsers(optionsRes.data);
+              } catch (err) {
+                console.error('Could not load assignment options', err);
+              }
+            } else {
+              setApprovedUsers([]);
             }
 
             setScreen('Dashboard');
@@ -239,7 +255,12 @@ export default function AppNavigator() {
     );
   }
 
-  if (screen === 'Dashboard' || screen === 'UserManagement') {
+  if (
+    screen === 'Dashboard' ||
+    screen === 'UserManagement' ||
+    screen === 'SurveyorProjectDetails' ||
+    screen === 'SurveyorAreaDetails'
+  ) {
     if (!currentUser) {
       setScreen('Login');
       return null;
@@ -248,6 +269,8 @@ export default function AppNavigator() {
       setAuthToken(null);
       setCurrentUser(null);
       setApprovedUsers([]);
+      setSelectedProjectId('');
+      setSelectedAreaId('');
       setScreen('Login');
     };
     const canManageUsers =
@@ -274,12 +297,12 @@ export default function AppNavigator() {
                 onPress={() => setScreen('Dashboard')}
                 style={[
                   styles.mobileNavItem,
-                  screen === 'Dashboard' && styles.mobileNavItemActive,
+                  screen !== 'UserManagement' && styles.mobileNavItemActive,
                 ]}>
                 <Text
                   style={[
                     styles.mobileNavText,
-                    screen === 'Dashboard' && styles.mobileNavTextActive,
+                    screen !== 'UserManagement' && styles.mobileNavTextActive,
                   ]}>
                   Dashboard
                 </Text>
@@ -305,11 +328,13 @@ export default function AppNavigator() {
           </View>
         ) : (
           <Sidebar
-            active={screen}
+            active={screen === 'UserManagement' ? screen : 'Dashboard'}
             userName={currentUser.name}
             userRole={currentUser.role}
             onNavigate={key => {
               if (key === 'Dashboard' || key === 'UserManagement') {
+                setSelectedProjectId('');
+                setSelectedAreaId('');
                 setScreen(key as Screen);
               }
             }}
@@ -317,18 +342,45 @@ export default function AppNavigator() {
           />
         )}
         <View style={styles.mainContent}>
-          {screen === 'Dashboard' ? (
+          {screen === 'Dashboard' &&
+          currentUser.role.toLowerCase() === 'surveyor' ? (
+            <SurveyorDashboardScreen
+              userName={currentUser.name}
+              onProjectPress={projectId => {
+                setSelectedProjectId(projectId);
+                setSelectedAreaId('');
+                setScreen('SurveyorProjectDetails');
+              }}
+            />
+          ) : screen === 'Dashboard' ? (
             <DashboardScreen
               userName={currentUser.name}
               surveyors={approvedUsers
-               .filter((u: any) => u.role?.toLowerCase() === 'surveyor')
-               .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+                .filter((u: any) => u.role?.toLowerCase() === 'surveyor')
+                .map((u: any) => ({id: u.id, displayName: u.displayName}))}
               qcUsers={approvedUsers
-               .filter((u: any) => u.role?.toLowerCase() === 'qc')
-               .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+                .filter((u: any) => u.role?.toLowerCase() === 'qc')
+                .map((u: any) => ({id: u.id, displayName: u.displayName}))}
               clients={approvedUsers
-               .filter((u: any) => u.role?.toLowerCase() === 'client')
-               .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+                .filter((u: any) => u.role?.toLowerCase() === 'client')
+                .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+            />
+          ) : screen === 'SurveyorProjectDetails' && selectedProjectId ? (
+            <SurveyorProjectDetailsScreen
+              projectId={selectedProjectId}
+              onBack={() => setScreen('Dashboard')}
+              onAreaPress={areaId => {
+                setSelectedAreaId(areaId);
+                setScreen('SurveyorAreaDetails');
+              }}
+            />
+          ) : screen === 'SurveyorAreaDetails' &&
+            selectedProjectId &&
+            selectedAreaId ? (
+            <SurveyorAreaDetailsScreen
+              projectId={selectedProjectId}
+              areaId={selectedAreaId}
+              onBack={() => setScreen('SurveyorProjectDetails')}
             />
           ) : (
             <UserManagementScreen onBack={() => setScreen('Dashboard')} />

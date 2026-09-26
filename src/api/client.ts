@@ -28,12 +28,29 @@ const apiClient = axios.create({
   headers: {'Content-Type': 'application/json'},
 });
 
+let authToken: string | null = null;
+
 export const setAuthToken = (token: string | null) => {
+  authToken = token;
   if (token) {
     apiClient.defaults.headers.common.Authorization = `Bearer ${token}`;
   } else {
     delete apiClient.defaults.headers.common.Authorization;
   }
+};
+
+export const getAuthToken = () => authToken;
+
+export const getApiResourceUrl = (path: string) => {
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  const baseUrl = String(apiClient.defaults.baseURL || '').replace(/\/$/, '');
+  const origin = baseUrl.replace(/\/api$/, '');
+  return path.startsWith('/api/')
+    ? `${origin}${path}`
+    : `${baseUrl}/${path.replace(/^\//, '')}`;
 };
 
 export default apiClient;
