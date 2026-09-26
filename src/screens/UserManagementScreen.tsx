@@ -923,23 +923,17 @@ function PillButton({
   );
 }
 
-function RoleDropdown({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: string;
-  onChange: (r: string) => void;
-  disabled?: boolean;
-}) {
+function RoleDropdown({value, onChange}: {value: string; onChange: (r: string) => void}) {
+  const matchedOption =
+    ROLE_OPTIONS.find(r => r.toLowerCase() === value.toLowerCase()) || ROLE_OPTIONS[0];
+
   if (Platform.OS === 'web') {
     return (
       // @ts-ignore
       <select
-        value={value}
-        disabled={disabled}
+        value={matchedOption}
         onChange={(e: any) => onChange(e.target.value)}
-        style={{...selectStyleWeb, opacity: disabled ? 0.6 : 1}}>
+        style={selectStyleWeb}>
         {ROLE_OPTIONS.map(role => (
           <option key={role} value={role}>
             {role}
@@ -950,13 +944,13 @@ function RoleDropdown({
   }
   return (
     <TouchableOpacity
-      style={[styles.nativeDropdown, disabled && styles.pillBtnDisabled]}
-      disabled={disabled}
+      style={styles.nativeDropdown}
       onPress={() => {
-        const next = ROLE_OPTIONS[(ROLE_OPTIONS.indexOf(value) + 1) % ROLE_OPTIONS.length];
+        const next =
+          ROLE_OPTIONS[(ROLE_OPTIONS.indexOf(matchedOption) + 1) % ROLE_OPTIONS.length];
         onChange(next);
       }}>
-      <Text style={styles.nativeDropdownText}>{value} ▾</Text>
+      <Text style={styles.nativeDropdownText}>{matchedOption} ▾</Text>
     </TouchableOpacity>
   );
 }

@@ -321,14 +321,14 @@ export default function AppNavigator() {
             <DashboardScreen
               userName={currentUser.name}
               surveyors={approvedUsers
-                .filter((u: any) => u.role === 'Surveyor')
-                .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+               .filter((u: any) => u.role?.toLowerCase() === 'surveyor')
+               .map((u: any) => ({id: u.id, displayName: u.displayName}))}
               qcUsers={approvedUsers
-                .filter((u: any) => u.role === 'QC')
-                .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+               .filter((u: any) => u.role?.toLowerCase() === 'qc')
+               .map((u: any) => ({id: u.id, displayName: u.displayName}))}
               clients={approvedUsers
-                .filter((u: any) => u.role === 'Client')
-                .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+               .filter((u: any) => u.role?.toLowerCase() === 'client')
+               .map((u: any) => ({id: u.id, displayName: u.displayName}))}
             />
           ) : (
             <UserManagementScreen onBack={() => setScreen('Dashboard')} />

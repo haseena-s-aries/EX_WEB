@@ -322,7 +322,7 @@ import {
 } from 'react-native';
 import NewProjectModal from '../components/NewProjectModal';
 import StatCard from '../components/StatCard';
-import {getProjects, createProject} from '../api/projects';
+import {getProjects, createProject, addProjectArea} from '../api/projects';
 
 const STATUS_COLORS: Record<string, {bg: string; text: string}> = {
   Pending: {bg: '#fdf1e0', text: '#b8770a'},
@@ -406,39 +406,57 @@ export default function DashboardScreen({
     .slice(0, 6);
 
   const handleCreate = async (data: {
-    projectName: string;
-    sector: string;
-    jobNumber: string;
-    location: string;
-    vesselName: string;
-    surveyorId: string;
-    qcId: string;
-    clientId: string;
-    status: string;
-  }) => {
-    setCreating(true);
-    try {
-      await createProject({
-        projectName: data.projectName,
-        sector: data.sector,
-        jobNo: data.jobNumber,
-        location: data.location,
-        vesselOrSiteName: data.vesselName,
-        assignedSurveyorId: data.surveyorId,
-        assignedQcId: data.qcId,
-        assignedClientId: data.clientId,
-        // NOTE: backend's POST /api/projects doesn't accept a `status` field yet —
-        // ask backend whether status needs to be set via a separate PUT call.
-      });
-      setShowNewProject(false);
-      await loadProjects();
-    } catch (err: any) {
-      const errData = err?.response?.data;
-      Alert.alert('Error', errData?.error || errData?.message || 'Could not create project');
-    } finally {
-      setCreating(false);
+  projectName: string;
+  sector: string;
+  jobNumber: string;
+  location: string;
+  vesselName: string;
+  surveyorId: string;
+  qcId: string;
+  clientId: string;
+  areas: {name: string; file: any; fileName: string}[];
+}) => {
+  setCreating(true);
+  try {
+    const res = await createProject({
+      projectName: data.projectName,
+      sector: data.sector,
+      jobNo: data.jobNumber,
+      location: data.location,
+      vesselOrSiteName: data.vesselName,
+      assignedSurveyorId: data.surveyorId,
+      assignedQcId: data.qcId,
+      assignedClientId: data.clientId,
+    });
+
+    const projectId = res.data.id;
+    const failedAreas: string[] = [];
+
+    for (const area of data.areas) {
+      try {
+        await addProjectArea(projectId, area.name, area.file);
+      } catch (err) {
+        console.error('Failed to add area', area.name, err);
+        failedAreas.push(area.name);
+      }
     }
-  };
+
+    if (failedAreas.length > 0) {
+      Alert.alert(
+        'Project created',
+        `Project was created, but these areas could not be added: ${failedAreas.join(', ')}`,
+      );
+    }
+
+    setShowNewProject(false);
+    await loadProjects();
+  } catch (err: any) {
+    const errData = err?.response?.data;
+    Alert.alert('Error', errData?.error || errData?.message || 'Could not create project');
+  } finally {
+    setCreating(false);
+  }
+};
 
   return (
     <ScrollView
