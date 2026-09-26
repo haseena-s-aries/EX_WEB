@@ -660,11 +660,22 @@ export default function UserManagementScreen({onBack}: Props) {
       async () => {
         setActioningId(user.id);
         try {
-          await deleteUser(user.id);
-          setApproved(prev => prev.filter(u => u.id !== user.id));
+          const response = await deleteUser(user.id);
+          await loadAll();
+          Alert.alert(
+            'User deleted',
+            response.data?.message || 'User was permanently deleted.',
+          );
         } catch (err: any) {
           console.error(err?.response?.data || err.message);
-          Alert.alert('Error', 'Could not delete user');
+          const data = err?.response?.data;
+          const dependencies = Array.isArray(data?.dependencies)
+            ? `\n\nRelated records: ${data.dependencies.join(', ')}`
+            : '';
+          Alert.alert(
+            'Could not delete user',
+            `${data?.error || err.message || 'The delete request failed.'}${dependencies}`,
+          );
         } finally {
           setActioningId(null);
         }
@@ -775,8 +786,16 @@ export default function UserManagementScreen({onBack}: Props) {
               <PillButton
                 label="Approve"
                 variant="approve"
+                disabled={actioningId === user.id}
                 loading={actioningId === user.id}
                 onPress={() => handleReapprove(user)}
+              />
+              <PillButton
+                label="Delete"
+                variant="reject"
+                disabled={actioningId === user.id}
+                loading={actioningId === user.id}
+                onPress={() => handleDelete(user)}
               />
             </View>
           </>

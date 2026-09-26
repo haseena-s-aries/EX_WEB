@@ -55,13 +55,8 @@ export const rejectUser = (userId: string) =>
 export const getUsers = (status?: string) =>
   apiClient.get('/auth/users', {params: status ? {status} : {}});
 
-// --- NEW: not in the current backend yet ---
-// Ask backend to add:
-//   PUT /api/auth/users/{userId}/role   body: { role: string }
 export const updateUserRole = (userId: string, role: string) =>
   apiClient.put(`/auth/users/${userId}/role`, {role});
 
-// Ask backend to add:
-//   DELETE /api/auth/users/{userId}
 export const deleteUser = (userId: string) =>
   apiClient.delete(`/auth/users/${userId}`);
