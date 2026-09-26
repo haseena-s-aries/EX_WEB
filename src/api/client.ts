@@ -19,7 +19,7 @@ import {Platform} from 'react-native';
 
 const BASE_URL = Platform.select({
   web: 'https://localhost:7288/api',
-  android: 'https://10.0.2.2:7288/api',
+  android: 'http://10.0.2.2:5235/api',
   default: 'https://localhost:7288/api',
 });
 

@@ -318,6 +318,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import NewProjectModal from '../components/NewProjectModal';
 import StatCard from '../components/StatCard';
@@ -346,6 +347,8 @@ export default function DashboardScreen({
   qcUsers = [],
   clients = [],
 }: Props) {
+  const {width} = useWindowDimensions();
+  const isPhone = width < 600;
   const [showNewProject, setShowNewProject] = useState(false);
   const [creating, setCreating] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(true);
@@ -438,10 +441,13 @@ export default function DashboardScreen({
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={[styles.content, isPhone && styles.contentPhone]}>
       <Animated.View
         style={[
           styles.headerBanner,
+          isPhone && styles.headerBannerPhone,
           {opacity: bannerOpacity, transform: [{translateY: bannerY}]},
         ]}>
         <View style={styles.bannerGlowOne} />
@@ -458,10 +464,15 @@ export default function DashboardScreen({
               })}
             </Text>
           </View>
-          <Text style={styles.welcomeText}>Welcome back, {userName.split(' ')[0]} 👋</Text>
+          <Text style={[styles.welcomeText, isPhone && styles.welcomeTextPhone]}>
+            Welcome back, {userName.split(' ')[0]} 👋
+          </Text>
           <Text style={styles.subText}>Here's an overview of your projects</Text>
         </View>
-        <NewProjectButton onPress={() => setShowNewProject(true)} />
+        <NewProjectButton
+          fullWidth={isPhone}
+          onPress={() => setShowNewProject(true)}
+        />
       </Animated.View>
 
       {loadingProjects ? (
@@ -539,7 +550,13 @@ export default function DashboardScreen({
   );
 }
 
-function NewProjectButton({onPress}: {onPress: () => void}) {
+function NewProjectButton({
+  onPress,
+  fullWidth = false,
+}: {
+  onPress: () => void;
+  fullWidth?: boolean;
+}) {
   const scale = useRef(new Animated.Value(1)).current;
   const animateTo = (v: number) =>
     Animated.spring(scale, {
@@ -554,8 +571,13 @@ function NewProjectButton({onPress}: {onPress: () => void}) {
       onPressIn={() => animateTo(0.95)}
       onPressOut={() => animateTo(1)}
       onPress={onPress}
-      style={{zIndex: 1}}>
-      <Animated.View style={[styles.newProjectBtn, {transform: [{scale}]}]}>
+      style={[styles.newProjectButtonWrap, fullWidth && styles.fullWidth]}>
+      <Animated.View
+        style={[
+          styles.newProjectBtn,
+          fullWidth && styles.newProjectBtnPhone,
+          {transform: [{scale}]},
+        ]}>
         <Text style={styles.newProjectBtnIcon}>+</Text>
         <Text style={styles.newProjectBtnText}>New Project</Text>
       </Animated.View>
@@ -566,6 +588,7 @@ function NewProjectButton({onPress}: {onPress: () => void}) {
 const styles = StyleSheet.create({
   screen: {flex: 1, backgroundColor: '#f4f6fb'},
   content: {padding: 28, minHeight: '100%' as any},
+  contentPhone: {padding: 16, paddingBottom: 28},
   headerBanner: {
     borderRadius: 22,
     padding: 28,
@@ -590,12 +613,20 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  headerBannerPhone: {
+    padding: 20,
+    marginBottom: 20,
+    borderRadius: 16,
+    flexDirection: 'column',
+    gap: 18,
+  },
   bannerGlowOne: {position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.06)', top: -80, right: -40},
   bannerGlowTwo: {position: 'absolute', width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.05)', bottom: -60, right: 100},
   dateRow: {flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 10},
   dateDot: {width: 6, height: 6, borderRadius: 3, backgroundColor: '#6fe3a3'},
   dateText: {color: '#b3b6e0', fontSize: 12.5, fontWeight: '600'},
   welcomeText: {color: '#fff', fontSize: 24, fontWeight: '800'},
+  welcomeTextPhone: {fontSize: 20},
   subText: {color: '#c7caf0', fontSize: 13.5, marginTop: 5},
   newProjectBtn: {
     flexDirection: 'row',
@@ -610,6 +641,9 @@ const styles = StyleSheet.create({
   },
   newProjectBtnIcon: {color: '#fff', fontSize: 17, fontWeight: '800'},
   newProjectBtnText: {color: '#fff', fontSize: 13.5, fontWeight: '700'},
+  newProjectButtonWrap: {zIndex: 1},
+  fullWidth: {width: '100%'},
+  newProjectBtnPhone: {width: '100%', justifyContent: 'center'},
   statRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginBottom: 30},
   sectionHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14},
   sectionTitle: {fontSize: 17, fontWeight: '800', color: '#1a1d2b'},
