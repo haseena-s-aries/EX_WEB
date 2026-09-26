@@ -25,7 +25,6 @@ const BASE_URL = Platform.select({
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
-  headers: {'Content-Type': 'application/json'},
 });
 
 let authToken: string | null = null;

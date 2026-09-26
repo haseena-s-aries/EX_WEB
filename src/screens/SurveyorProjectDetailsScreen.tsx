@@ -11,6 +11,7 @@ import {getApiErrorMessage} from '../api/errors';
 import {
   getSurveyorProject,
   getSurveyorProjectAreas,
+  getProjectAreaPhotos,
   SurveyorAreaSummary,
   SurveyorProjectDetails,
 } from '../api/projects';
@@ -46,7 +47,22 @@ export default function SurveyorProjectDetailsScreen({
         getSurveyorProjectAreas(projectId),
       ]);
       setProject(projectResponse.data);
-      setAreas(areaResponse.data);
+      const areasWithImages = await Promise.all(
+        areaResponse.data.map(async area => {
+          if (area.layoutImagePath) return area;
+          try {
+            const photos = await getProjectAreaPhotos(projectId, area.areaId);
+            return {
+              ...area,
+              layoutImagePath:
+                photos.data?.[0]?.downloadUrl || photos.data?.[0]?.filePath,
+            };
+          } catch {
+            return area;
+          }
+        }),
+      );
+      setAreas(areasWithImages);
     } catch (requestError) {
       setError(
         getApiErrorMessage(requestError, 'Could not load project details.'),

@@ -903,7 +903,7 @@ function AreaRow({
           onChangeText={onChangeName}
         />
       </Field>
-      <Field label="Drawing (Image / PDF)">
+      <Field label="Area Image (JPG, PNG, WebP; max 10 MB)">
         <FileUploadButton fileName={area.fileName} onPick={onPickFile} />
       </Field>
     </Animated.View>
@@ -920,7 +920,7 @@ function FileUploadButton({fileName, onPick}: {fileName: string; onPick: (file: 
         <input
           id={inputId}
           type="file"
-          accept="image/*,application/pdf"
+          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
           style={{display: 'none'}}
           onChange={(e: any) => {
             const f = e.target.files?.[0];

@@ -321,8 +321,10 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import NewProjectModal from '../components/NewProjectModal';
+import ProjectDetailModal from '../components/ProjectDetailModal';
 import StatCard from '../components/StatCard';
-import {getProjects, createProject, addProjectArea} from '../api/projects';
+import {getProjects, createProject, addProjectArea, updateProject} from '../api/projects';
+import {getApiErrorMessage} from '../api/errors';
 
 const STATUS_COLORS: Record<string, {bg: string; text: string}> = {
   Pending: {bg: '#fdf1e0', text: '#b8770a'},
@@ -353,6 +355,8 @@ export default function DashboardScreen({
   const [creating, setCreating] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [projects, setProjects] = useState<any[]>([]);
+  const [selectedProject, setSelectedProject] = useState<any | null>(null);
+  const [savingProject, setSavingProject] = useState(false);
 
   const bannerOpacity = useRef(new Animated.Value(0)).current;
   const bannerY = useRef(new Animated.Value(-12)).current;
@@ -437,14 +441,14 @@ export default function DashboardScreen({
         await addProjectArea(projectId, area.name, area.file);
       } catch (err) {
         console.error('Failed to add area', area.name, err);
-        failedAreas.push(area.name);
+        failedAreas.push(`${area.name}: ${getApiErrorMessage(err, 'image upload failed')}`);
       }
     }
 
     if (failedAreas.length > 0) {
       Alert.alert(
         'Project created',
-        `Project was created, but these areas could not be added: ${failedAreas.join(', ')}`,
+        `Project was created, but these areas could not be saved with their images:\n${failedAreas.join('\n')}`,
       );
     }
 
@@ -457,6 +461,32 @@ export default function DashboardScreen({
     setCreating(false);
   }
 };
+
+  const handleSaveProject = async (data: {
+    projectName: string;
+    sector: string;
+    jobNo: string;
+    location: string;
+    vesselOrSiteName: string;
+    assignedSurveyorId: string;
+    assignedQcId: string;
+    assignedClientId: string;
+    status: string;
+  }) => {
+    if (!selectedProject) return;
+    const projectId = selectedProject.id || selectedProject.projectId;
+    setSavingProject(true);
+    try {
+      await updateProject(projectId, data);
+      setSelectedProject(null);
+      await loadProjects();
+    } catch (err: any) {
+      const errData = err?.response?.data;
+      Alert.alert('Error', errData?.error || errData?.message || 'Could not save project changes');
+    } finally {
+      setSavingProject(false);
+    }
+  };
 
   return (
     <ScrollView
@@ -531,7 +561,11 @@ export default function DashboardScreen({
                 const status = statusOf(project);
                 const statusStyle = STATUS_COLORS[status] ?? STATUS_COLORS.Pending;
                 return (
-                  <View key={project.id} style={styles.projectRow}>
+                  <TouchableOpacity
+                    key={project.id}
+                    style={styles.projectRow}
+                    onPress={() => setSelectedProject(project)}
+                    activeOpacity={0.6}>
                     <View style={styles.projectIconWrap}>
                       <Text style={styles.projectIcon}>📁</Text>
                     </View>
@@ -547,7 +581,7 @@ export default function DashboardScreen({
                         {status}
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               })
             )}
@@ -563,6 +597,18 @@ export default function DashboardScreen({
         clients={clients}
         loading={creating}
         onCreate={handleCreate}
+      />
+
+      <ProjectDetailModal
+        visible={!!selectedProject}
+        project={selectedProject}
+        onClose={() => setSelectedProject(null)}
+        onSave={handleSaveProject}
+        onAreasChanged={loadProjects}
+        surveyors={surveyors}
+        qcUsers={qcUsers}
+        clients={clients}
+        loading={savingProject}
       />
     </ScrollView>
   );

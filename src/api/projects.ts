@@ -21,6 +21,10 @@ export const getAssignmentOptions = () => apiClient.get('/projects/assignment-op
 
 export const getProjects = () => apiClient.get('/projects');
 
+// NEW: fetches the full record for one project (used by the project
+// detail/edit modal) — matches GET /api/projects/{id} confirmed in Swagger.
+export const getProject = (projectId: string) => apiClient.get(`/projects/${projectId}`);
+
 export const createProject = (data: {
   projectName: string;
   sector: string;
@@ -32,18 +36,96 @@ export const createProject = (data: {
   assignedClientId: string;
 }) => apiClient.post('/projects', data);
 
-// TODO: confirm the exact multipart field name backend expects for the drawing
-// (currently sending it as "file" — could be "drawingFile", "image", etc.)
+// NEW: not confirmed on the backend yet — ask backend to add:
+//   PUT /api/projects/{projectId}
+// body: same shape as createProject, plus `status`.
+export const updateProject = (
+  projectId: string,
+  data: {
+    projectName: string;
+    sector: string;
+    jobNo: string;
+    location: string;
+    vesselOrSiteName: string;
+    assignedSurveyorId: string;
+    assignedQcId: string;
+    assignedClientId: string;
+    status: string;
+  },
+) => apiClient.put(`/projects/${projectId}`, data);
+
 export const addProjectArea = (projectId: string, name: string, file: any) => {
-  const formData = new FormData();
-  formData.append('name', name);
-  if (file) {
-    formData.append('file', file);
-  }
-  return apiClient.post(`/projects/${projectId}/areas`, formData, {
-    headers: {'Content-Type': 'multipart/form-data'},
+  const request = apiClient.post(`/projects/${projectId}/areas`, {
+    areaName: name,
+  });
+  return request.then(async response => {
+    if (file && response.data?.id) {
+      try {
+        const photoResponse = await uploadProjectAreaPhoto(
+          projectId,
+          response.data.id,
+          file,
+        );
+        response.data.layoutImagePath =
+          photoResponse.data?.[0]?.downloadUrl || photoResponse.data?.[0]?.filePath;
+      } catch (error: any) {
+        // Area creation is already committed. Preserve its ID so callers can
+        // retry the image upload without trying to create a duplicate area.
+        error.createdArea = response.data;
+        throw error;
+      }
+    }
+    return response;
   });
 };
+
+export const updateProjectArea = (
+  projectId: string,
+  areaId: string,
+  name: string,
+  file?: any,
+) => {
+  const request = apiClient.put(`/projects/${projectId}/areas/${areaId}`, {
+    areaName: name,
+  });
+  return request.then(async response => {
+    if (file) {
+      const photoResponse = await uploadProjectAreaPhoto(projectId, areaId, file);
+      response.data.layoutImagePath =
+        photoResponse.data?.[0]?.downloadUrl || photoResponse.data?.[0]?.filePath;
+    }
+    return response;
+  });
+};
+
+export type ProjectAreaPhoto = {
+  id: string;
+  fileName?: string | null;
+  filePath?: string | null;
+  downloadUrl?: string | null;
+};
+
+export const uploadProjectAreaPhoto = (
+  projectId: string,
+  areaId: string,
+  file: any,
+) => {
+  const formData = new FormData();
+  formData.append('Files', file);
+  return apiClient.post<ProjectAreaPhoto[]>(
+    `/projects/${projectId}/areas/${areaId}/photos`,
+    formData,
+  );
+};
+
+export const getProjectAreaPhotos = (projectId: string, areaId: string) =>
+  apiClient.get<ProjectAreaPhoto[]>(
+    `/projects/${projectId}/areas/${areaId}/photos`,
+  );
+
+// NEW: matches DELETE /api/projects/{projectId}/areas/{areaId}
+export const deleteProjectArea = (projectId: string, areaId: string) =>
+  apiClient.delete(`/projects/${projectId}/areas/${areaId}`);
 
 export type SurveyorProjectSummary = {
   projectId: string;

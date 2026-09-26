@@ -11,6 +11,7 @@ import {getApiErrorMessage} from '../api/errors';
 import {
   AreaEquipment,
   getSurveyorArea,
+  getProjectAreaPhotos,
   SurveyorAreaDetails,
 } from '../api/projects';
 import AuthenticatedImage from '../components/AuthenticatedImage';
@@ -34,8 +35,16 @@ export default function SurveyorAreaDetailsScreen({
     setLoading(true);
     setError('');
     try {
-      const response = await getSurveyorArea(projectId, areaId);
-      setArea(response.data);
+      const [response, photosResponse] = await Promise.all([
+        getSurveyorArea(projectId, areaId),
+        getProjectAreaPhotos(projectId, areaId).catch(() => null),
+      ]);
+      const firstPhoto = photosResponse?.data?.[0];
+      setArea({
+        ...response.data,
+        layoutImagePath:
+          response.data.layoutImagePath || firstPhoto?.downloadUrl || firstPhoto?.filePath,
+      });
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, 'Could not load this area.'));
     } finally {
