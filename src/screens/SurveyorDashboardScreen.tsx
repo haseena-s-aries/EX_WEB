@@ -11,7 +11,6 @@ import {
 import {getApiErrorMessage} from '../api/errors';
 import {
   getSurveyorProjects,
-  projectStatusLabel,
   SurveyorProjectSummary,
 } from '../api/projects';
 
@@ -21,7 +20,7 @@ type Props = {
 };
 
 const projectStatus = (project: SurveyorProjectSummary) =>
-  projectStatusLabel(project.status);
+  project.status || 'Assigned';
 
 const STATUS_BADGES: Record<string, {backgroundColor: string; color: string}> = {
   assigned: {backgroundColor: '#f0eeff', color: '#718be8'},

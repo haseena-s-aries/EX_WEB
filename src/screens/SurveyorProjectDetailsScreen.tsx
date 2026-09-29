@@ -12,7 +12,6 @@ import {
   getSurveyorProject,
   getSurveyorProjectAreas,
   getProjectAreaPhotos,
-  projectStatusLabel,
   SurveyorAreaSummary,
   SurveyorProjectDetails,
 } from '../api/projects';
@@ -125,8 +124,8 @@ export default function SurveyorProjectDetailsScreen({
             <Text style={styles.headerMetaText}>Created {formatDate(project.createdDate)}</Text>
           </View>
         </View>
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>{projectStatusLabel(project.status)}</Text>
+        <View style={[styles.statusBadge, {backgroundColor: statusBadge.backgroundColor}]}>
+          <Text style={[styles.statusText, {color: statusBadge.color}]}>{status}</Text>
         </View>
       </View>
 

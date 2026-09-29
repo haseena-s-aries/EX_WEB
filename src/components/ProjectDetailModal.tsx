@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   Modal,
   View,
@@ -17,8 +17,6 @@ import {
   addProjectArea,
   updateProjectArea,
   deleteProjectArea,
-  normalizeProjectStatus,
-  ProjectStatus,
 } from '../api/projects';
 import {getApiErrorMessage} from '../api/errors';
 import AuthenticatedImage from './AuthenticatedImage';
@@ -38,7 +36,7 @@ type Props = {
     assignedSurveyorId: string;
     assignedQcId: string;
     assignedClientId: string;
-    status: ProjectStatus;
+    status: string;
   }) => void;
   onAreasChanged?: () => void;
   surveyors: UserOption[];
@@ -100,9 +98,9 @@ const emptyAreaRow = (): AreaRow => ({
 function confirmAction(message: string, confirmLabel: string, onConfirm: () => void) {
   if (Platform.OS === 'web') {
     // eslint-disable-next-line no-alert
-  if ((globalThis as any).confirm(message)) {
-  onConfirm();
-}
+    if (window.confirm(message)) onConfirm();
+    return;
+  }
   Alert.alert('Are you sure?', message, [
     {text: 'Cancel', style: 'cancel'},
     {text: confirmLabel, style: 'destructive', onPress: onConfirm},
@@ -131,14 +129,13 @@ export default function ProjectDetailModal({
   const [surveyorId, setSurveyorId] = useState('');
   const [qcId, setQcId] = useState('');
   const [clientId, setClientId] = useState('');
-  const [status, setStatus] = useState<ProjectStatus>('Pending');
+  const [status, setStatus] = useState('Pending');
   const [areas, setAreas] = useState<AreaRow[]>([]);
 
   const scale = useRef(new Animated.Value(0.9)).current;
   const opacity = useRef(new Animated.Value(0)).current;
-  const projectId = project?.id || project?.projectId;
 
-  const applyDetail = useCallback((detail: any) => {
+  const applyDetail = (detail: any) => {
     setProjectName(pick(detail, 'projectName'));
     setSector(pick(detail, 'sector') || SECTOR_OPTIONS[0]);
     setJobNo(pick(detail, 'jobNo', 'jobNumber'));
@@ -147,7 +144,7 @@ export default function ProjectDetailModal({
     setSurveyorId(pick(detail, 'assignedSurveyorId', 'surveyorId'));
     setQcId(pick(detail, 'assignedQcId', 'qcId'));
     setClientId(pick(detail, 'assignedClientId', 'clientId'));
-    setStatus(normalizeProjectStatus(pick(detail, 'status', 'projectStatus')));
+    setStatus(pick(detail, 'status', 'projectStatus') || 'Pending');
 
     const rawAreas: any[] = detail.areas || [];
     setAreas(
@@ -166,7 +163,9 @@ export default function ProjectDetailModal({
         isNew: false,
       })),
     );
-  }, []);
+  };
+
+  const projectId = project?.id || project?.projectId;
 
   useEffect(() => {
     if (visible && project) {
@@ -191,7 +190,7 @@ export default function ProjectDetailModal({
         Animated.timing(opacity, {toValue: 1, duration: 220, useNativeDriver: Platform.OS !== 'web'}),
       ]).start();
     }
-  }, [applyDetail, opacity, project, projectId, scale, visible]);
+  }, [visible, project]);
 
   if (!project) return null;
 
@@ -303,7 +302,7 @@ export default function ProjectDetailModal({
     surveyors.find(s => s.id === surveyorId)?.displayName || (surveyorId ? surveyorId : '—');
   const qcName = qcUsers.find(u => u.id === qcId)?.displayName || (qcId ? qcId : '—');
   const clientName = clients.find(c => c.id === clientId)?.displayName || (clientId ? clientId : '—');
-  const statusMeta = STATUS_OPTIONS.find(s => s.value === status) ?? STATUS_OPTIONS[0];
+  const statusMeta = STATUS_OPTIONS.find(s => s.label === status) ?? STATUS_OPTIONS[0];
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -380,11 +379,11 @@ export default function ProjectDetailModal({
             {editing ? (
               <View style={styles.statusRow}>
                 {STATUS_OPTIONS.map(opt => {
-                  const active = status === opt.value;
+                  const active = status === opt.label;
                   return (
                     <TouchableOpacity
                       key={opt.label}
-                      onPress={() => setStatus(opt.value)}
+                      onPress={() => setStatus(opt.label)}
                       style={[
                         styles.statusChip,
                         {borderColor: active ? opt.color : '#e5e9f6'},

@@ -323,14 +323,7 @@ import {
 import NewProjectModal from '../components/NewProjectModal';
 import ProjectDetailModal from '../components/ProjectDetailModal';
 import StatCard from '../components/StatCard';
-import {
-  getProjects,
-  createProject,
-  addProjectArea,
-  updateProject,
-  projectStatusLabel,
-  ProjectStatus,
-} from '../api/projects';
+import {getProjects, createProject, addProjectArea, updateProject} from '../api/projects';
 import {getApiErrorMessage} from '../api/errors';
 
 const STATUS_COLORS: Record<string, {bg: string; text: string}> = {
@@ -399,7 +392,9 @@ export default function DashboardScreen({
     ]).start();
   }, [bannerOpacity, bannerY]);
 
-  const statusOf = (p: any) => projectStatusLabel(p.status ?? p.projectStatus);
+  // TODO: confirm the exact status field name/values with backend —
+  // assuming `status` for now, defaulting to "Pending" if missing.
+  const statusOf = (p: any) => p.status || p.projectStatus || 'Pending';
 
   const stats = [
     {label: 'Total Projects', value: projects.length, icon: '📁', color: '#8fa7f8', bg: '#f0eeff'},
@@ -476,7 +471,7 @@ export default function DashboardScreen({
     assignedSurveyorId: string;
     assignedQcId: string;
     assignedClientId: string;
-    status: ProjectStatus;
+    status: string;
   }) => {
     if (!selectedProject) return;
     const projectId = selectedProject.id || selectedProject.projectId;
