@@ -29,6 +29,15 @@ const formatDate = (value: string) => {
   return Number.isNaN(date.getTime()) ? 'Not set' : date.toLocaleDateString();
 };
 
+const STATUS_BADGES: Record<string, {backgroundColor: string; color: string}> = {
+  assigned: {backgroundColor: '#f0eeff', color: '#718be8'},
+  pending: {backgroundColor: '#fff0d7', color: '#a75a0b'},
+  active: {backgroundColor: '#f0eeff', color: '#718be8'},
+  'in progress': {backgroundColor: '#f1eaf3', color: '#8053a6'},
+  completed: {backgroundColor: '#e5eef7', color: '#3b68aa'},
+  'on hold': {backgroundColor: '#fde8e2', color: '#ba4e3c'},
+};
+
 export default function SurveyorProjectDetailsScreen({
   projectId,
   onBack,
@@ -97,6 +106,9 @@ export default function SurveyorProjectDetailsScreen({
       </View>
     );
   }
+
+  const status = project.status || 'Assigned';
+  const statusBadge = STATUS_BADGES[status.toLowerCase()] || STATUS_BADGES.assigned;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -203,58 +215,58 @@ function TeamMember({role, name}: {role: string; name?: string | null}) {
 function PageState({message}: {message: string}) {
   return (
     <View style={styles.fullState}>
-      <ActivityIndicator color="#3f47d6" size="large" />
+      <ActivityIndicator color="#8fa7f8" size="large" />
       <Text style={styles.stateMessage}>{message}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {flex: 1, backgroundColor: '#f4f6fb'},
+  screen: {flex: 1, backgroundColor: '#f7f9ff'},
   content: {padding: 24, paddingBottom: 48, maxWidth: 1180, width: '100%', alignSelf: 'center'},
   backButton: {alignSelf: 'flex-start', paddingVertical: 8, marginBottom: 8},
-  backText: {color: '#3f47d6', fontWeight: '800', fontSize: 13},
-  header: {backgroundColor: '#20255f', minHeight: 155, borderRadius: 8, padding: 24, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14},
+  backText: {color: '#8fa7f8', fontWeight: '800', fontSize: 13},
+  header: {backgroundColor: '#242d52', minHeight: 155, borderRadius: 16, padding: 24, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14},
   headerMain: {flex: 1},
-  eyebrow: {fontSize: 10, color: '#afb5ff', fontWeight: '800'},
+  eyebrow: {fontSize: 10, color: '#b8a5f8', fontWeight: '800', letterSpacing: 1.1},
   title: {color: '#fff', fontWeight: '800', fontSize: 25, marginTop: 8},
   headerMeta: {flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 15},
-  headerMetaText: {fontSize: 12, color: '#d4d7ef', fontWeight: '600'},
-  statusBadge: {backgroundColor: '#dff5e8', borderRadius: 6, paddingHorizontal: 11, paddingVertical: 7},
-  statusText: {color: '#207546', fontSize: 11, fontWeight: '800'},
+  headerMetaText: {fontSize: 12, color: '#e3eaff', fontWeight: '600'},
+  statusBadge: {borderRadius: 16, paddingHorizontal: 11, paddingVertical: 7},
+  statusText: {fontSize: 11, fontWeight: '800'},
   twoColumn: {flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 16},
-  cardWide: {flex: 2, minWidth: 290, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e4e7ef', padding: 20},
-  cardNarrow: {flex: 1, minWidth: 250, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e4e7ef', padding: 20},
-  cardTitle: {fontSize: 16, color: '#24284e', fontWeight: '800', marginBottom: 17},
+  cardWide: {flex: 2, minWidth: 290, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e9f6', padding: 20},
+  cardNarrow: {flex: 1, minWidth: 250, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e9f6', padding: 20},
+  cardTitle: {fontSize: 16, color: '#242d52', fontWeight: '800', marginBottom: 17},
   detailsGrid: {flexDirection: 'row', flexWrap: 'wrap', rowGap: 19},
   detailItem: {width: '50%', minWidth: 150, paddingRight: 15},
   detailLabel: {fontSize: 10, fontWeight: '800', color: '#9296a6', textTransform: 'uppercase'},
   detailValue: {fontSize: 13, fontWeight: '700', color: '#3b3f59', marginTop: 5},
   teamRow: {flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#eef0f5'},
-  avatar: {width: 35, height: 35, borderRadius: 18, backgroundColor: '#e9ebff', alignItems: 'center', justifyContent: 'center'},
-  avatarText: {color: '#3f47d6', fontWeight: '800', fontSize: 13},
+  avatar: {width: 35, height: 35, borderRadius: 18, backgroundColor: '#f0eeff', alignItems: 'center', justifyContent: 'center'},
+  avatarText: {color: '#8fa7f8', fontWeight: '800', fontSize: 13},
   teamCopy: {flex: 1, marginLeft: 10},
   teamRole: {fontSize: 9, fontWeight: '800', color: '#979baa', textTransform: 'uppercase'},
   teamName: {fontSize: 13, color: '#343851', fontWeight: '700', marginTop: 3},
   sectionHeader: {marginTop: 28, marginBottom: 13, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14},
-  sectionTitle: {fontSize: 18, color: '#1d2148', fontWeight: '800'},
+  sectionTitle: {fontSize: 18, color: '#242d52', fontWeight: '800'},
   sectionSubtitle: {fontSize: 12, color: '#838798', marginTop: 4},
   areaCount: {fontSize: 12, color: '#707589', fontWeight: '700'},
   areaGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 14},
-  areaCard: {flexGrow: 1, flexBasis: 280, maxWidth: 380, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e3e6ee', borderRadius: 8, overflow: 'hidden'},
+  areaCard: {flexGrow: 1, flexBasis: 280, maxWidth: 380, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e9f6', borderRadius: 8, overflow: 'hidden'},
   thumbnail: {width: '100%', height: 132},
   areaBody: {padding: 16},
-  areaName: {fontSize: 15, color: '#272b4d', fontWeight: '800'},
+  areaName: {fontSize: 15, color: '#242d52', fontWeight: '800'},
   areaStats: {fontSize: 11, color: '#818697', marginTop: 7},
-  viewAreaButton: {marginTop: 15, minHeight: 38, borderRadius: 7, backgroundColor: '#3f47d6', alignItems: 'center', justifyContent: 'center'},
-  viewAreaText: {fontSize: 12, color: '#fff', fontWeight: '800'},
-  emptyAreas: {minHeight: 170, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e4e7ef', alignItems: 'center', justifyContent: 'center', padding: 24},
-  fullState: {flex: 1, minHeight: 400, backgroundColor: '#f4f6fb', alignItems: 'center', justifyContent: 'center', padding: 28},
-  stateTitle: {fontSize: 17, color: '#292d50', fontWeight: '800'},
+  viewAreaButton: {marginTop: 15, minHeight: 38, borderRadius: 10, backgroundColor: '#b8a5f8', alignItems: 'center', justifyContent: 'center'},
+  viewAreaText: {fontSize: 12, color: '#242d52', fontWeight: '800'},
+  emptyAreas: {minHeight: 170, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e9f6', alignItems: 'center', justifyContent: 'center', padding: 24},
+  fullState: {flex: 1, minHeight: 400, backgroundColor: '#f7f9ff', alignItems: 'center', justifyContent: 'center', padding: 28},
+  stateTitle: {fontSize: 17, color: '#242d52', fontWeight: '800'},
   stateMessage: {fontSize: 13, color: '#7d8192', lineHeight: 19, textAlign: 'center', marginTop: 10},
   stateActions: {flexDirection: 'row', gap: 10, marginTop: 18},
-  primaryButton: {backgroundColor: '#3f47d6', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 7},
-  primaryButtonText: {fontSize: 12, color: '#fff', fontWeight: '800'},
+  primaryButton: {backgroundColor: '#b8a5f8', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10},
+  primaryButtonText: {fontSize: 12, color: '#242d52', fontWeight: '800'},
   secondaryButton: {backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9dce8', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 7},
   secondaryButtonText: {fontSize: 12, color: '#424760', fontWeight: '800'},
 });

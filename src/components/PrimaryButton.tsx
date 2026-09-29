@@ -49,7 +49,7 @@ export default function PrimaryButton({
           (disabled || loading) && styles.buttonDisabled,
         ]}>
         {loading ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color="#242d52" />
         ) : (
           <Text style={styles.buttonText}>{title}</Text>
         )}
@@ -60,15 +60,15 @@ export default function PrimaryButton({
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#1a237e',
-    borderRadius: 12,
-    paddingVertical: 15,
+    backgroundColor: '#b8a5f8',
+    borderRadius: 13,
+    paddingVertical: 16,
     alignItems: 'center',
     marginTop: 6,
   },
   buttonDisabled: {opacity: 0.6},
   buttonText: {
-    color: '#fff',
+    color: '#242d52',
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.3,

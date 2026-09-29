@@ -9,10 +9,10 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  {key: 'Dashboard', label: 'Dashboard', icon: '🏠'},
-  {key: 'UserManagement', label: 'User Management', icon: '👥', adminOnly: true},
-  {key: 'Projects', label: 'Projects', icon: '📁'},
-  {key: 'Reports', label: 'Reports', icon: '📊'},
+  {key: 'Dashboard', label: 'Dashboard', icon: '⌂'},
+  {key: 'UserManagement', label: 'User Management', icon: '◎', adminOnly: true},
+  {key: 'Projects', label: 'Projects', icon: '▦'},
+  {key: 'Reports', label: 'Reports', icon: '↗'},
 ];
 
 type Props = {
@@ -38,7 +38,7 @@ export default function Sidebar({active, userName, userRole, onNavigate, onLogou
         </View>
       </View>
 
-      <Text style={styles.sectionLabel}>NAVIGATION</Text>
+      <Text style={styles.sectionLabel}>WORKSPACE</Text>
 
       <View style={styles.navList}>
         {NAV_ITEMS.filter(item => !item.adminOnly || isAdminOrManager).map(item => {
@@ -79,64 +79,66 @@ export default function Sidebar({active, userName, userRole, onNavigate, onLogou
 
 const styles = StyleSheet.create({
   sidebar: {
-    width: 240,
-    backgroundColor: '#12143d',
-    paddingVertical: 24,
-    paddingHorizontal: 16,
+    width: 264,
+    backgroundColor: '#242d52',
+    borderRightWidth: 1,
+    borderRightColor: '#3e4974',
+    paddingVertical: 28,
+    paddingHorizontal: 20,
     justifyContent: 'space-between',
     minHeight: '100%' as any,
   },
-  logoRow: {flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 30},
+  logoRow: {flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 42},
   logoCircle: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: '#3f47d6',
+    backgroundColor: '#b8a5f8',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoText: {color: '#fff', fontWeight: '800', fontSize: 14},
-  brand: {color: '#fff', fontSize: 15, fontWeight: '700'},
-  brandSub: {color: '#8b8fc2', fontSize: 11},
+  logoText: {color: '#242d52', fontWeight: '900', fontSize: 14},
+  brand: {color: '#fff', fontSize: 15, fontWeight: '800'},
+  brandSub: {color: '#c9cded', fontSize: 10, letterSpacing: 0.7, marginTop: 2},
   sectionLabel: {
-    color: '#6b6fa0',
+    color: '#aeb9d6',
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
-    marginBottom: 10,
+    marginBottom: 13,
   },
-  navList: {gap: 4, flex: 1},
+  navList: {gap: 6, flex: 1},
   navItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 11,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+    paddingVertical: 13,
+    paddingHorizontal: 13,
+    borderRadius: 11,
   },
-  navItemActive: {backgroundColor: '#3f47d6'},
-  navIcon: {fontSize: 15},
-  navLabel: {color: '#b3b6e0', fontSize: 13.5, fontWeight: '600'},
-  navLabelActive: {color: '#fff'},
-  footer: {borderTopWidth: 1, borderTopColor: '#2a2d63', paddingTop: 16, marginTop: 16},
+  navItemActive: {backgroundColor: '#b8a5f8'},
+  navIcon: {fontSize: 17, color: '#c9cded', width: 22, textAlign: 'center'},
+  navLabel: {color: '#e3eaff', fontSize: 13, fontWeight: '600'},
+  navLabelActive: {color: '#242d52', fontWeight: '800'},
+  footer: {borderTopWidth: 1, borderTopColor: '#3e4974', paddingTop: 18, marginTop: 16},
   userRow: {flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12},
   avatar: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#3f47d6',
+    backgroundColor: '#354574',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: {color: '#fff', fontWeight: '700', fontSize: 13},
-  userName: {color: '#fff', fontSize: 13, fontWeight: '700'},
-  userRole: {color: '#8b8fc2', fontSize: 11},
+  avatarText: {color: '#b8a5f8', fontWeight: '800', fontSize: 13},
+  userName: {color: '#fff', fontSize: 13, fontWeight: '800'},
+  userRole: {color: '#c9cded', fontSize: 11},
   logoutBtn: {
     borderWidth: 1.5,
-    borderColor: '#3a3d78',
-    borderRadius: 8,
+    borderColor: '#485780',
+    borderRadius: 10,
     paddingVertical: 8,
     alignItems: 'center',
   },
-  logoutText: {color: '#b3b6e0', fontSize: 12.5, fontWeight: '600'},
+  logoutText: {color: '#e3eaff', fontSize: 12.5, fontWeight: '700'},
 });

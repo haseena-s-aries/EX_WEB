@@ -37,16 +37,16 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1.5,
-    borderColor: '#e1e4ee',
+    borderColor: '#dce5dd',
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#1a1d2b',
+    color: '#252f50',
     backgroundColor: '#f8f9fc',
   },
   inputFocused: {
-    borderColor: '#1a237e',
+    borderColor: '#718be8',
     backgroundColor: '#ffffff',
   },
 });

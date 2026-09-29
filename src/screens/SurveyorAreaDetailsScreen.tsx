@@ -535,12 +535,12 @@ function PageState({loading, message}: {loading?: boolean; message: string}) {
 }
 
 const styles = StyleSheet.create({
-  screen: {flex: 1, backgroundColor: '#f4f6fb'},
+  screen: {flex: 1, backgroundColor: '#f7f9ff'},
   content: {padding: 24, paddingBottom: 48, maxWidth: 1180, width: '100%', alignSelf: 'center'},
   backButton: {alignSelf: 'flex-start', paddingVertical: 8, marginBottom: 8},
-  backText: {fontSize: 13, color: '#3f47d6', fontWeight: '800'},
-  header: {minHeight: 125, backgroundColor: '#20255f', borderRadius: 8, padding: 23, justifyContent: 'center'},
-  eyebrow: {fontSize: 10, color: '#afb5ff', fontWeight: '800'},
+  backText: {fontSize: 13, color: '#8fa7f8', fontWeight: '800'},
+  header: {minHeight: 125, backgroundColor: '#242d52', borderRadius: 16, padding: 23, justifyContent: 'center'},
+  eyebrow: {fontSize: 10, color: '#b8a5f8', fontWeight: '800', letterSpacing: 1.1},
   title: {fontSize: 24, color: '#fff', fontWeight: '800', marginTop: 7},
   subtitle: {fontSize: 12, color: '#d0d4e9', marginTop: 7},
   layoutCard: {marginTop: 16, padding: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e3e6ee', borderRadius: 8},
@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
   pinSelected: {backgroundColor: '#3038bd', borderWidth: 3, width: 36, height: 36, marginLeft: -18, marginTop: -18, borderRadius: 18},
   pinText: {fontSize: 11, color: '#fff', fontWeight: '800'},
   sectionHeader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 27, marginBottom: 12},
-  sectionTitle: {fontSize: 18, color: '#1f2349', fontWeight: '800'},
+  sectionTitle: {fontSize: 18, color: '#242d52', fontWeight: '800'},
   sectionCount: {fontSize: 12, color: '#73788c', fontWeight: '700'},
   table: {minWidth: 955, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e1e4ed', borderRadius: 8, overflow: 'hidden'},
   tableHeader: {flexDirection: 'row', backgroundColor: '#f0f2f8'},
@@ -608,8 +608,8 @@ const styles = StyleSheet.create({
   stateTitle: {fontSize: 17, color: '#292d50', fontWeight: '800'},
   stateMessage: {fontSize: 13, color: '#7d8192', lineHeight: 19, textAlign: 'center', marginTop: 10},
   stateActions: {flexDirection: 'row', gap: 10, marginTop: 18},
-  primaryButton: {backgroundColor: '#3f47d6', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 7},
-  primaryButtonText: {fontSize: 12, color: '#fff', fontWeight: '800'},
+  primaryButton: {backgroundColor: '#b8a5f8', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10},
+  primaryButtonText: {fontSize: 12, color: '#242d52', fontWeight: '800'},
   secondaryButton: {backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9dce8', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 7},
   secondaryButtonText: {fontSize: 12, color: '#424760', fontWeight: '800'},
 });

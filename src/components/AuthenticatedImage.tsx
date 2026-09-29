@@ -75,7 +75,7 @@ export default function AuthenticatedImage({
   if (loading) {
     return (
       <View style={[styles.placeholder, style]}>
-        <ActivityIndicator color="#3f47d6" />
+        <ActivityIndicator color="#8fa7f8" />
       </View>
     );
   }
