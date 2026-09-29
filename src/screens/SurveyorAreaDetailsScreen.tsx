@@ -59,7 +59,7 @@ export default function SurveyorAreaDetailsScreen({
   if (loading) {
     return (
       <View style={styles.fullState}>
-        <ActivityIndicator color="#3f47d6" size="large" />
+        <ActivityIndicator color="#8fa7f8" size="large" />
         <Text style={styles.stateMessage}>Loading area layout...</Text>
       </View>
     );
@@ -179,44 +179,44 @@ function EquipmentValue({label, value}: {label: string; value?: string | null}) 
 }
 
 const styles = StyleSheet.create({
-  screen: {flex: 1, backgroundColor: '#f4f6fb'},
+  screen: {flex: 1, backgroundColor: '#f7f9ff'},
   content: {padding: 24, paddingBottom: 48, maxWidth: 1180, width: '100%', alignSelf: 'center'},
   backButton: {alignSelf: 'flex-start', paddingVertical: 8, marginBottom: 8},
-  backText: {fontSize: 13, color: '#3f47d6', fontWeight: '800'},
-  header: {minHeight: 125, backgroundColor: '#20255f', borderRadius: 8, padding: 23, justifyContent: 'center'},
-  eyebrow: {fontSize: 10, color: '#afb5ff', fontWeight: '800'},
+  backText: {fontSize: 13, color: '#8fa7f8', fontWeight: '800'},
+  header: {minHeight: 125, backgroundColor: '#242d52', borderRadius: 16, padding: 23, justifyContent: 'center'},
+  eyebrow: {fontSize: 10, color: '#b8a5f8', fontWeight: '800', letterSpacing: 1.1},
   title: {fontSize: 24, color: '#fff', fontWeight: '800', marginTop: 7},
-  subtitle: {fontSize: 12, color: '#d0d4e9', marginTop: 7},
-  layoutCard: {marginTop: 16, padding: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e3e6ee', borderRadius: 8},
+  subtitle: {fontSize: 12, color: '#e3eaff', marginTop: 7},
+  layoutCard: {marginTop: 16, padding: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e9f6', borderRadius: 8},
   cardHeader: {flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 14},
-  cardTitle: {fontSize: 16, fontWeight: '800', color: '#25294f'},
+  cardTitle: {fontSize: 16, fontWeight: '800', color: '#242d52'},
   cardHint: {fontSize: 11, color: '#898d9e'},
   layoutCanvas: {position: 'relative', width: '100%', aspectRatio: 16 / 9, maxHeight: 560, minHeight: 230, overflow: 'hidden', borderRadius: 6, backgroundColor: '#eef0f6'},
   layoutImage: {width: '100%', height: '100%'},
   pin: {position: 'absolute', width: 26, height: 26, marginLeft: -13, marginTop: -13, borderRadius: 13, backgroundColor: '#e63f4f', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center'},
   pinText: {fontSize: 10, color: '#fff', fontWeight: '800'},
   sectionHeader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 27, marginBottom: 12},
-  sectionTitle: {fontSize: 18, color: '#1f2349', fontWeight: '800'},
+  sectionTitle: {fontSize: 18, color: '#242d52', fontWeight: '800'},
   sectionCount: {fontSize: 12, color: '#73788c', fontWeight: '700'},
   equipmentList: {gap: 10},
-  equipmentCard: {flexDirection: 'row', gap: 13, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e3e6ee', borderRadius: 8, padding: 16},
+  equipmentCard: {flexDirection: 'row', gap: 13, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e9f6', borderRadius: 8, padding: 16},
   equipmentIndex: {width: 31, height: 31, borderRadius: 16, backgroundColor: '#e63f4f', alignItems: 'center', justifyContent: 'center'},
   equipmentIndexText: {fontSize: 11, color: '#fff', fontWeight: '800'},
   equipmentContent: {flex: 1, minWidth: 0},
   equipmentTop: {flexDirection: 'row', flexWrap: 'wrap', gap: 9, alignItems: 'center'},
-  equipmentTag: {fontSize: 15, color: '#292d4e', fontWeight: '800'},
-  equipmentType: {fontSize: 10, color: '#3f47d6', fontWeight: '800', backgroundColor: '#ebedff', borderRadius: 5, paddingHorizontal: 8, paddingVertical: 4},
+  equipmentTag: {fontSize: 15, color: '#242d52', fontWeight: '800'},
+  equipmentType: {fontSize: 10, color: '#8fa7f8', fontWeight: '800', backgroundColor: '#f0eeff', borderRadius: 5, paddingHorizontal: 8, paddingVertical: 4},
   equipmentGrid: {flexDirection: 'row', flexWrap: 'wrap', marginTop: 13, rowGap: 12},
   equipmentValue: {width: '25%', minWidth: 130, paddingRight: 12},
   valueLabel: {fontSize: 9, color: '#9599a9', fontWeight: '800', textTransform: 'uppercase'},
   valueText: {fontSize: 12, color: '#494d63', fontWeight: '600', marginTop: 4},
-  emptyState: {minHeight: 160, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e3e6ee', borderRadius: 8, alignItems: 'center', justifyContent: 'center', padding: 24},
-  fullState: {flex: 1, minHeight: 400, backgroundColor: '#f4f6fb', alignItems: 'center', justifyContent: 'center', padding: 28},
-  stateTitle: {fontSize: 17, color: '#292d50', fontWeight: '800'},
+  emptyState: {minHeight: 160, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e9f6', borderRadius: 8, alignItems: 'center', justifyContent: 'center', padding: 24},
+  fullState: {flex: 1, minHeight: 400, backgroundColor: '#f7f9ff', alignItems: 'center', justifyContent: 'center', padding: 28},
+  stateTitle: {fontSize: 17, color: '#242d52', fontWeight: '800'},
   stateMessage: {fontSize: 13, color: '#7d8192', lineHeight: 19, textAlign: 'center', marginTop: 10},
   stateActions: {flexDirection: 'row', gap: 10, marginTop: 18},
-  primaryButton: {backgroundColor: '#3f47d6', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 7},
-  primaryButtonText: {fontSize: 12, color: '#fff', fontWeight: '800'},
+  primaryButton: {backgroundColor: '#b8a5f8', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10},
+  primaryButtonText: {fontSize: 12, color: '#242d52', fontWeight: '800'},
   secondaryButton: {backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9dce8', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 7},
   secondaryButtonText: {fontSize: 12, color: '#424760', fontWeight: '800'},
 });

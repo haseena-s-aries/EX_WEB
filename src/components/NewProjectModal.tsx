@@ -36,11 +36,11 @@
 // };
 
 // const STATUS_OPTIONS = [
-//   {label: 'Pending', icon: '⏳', color: '#b8770a', bg: '#fdf1e0'},
-//   {label: 'Active', icon: '🟢', color: '#1f8a4c', bg: '#e2f7ec'},
-//   {label: 'In Progress', icon: '⚙️', color: '#5a3fd6', bg: '#eae7fc'},
-//   {label: 'Completed', icon: '✅', color: '#2a5fb0', bg: '#e6f0fb'},
-//   {label: 'On Hold', icon: '⛔', color: '#c93838', bg: '#fde6e6'},
+//   {label: 'Pending', icon: '⏳', color: '#a75a0b', bg: '#fff0d7'},
+//   {label: 'Active', icon: '🟢', color: '#718be8', bg: '#f0eeff'},
+//   {label: 'In Progress', icon: '⚙️', color: '#8053a6', bg: '#f1eaf3'},
+//   {label: 'Completed', icon: '✅', color: '#3b68aa', bg: '#e5eef7'},
+//   {label: 'On Hold', icon: '⛔', color: '#ba4e3c', bg: '#fde8e2'},
 // ];
 
 // const SECTOR_OPTIONS = [
@@ -165,7 +165,7 @@
 //           </View>
 
 //           <ScrollView contentContainerStyle={styles.body} style={styles.bodyScroll}>
-//             <StepHeader index={1} color="#3f47d6" icon="📁" title="Project Information" />
+//             <StepHeader index={1} color="#8fa7f8" icon="📁" title="Project Information" />
 
 //             <Field label="Project Name" required>
 //               <TextInput
@@ -218,7 +218,7 @@
 //               </View>
 //             </View>
 
-//             <StepHeader index={2} color="#8b3fd6" icon="👥" title="Team Assignment" />
+//             <StepHeader index={2} color="#8053a6" icon="👥" title="Team Assignment" />
 
 //             <View style={styles.row}>
 //               <View style={styles.third}>
@@ -253,7 +253,7 @@
 //               </View>
 //             </View>
 
-//             <StepHeader index={3} color="#1f8a8a" icon="🚦" title="Project Status" />
+//             <StepHeader index={3} color="#8fa7f8" icon="🚦" title="Project Status" />
 
 //             <View style={styles.statusRow}>
 //               {STATUS_OPTIONS.map(s => (
@@ -379,7 +379,7 @@
 //         const next = normalized[(idx + 1) % normalized.length];
 //         if (next) onChange(next.value);
 //       }}>
-//       <Text style={{color: value ? '#1a1d2b' : '#9aa0b4'}}>{currentLabel} ▾</Text>
+//       <Text style={{color: value ? '#252f50' : '#9aa0b4'}}>{currentLabel} ▾</Text>
 //     </TouchableOpacity>
 //   );
 // }
@@ -391,7 +391,7 @@
 //   border: '1.5px solid transparent',
 //   fontSize: 14,
 //   backgroundColor: 'transparent',
-//   color: '#1a1d2b',
+//   color: '#252f50',
 //   appearance: 'none',
 //   WebkitAppearance: 'none',
 //   outline: 'none',
@@ -420,9 +420,9 @@
 //     paddingHorizontal: 28,
 //     position: 'relative',
 //     overflow: 'hidden',
-//     backgroundColor: '#12143d',
+//     backgroundColor: '#242d52',
 //     ...Platform.select({
-//       web: {backgroundImage: 'linear-gradient(120deg, #12143d 0%, #1e2166 60%, #3f47d6 130%)'},
+//       web: {backgroundImage: 'linear-gradient(120deg, #242d52 0%, #1e2166 60%, #8fa7f8 130%)'},
 //     }),
 //   },
 //   headerGlow: {position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.06)', top: -60, right: -30},
@@ -433,28 +433,28 @@
 //   closeBtn: {width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', zIndex: 1},
 //   closeBtnText: {color: '#c7caf0', fontSize: 14, fontWeight: '700'},
 //   progressTrack: {height: 3, backgroundColor: '#eceef4'},
-//   progressFill: {height: 3, backgroundColor: '#3f47d6'},
+//   progressFill: {height: 3, backgroundColor: '#8fa7f8'},
 //   bodyScroll: {maxHeight: 500},
 //   body: {padding: 28, paddingBottom: 10},
 //   stepHeader: {flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 24, marginBottom: 18},
 //   stepBadge: {width: 25, height: 25, borderRadius: 13, alignItems: 'center', justifyContent: 'center'},
 //   stepBadgeText: {color: '#fff', fontSize: 11.5, fontWeight: '800'},
 //   stepIcon: {fontSize: 14},
-//   stepTitle: {fontSize: 15.5, fontWeight: '800', color: '#1a1d2b'},
+//   stepTitle: {fontSize: 15.5, fontWeight: '800', color: '#252f50'},
 //   stepLine: {flex: 1, height: 1, backgroundColor: '#eceef4', marginLeft: 6},
 //   label: {fontSize: 12.5, fontWeight: '700', color: '#5b6178', marginBottom: 7, letterSpacing: 0.2},
 //   required: {color: '#d64545'},
 //   input: {
 //     borderWidth: 1.5,
-//     borderColor: '#e5e7f0',
+//     borderColor: '#e5e9f6',
 //     borderRadius: 10,
 //     paddingHorizontal: 13,
 //     paddingVertical: 12,
 //     fontSize: 14,
 //     backgroundColor: '#f8f9fc',
-//     color: '#1a1d2b',
+//     color: '#252f50',
 //   },
-//   selectWrap: {borderWidth: 1.5, borderColor: '#e5e7f0', borderRadius: 10, backgroundColor: '#f8f9fc', position: 'relative', justifyContent: 'center'},
+//   selectWrap: {borderWidth: 1.5, borderColor: '#e5e9f6', borderRadius: 10, backgroundColor: '#f8f9fc', position: 'relative', justifyContent: 'center'},
 //   selectArrow: {position: 'absolute', right: 12, fontSize: 12, color: '#8a8fa3', pointerEvents: 'none' as any},
 //   row: {flexDirection: 'row', gap: 14},
 //   half: {flex: 1},
@@ -465,7 +465,7 @@
 //     alignItems: 'center',
 //     gap: 6,
 //     borderWidth: 1.5,
-//     borderColor: '#e5e7f0',
+//     borderColor: '#e5e9f6',
 //     borderRadius: 10,
 //     paddingVertical: 9,
 //     paddingHorizontal: 14,
@@ -474,7 +474,7 @@
 //   statusChipIcon: {fontSize: 13},
 //   statusChipText: {fontSize: 12.5, fontWeight: '600', color: '#5b6178'},
 //   errorBox: {backgroundColor: '#fdeceb', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, marginTop: 12},
-//   errorText: {color: '#c93838', fontSize: 12.5, fontWeight: '600'},
+//   errorText: {color: '#ba4e3c', fontSize: 12.5, fontWeight: '600'},
 //   footer: {
 //     paddingHorizontal: 28,
 //     paddingVertical: 18,
@@ -483,9 +483,9 @@
 //   },
 //   progressLabel: {fontSize: 11.5, color: '#9aa0b4', fontWeight: '600', marginBottom: 10},
 //   footerBtns: {flexDirection: 'row', justifyContent: 'flex-end', gap: 12},
-//   cancelBtn: {borderWidth: 1.5, borderColor: '#e5e7f0', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20, justifyContent: 'center'},
+//   cancelBtn: {borderWidth: 1.5, borderColor: '#e5e9f6', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20, justifyContent: 'center'},
 //   cancelBtnText: {fontSize: 14, fontWeight: '700', color: '#5b6178'},
-//   createBtn: {backgroundColor: '#1a237e', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 24},
+//   createBtn: {backgroundColor: '#718be8', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 24},
 //   createBtnText: {fontSize: 14, fontWeight: '700', color: '#fff'},
 // });
 
@@ -697,7 +697,7 @@ export default function NewProjectModal({
           </View>
 
           <ScrollView contentContainerStyle={styles.body} style={styles.bodyScroll}>
-            <StepHeader index={1} color="#3f47d6" icon="📁" title="Project Information" />
+            <StepHeader index={1} color="#8fa7f8" icon="📁" title="Project Information" />
 
             <Field label="Project Name" required>
               <TextInput
@@ -753,7 +753,7 @@ export default function NewProjectModal({
               </View>
             </View>
 
-            <StepHeader index={2} color="#8b3fd6" icon="👥" title="Team Assignment" />
+            <StepHeader index={2} color="#8053a6" icon="👥" title="Team Assignment" />
 
             <View style={styles.row}>
               <View style={styles.third}>
@@ -788,7 +788,7 @@ export default function NewProjectModal({
               </View>
             </View>
 
-            <StepHeader index={3} color="#1f8a8a" icon="🗺️" title="Area Details" />
+            <StepHeader index={3} color="#8fa7f8" icon="🗺️" title="Area Details" />
 
             {areas.map((area, idx) => (
               <AreaRow
@@ -984,7 +984,7 @@ function SimpleSelect({value, options, onChange, placeholder}: {value: string; o
         const next = normalized[(idx + 1) % normalized.length];
         if (next) onChange(next.value);
       }}>
-      <Text style={{color: value ? '#1a1d2b' : '#9aa0b4'}}>{currentLabel} ▾</Text>
+      <Text style={{color: value ? '#252f50' : '#9aa0b4'}}>{currentLabel} ▾</Text>
     </TouchableOpacity>
   );
 }
@@ -996,7 +996,7 @@ const selectStyleWeb: any = {
   border: '1.5px solid transparent',
   fontSize: 14,
   backgroundColor: 'transparent',
-  color: '#1a1d2b',
+  color: '#252f50',
   appearance: 'none',
   WebkitAppearance: 'none',
   outline: 'none',
@@ -1037,9 +1037,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     position: 'relative',
     overflow: 'hidden',
-    backgroundColor: '#12143d',
+    backgroundColor: '#242d52',
     ...Platform.select({
-      web: {backgroundImage: 'linear-gradient(120deg, #12143d 0%, #1e2166 60%, #3f47d6 130%)'},
+      web: {backgroundImage: 'linear-gradient(120deg, #242d52 0%, #718be8 60%, #8fa7f8 130%)'},
     }),
   },
   headerGlow: {position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.06)', top: -60, right: -30},
@@ -1050,28 +1050,28 @@ const styles = StyleSheet.create({
   closeBtn: {width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', zIndex: 1},
   closeBtnText: {color: '#c7caf0', fontSize: 14, fontWeight: '700'},
   progressTrack: {height: 3, backgroundColor: '#eceef4'},
-  progressFill: {height: 3, backgroundColor: '#3f47d6'},
+  progressFill: {height: 3, backgroundColor: '#8fa7f8'},
   bodyScroll: {maxHeight: 500},
   body: {padding: 28, paddingBottom: 10},
   stepHeader: {flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 24, marginBottom: 18},
   stepBadge: {width: 25, height: 25, borderRadius: 13, alignItems: 'center', justifyContent: 'center'},
   stepBadgeText: {color: '#fff', fontSize: 11.5, fontWeight: '800'},
   stepIcon: {fontSize: 14},
-  stepTitle: {fontSize: 15.5, fontWeight: '800', color: '#1a1d2b'},
+  stepTitle: {fontSize: 15.5, fontWeight: '800', color: '#252f50'},
   stepLine: {flex: 1, height: 1, backgroundColor: '#eceef4', marginLeft: 6},
   label: {fontSize: 12.5, fontWeight: '700', color: '#5b6178', marginBottom: 7, letterSpacing: 0.2},
   required: {color: '#d64545'},
   input: {
     borderWidth: 1.5,
-    borderColor: '#e5e7f0',
+    borderColor: '#e5e9f6',
     borderRadius: 10,
     paddingHorizontal: 13,
     paddingVertical: 12,
     fontSize: 14,
     backgroundColor: '#f8f9fc',
-    color: '#1a1d2b',
+    color: '#252f50',
   },
-  selectWrap: {borderWidth: 1.5, borderColor: '#e5e7f0', borderRadius: 10, backgroundColor: '#f8f9fc', position: 'relative', justifyContent: 'center'},
+  selectWrap: {borderWidth: 1.5, borderColor: '#e5e9f6', borderRadius: 10, backgroundColor: '#f8f9fc', position: 'relative', justifyContent: 'center'},
   selectArrow: {position: 'absolute', right: 12, fontSize: 12, color: '#8a8fa3', pointerEvents: 'none' as any},
   row: {flexDirection: 'row', gap: 14},
   half: {flex: 1},
@@ -1085,7 +1085,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fbfbfd',
   },
   areaCardHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12},
-  areaCardTitle: {fontSize: 13.5, fontWeight: '800', color: '#3f47d6'},
+  areaCardTitle: {fontSize: 13.5, fontWeight: '800', color: '#8fa7f8'},
   areaRemoveText: {fontSize: 12, fontWeight: '700', color: '#d64545'},
   uploadBoxNative: {
     borderWidth: 1.5,
@@ -1099,21 +1099,21 @@ const styles = StyleSheet.create({
   uploadBoxNativeText: {fontSize: 12.5, color: '#5b6178'},
   addAreaBtn: {
     borderWidth: 1.5,
-    borderColor: '#3f47d6',
+    borderColor: '#8fa7f8',
     borderStyle: 'dashed',
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
     marginBottom: 10,
   },
-  addAreaBtnText: {fontSize: 13, fontWeight: '700', color: '#3f47d6'},
+  addAreaBtnText: {fontSize: 13, fontWeight: '700', color: '#8fa7f8'},
   errorBox: {backgroundColor: '#fdeceb', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, marginTop: 12},
-  errorText: {color: '#c93838', fontSize: 12.5, fontWeight: '600'},
+  errorText: {color: '#ba4e3c', fontSize: 12.5, fontWeight: '600'},
   footer: {paddingHorizontal: 28, paddingVertical: 18, borderTopWidth: 1, borderTopColor: '#eceef4'},
   progressLabel: {fontSize: 11.5, color: '#9aa0b4', fontWeight: '600', marginBottom: 10},
   footerBtns: {flexDirection: 'row', justifyContent: 'flex-end', gap: 12},
-  cancelBtn: {borderWidth: 1.5, borderColor: '#e5e7f0', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20, justifyContent: 'center'},
+  cancelBtn: {borderWidth: 1.5, borderColor: '#e5e9f6', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20, justifyContent: 'center'},
   cancelBtnText: {fontSize: 14, fontWeight: '700', color: '#5b6178'},
-  createBtn: {backgroundColor: '#1a237e', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 24},
-  createBtnText: {fontSize: 14, fontWeight: '700', color: '#fff'},
+  createBtn: {backgroundColor: '#b8a5f8', borderRadius: 11, paddingVertical: 13, paddingHorizontal: 24},
+  createBtnText: {fontSize: 14, fontWeight: '800', color: '#242d52'},
 });

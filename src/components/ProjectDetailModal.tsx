@@ -46,7 +46,7 @@ type Props = {
 };
 
 type AreaRow = {
-  id: string; // '' means not yet created on the backend
+  id: string;
   name: string;
   savedName?: string;
   file: any;
@@ -68,11 +68,11 @@ const SECTOR_OPTIONS = [
 ];
 
 const STATUS_OPTIONS = [
-  {label: 'Pending', icon: '⏳', color: '#b8770a', bg: '#fdf1e0'},
-  {label: 'Active', icon: '🟢', color: '#1f8a4c', bg: '#e2f7ec'},
-  {label: 'In Progress', icon: '⚙️', color: '#5a3fd6', bg: '#eae7fc'},
-  {label: 'Completed', icon: '✅', color: '#2a5fb0', bg: '#e6f0fb'},
-  {label: 'On Hold', icon: '⛔', color: '#c93838', bg: '#fde6e6'},
+  {label: 'Pending', icon: '⏳', color: '#a75a0b', bg: '#fff0d7'},
+  {label: 'Active', icon: '🟢', color: '#718be8', bg: '#f0eeff'},
+  {label: 'In Progress', icon: '⚙️', color: '#8053a6', bg: '#f1eaf3'},
+  {label: 'Completed', icon: '✅', color: '#3b68aa', bg: '#e5eef7'},
+  {label: 'On Hold', icon: '⛔', color: '#ba4e3c', bg: '#fde8e2'},
 ];
 
 // TODO: confirm exact field names the backend uses once these responses are
@@ -326,7 +326,7 @@ export default function ProjectDetailModal({
           </View>
 
           <ScrollView contentContainerStyle={styles.body} style={styles.bodyScroll}>
-            <SectionHeader color="#3f47d6" icon="📁" title="Project Information" />
+            <SectionHeader color="#8fa7f8" icon="📁" title="Project Information" />
 
             {editing ? (
               <>
@@ -375,7 +375,7 @@ export default function ProjectDetailModal({
               </>
             )}
 
-            <SectionHeader color="#b8770a" icon="📌" title="Status" />
+            <SectionHeader color="#a75a0b" icon="📌" title="Status" />
             {editing ? (
               <View style={styles.statusRow}>
                 {STATUS_OPTIONS.map(opt => {
@@ -386,7 +386,7 @@ export default function ProjectDetailModal({
                       onPress={() => setStatus(opt.label)}
                       style={[
                         styles.statusChip,
-                        {borderColor: active ? opt.color : '#e5e7f0'},
+                        {borderColor: active ? opt.color : '#e5e9f6'},
                         active && {backgroundColor: opt.bg},
                       ]}>
                       <Text style={styles.statusChipIcon}>{opt.icon}</Text>
@@ -406,7 +406,7 @@ export default function ProjectDetailModal({
               </View>
             )}
 
-            <SectionHeader color="#8b3fd6" icon="👥" title="Team Assignment" />
+            <SectionHeader color="#8053a6" icon="👥" title="Team Assignment" />
 
             {editing ? (
               <View style={styles.row}>
@@ -449,10 +449,10 @@ export default function ProjectDetailModal({
               </View>
             )}
 
-            <SectionHeader color="#1f8a8a" icon="🗺️" title={`Areas ${areas.length ? `(${areas.length})` : ''}`} />
+            <SectionHeader color="#8fa7f8" icon="🗺️" title={`Areas ${areas.length ? `(${areas.length})` : ''}`} />
 
             {loadingDetail && areas.length === 0 ? (
-              <ActivityIndicator color="#1f8a8a" style={{marginVertical: 10}} />
+              <ActivityIndicator color="#8fa7f8" style={{marginVertical: 10}} />
             ) : areas.length === 0 && !editing ? (
               <Text style={styles.noAreasText}>No areas added yet.</Text>
             ) : (
@@ -692,7 +692,7 @@ function SimpleSelect({
         const next = normalized[(idx + 1) % normalized.length];
         if (next) onChange(next.value);
       }}>
-      <Text style={{color: value ? '#1a1d2b' : '#9aa0b4'}}>{currentLabel} ▾</Text>
+      <Text style={{color: value ? '#252f50' : '#9aa0b4'}}>{currentLabel} ▾</Text>
     </TouchableOpacity>
   );
 }
@@ -704,7 +704,7 @@ const selectStyleWeb: any = {
   border: '1.5px solid transparent',
   fontSize: 14,
   backgroundColor: 'transparent',
-  color: '#1a1d2b',
+  color: '#252f50',
   appearance: 'none',
   WebkitAppearance: 'none',
   outline: 'none',
@@ -745,9 +745,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     position: 'relative',
     overflow: 'hidden',
-    backgroundColor: '#12143d',
+    backgroundColor: '#242d52',
     ...Platform.select({
-      web: {backgroundImage: 'linear-gradient(120deg, #12143d 0%, #1e2166 60%, #3f47d6 130%)'},
+      web: {backgroundImage: 'linear-gradient(120deg, #242d52 0%, #718be8 60%, #8fa7f8 130%)'},
     }),
   },
   headerGlow: {position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.06)', top: -60, right: -30},
@@ -762,21 +762,21 @@ const styles = StyleSheet.create({
   sectionHeader: {flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 22, marginBottom: 16},
   sectionDot: {width: 8, height: 8, borderRadius: 4},
   sectionIcon: {fontSize: 14},
-  sectionTitle: {fontSize: 14.5, fontWeight: '800', color: '#1a1d2b'},
+  sectionTitle: {fontSize: 14.5, fontWeight: '800', color: '#252f50'},
   sectionLine: {flex: 1, height: 1, backgroundColor: '#eceef4', marginLeft: 4},
   label: {fontSize: 12.5, fontWeight: '700', color: '#5b6178', marginBottom: 7, letterSpacing: 0.2},
   input: {
     borderWidth: 1.5,
-    borderColor: '#e5e7f0',
+    borderColor: '#e5e9f6',
     borderRadius: 10,
     paddingHorizontal: 13,
     paddingVertical: 12,
     fontSize: 14,
     backgroundColor: '#f8f9fc',
-    color: '#1a1d2b',
+    color: '#252f50',
   },
-  readValue: {fontSize: 14, fontWeight: '600', color: '#1a1d2b'},
-  selectWrap: {borderWidth: 1.5, borderColor: '#e5e7f0', borderRadius: 10, backgroundColor: '#f8f9fc', position: 'relative', justifyContent: 'center'},
+  readValue: {fontSize: 14, fontWeight: '600', color: '#252f50'},
+  selectWrap: {borderWidth: 1.5, borderColor: '#e5e9f6', borderRadius: 10, backgroundColor: '#f8f9fc', position: 'relative', justifyContent: 'center'},
   selectArrow: {position: 'absolute', right: 12, fontSize: 12, color: '#8a8fa3', pointerEvents: 'none' as any},
   row: {flexDirection: 'row', gap: 14},
   half: {flex: 1},
@@ -787,7 +787,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     borderWidth: 1.5,
-    borderColor: '#e5e7f0',
+    borderColor: '#e5e9f6',
     borderRadius: 10,
     paddingVertical: 9,
     paddingHorizontal: 14,
@@ -816,7 +816,7 @@ const styles = StyleSheet.create({
   },
   areaReadIconWrap: {width: 34, height: 34, borderRadius: 9, backgroundColor: '#eafafa', alignItems: 'center', justifyContent: 'center'},
   areaReadIcon: {fontSize: 15},
-  areaReadName: {fontSize: 13.5, fontWeight: '700', color: '#1a1d2b'},
+  areaReadName: {fontSize: 13.5, fontWeight: '700', color: '#252f50'},
   areaReadMeta: {fontSize: 12, color: '#8a8fa3', marginTop: 2},
   areaCard: {
     borderWidth: 1.5,
@@ -828,7 +828,7 @@ const styles = StyleSheet.create({
   },
   areaPreview: {width: '100%', height: 150, borderRadius: 8, marginBottom: 10},
   areaCardHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12},
-  areaCardTitle: {fontSize: 13.5, fontWeight: '800', color: '#1f8a8a'},
+  areaCardTitle: {fontSize: 13.5, fontWeight: '800', color: '#8fa7f8'},
   areaRemoveText: {fontSize: 12, fontWeight: '700', color: '#d64545'},
   uploadBoxNative: {
     borderWidth: 1.5,
@@ -842,20 +842,20 @@ const styles = StyleSheet.create({
   uploadBoxNativeText: {fontSize: 12.5, color: '#5b6178'},
   addAreaBtn: {
     borderWidth: 1.5,
-    borderColor: '#1f8a8a',
+    borderColor: '#8fa7f8',
     borderStyle: 'dashed',
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
     marginBottom: 10,
   },
-  addAreaBtnText: {fontSize: 13, fontWeight: '700', color: '#1f8a8a'},
+  addAreaBtnText: {fontSize: 13, fontWeight: '700', color: '#8fa7f8'},
   footer: {paddingHorizontal: 28, paddingVertical: 18, borderTopWidth: 1, borderTopColor: '#eceef4'},
   footerBtns: {flexDirection: 'row', justifyContent: 'flex-end', gap: 12},
-  cancelBtn: {borderWidth: 1.5, borderColor: '#e5e7f0', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20, justifyContent: 'center'},
+  cancelBtn: {borderWidth: 1.5, borderColor: '#e5e9f6', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20, justifyContent: 'center'},
   cancelBtnText: {fontSize: 14, fontWeight: '700', color: '#5b6178'},
-  editBtn: {backgroundColor: '#1a237e', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 22, justifyContent: 'center'},
+  editBtn: {backgroundColor: '#718be8', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 22, justifyContent: 'center'},
   editBtnText: {fontSize: 14, fontWeight: '700', color: '#fff'},
-  saveBtn: {backgroundColor: '#1f8a4c', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 24},
+  saveBtn: {backgroundColor: '#718be8', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 24},
   saveBtnText: {fontSize: 14, fontWeight: '700', color: '#fff'},
 });

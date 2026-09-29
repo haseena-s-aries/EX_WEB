@@ -56,15 +56,22 @@ export default function SignupScreen({onRegister, onGoToLogin, loading}: Props) 
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={styles.orbLarge} />
+      <View style={styles.orbSmall} />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled">
-        <AnimatedCard>
-          <View style={styles.logoCircle}>
-            <Text style={styles.logoText}>EX</Text>
+        <AnimatedCard style={styles.authCard}>
+          <View style={styles.brandRow}>
+            <View style={styles.brandMark}><Text style={styles.brandMarkText}>EX</Text></View>
+            <View>
+              <Text style={styles.brandName}>EX-SURVEY</Text>
+              <Text style={styles.brandSub}>FIELD OPERATIONS</Text>
+            </View>
           </View>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join Ex-Survey to get started</Text>
+          <View style={styles.kickerRow}><View style={styles.kickerDot} /><Text style={styles.kicker}>JOIN THE FIELD TEAM</Text></View>
+          <Text style={styles.title}>Create your account.</Text>
+          <Text style={styles.subtitle}>Set up your profile to get started with Ex-Survey.</Text>
 
           <FormInput
             label="Full Name"
@@ -123,34 +130,35 @@ export default function SignupScreen({onRegister, onGoToLogin, loading}: Props) 
 }
 
 const styles = StyleSheet.create({
-  screen: {flex: 1, minHeight: '100vh', backgroundColor: '#eef1fb'},
+  screen: {flex: 1, minHeight: '100vh', overflow: 'hidden', backgroundColor: '#dce8ff', ...Platform.select({web: {backgroundImage: 'linear-gradient(135deg, #dce8ff 0%, #e9e5ff 56%, #d7e7ff 100%)'}, default: {}})},
+  orbLarge: {position: 'absolute', width: 520, height: 520, borderRadius: 260, borderWidth: 1, borderColor: 'rgba(113,139,232,0.28)', top: -190, right: -100},
+  orbSmall: {position: 'absolute', width: 330, height: 330, borderRadius: 165, backgroundColor: 'rgba(241,120,88,0.12)', bottom: -180, left: -100},
   scrollContent: {
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 36,
   },
-  logoCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#1a237e',
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: 14,
-  },
-  logoText: {color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: 1},
-  title: {fontSize: 22, fontWeight: '800', textAlign: 'center', color: '#1a1d2b'},
+  authCard: {maxWidth: 500, paddingHorizontal: 38, paddingVertical: 34, borderRadius: 25, backgroundColor: '#fff', ...Platform.select({web: {boxShadow: '0px 28px 80px rgba(0, 0, 0, 0.28)'}, default: {shadowColor: '#242d52', shadowOffset: {width: 0, height: 8}, shadowOpacity: 0.28, shadowRadius: 32, elevation: 8}})},
+  brandRow: {flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 25},
+  brandMark: {width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#242d52'},
+  brandMarkText: {color: '#b8a5f8', fontSize: 13, fontWeight: '900', letterSpacing: 0.6},
+  brandName: {fontSize: 12, letterSpacing: 1.4, color: '#252f50', fontWeight: '900'},
+  brandSub: {fontSize: 9, letterSpacing: 1.5, color: '#8b958e', fontWeight: '800', marginTop: 3},
+  kickerRow: {flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10},
+  kickerDot: {width: 7, height: 7, borderRadius: 4, backgroundColor: '#f17858'},
+  kicker: {fontSize: 9, fontWeight: '900', color: '#65756c', letterSpacing: 1.5},
+  title: {fontSize: 28, fontWeight: '800', color: '#252f50', letterSpacing: -0.6},
   subtitle: {
     fontSize: 13,
-    textAlign: 'center',
-    color: '#7a7f93',
-    marginBottom: 22,
-    marginTop: 4,
+    color: '#7a857d',
+    textAlign: 'left',
+    marginBottom: 23,
+    marginTop: 6,
   },
   error: {color: '#d64545', fontSize: 13, marginBottom: 8, textAlign: 'center'},
   footerRow: {flexDirection: 'row', justifyContent: 'center', marginTop: 18},
   footerText: {fontSize: 13, color: '#6a6f83'},
-  footerLink: {fontSize: 13, color: '#1a237e', fontWeight: '700'},
+  footerLink: {fontSize: 13, color: '#718be8', fontWeight: '800'},
 });

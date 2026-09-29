@@ -275,27 +275,27 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  dashboardShell: {flex: 1, backgroundColor: '#f4f6fb'},
+  dashboardShell: {flex: 1, backgroundColor: '#f7f9ff'},
   mobileHeader: {
     minHeight: 58,
     paddingHorizontal: 16,
     paddingVertical: 9,
-    backgroundColor: '#fff',
+    backgroundColor: '#242d52',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e4e7f0',
+    borderBottomColor: '#3e4974',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  brand: {fontSize: 17, fontWeight: '800', color: '#171a4b'},
-  role: {fontSize: 11, color: '#777d92', marginTop: 1},
+  brand: {fontSize: 17, fontWeight: '800', color: '#fff'},
+  role: {fontSize: 11, color: '#c9cded', marginTop: 1},
   logoutButton: {
     minHeight: 36,
     justifyContent: 'center',
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: '#d8dbea',
+    borderColor: '#485780',
     borderRadius: 8,
   },
-  logoutText: {fontSize: 13, fontWeight: '700', color: '#3f47d6'},
+  logoutText: {fontSize: 13, fontWeight: '800', color: '#b8a5f8'},
 });

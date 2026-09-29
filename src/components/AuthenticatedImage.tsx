@@ -68,7 +68,7 @@ export default function AuthenticatedImage({path, style}: Props) {
   if (loading) {
     return (
       <View style={[styles.placeholder, style]}>
-        <ActivityIndicator color="#3f47d6" />
+        <ActivityIndicator color="#8fa7f8" />
       </View>
     );
   }

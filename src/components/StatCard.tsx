@@ -38,9 +38,10 @@ export default function StatCard({label, value, icon, color, bg, delay}: Props) 
       <View style={[styles.iconWrap, {backgroundColor: bg}]}>
         <Text style={styles.icon}>{icon}</Text>
       </View>
-      <Text style={[styles.value, {color}]}>{value}</Text>
-      <Text style={styles.label}>{label}</Text>
-      <View style={[styles.accentBar, {backgroundColor: color}]} />
+      <View style={styles.copy}>
+        <Text style={[styles.value, {color}]}>{value}</Text>
+        <Text style={styles.label}>{label}</Text>
+      </View>
     </Animated.View>
   );
 }
@@ -48,43 +49,42 @@ export default function StatCard({label, value, icon, color, bg, delay}: Props) 
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    minWidth: 155,
+    minWidth: 135,
     backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 20,
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 17,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    borderWidth: 1,
+    borderColor: '#e5e9f6',
     overflow: 'hidden',
     ...Platform.select({
       web: {
-        boxShadow: '0px 4px 18px rgba(26, 35, 126, 0.06)',
+        boxShadow: '0px 5px 18px rgba(19, 42, 36, 0.06)',
         transitionProperty: 'transform, box-shadow',
         transitionDuration: '0.2s',
       },
       default: {
-        shadowColor: '#1a237e',
+        shadowColor: '#242d52',
         shadowOffset: {width: 0, height: 4},
-        shadowOpacity: 0.08,
+        shadowOpacity: 0.045,
         shadowRadius: 12,
         elevation: 3,
       },
     }),
   },
   iconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: 0,
   },
   icon: {fontSize: 18},
-  value: {fontSize: 28, fontWeight: '800'},
-  label: {fontSize: 12.5, color: '#8a8fa3', marginTop: 3, fontWeight: '600'},
-  accentBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-    opacity: 0.9,
-  },
+  copy: {flex: 1},
+  value: {fontSize: 24, fontWeight: '800'},
+  label: {fontSize: 11.5, color: '#7a7f93', marginTop: 2, fontWeight: '600'},
 });

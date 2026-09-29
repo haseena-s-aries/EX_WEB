@@ -165,6 +165,7 @@ import SignupScreen from '../screens/SignupScreen';
 import OtpScreen from '../screens/OtpScreen';
 import LoginScreen from '../screens/LoginScreen';
 import DashboardScreen from '../screens/DashboardScreen';
+import ProjectsScreen from '../screens/ProjectsScreen';
 import SurveyorDashboardScreen from '../screens/SurveyorDashboardScreen';
 import SurveyorProjectDetailsScreen from '../screens/SurveyorProjectDetailsScreen';
 import SurveyorAreaDetailsScreen from '../screens/SurveyorAreaDetailsScreen';
@@ -179,6 +180,7 @@ type Screen =
   | 'Otp'
   | 'Login'
   | 'Dashboard'
+  | 'Projects'
   | 'UserManagement'
   | 'SurveyorProjectDetails'
   | 'SurveyorAreaDetails';
@@ -194,6 +196,7 @@ export default function AppNavigator() {
   const [approvedUsers, setApprovedUsers] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [selectedAreaId, setSelectedAreaId] = useState('');
+  const [projectDetailsReturnScreen, setProjectDetailsReturnScreen] = useState<'Dashboard' | 'Projects'>('Dashboard');
 
   if (screen === 'Otp') {
     return (
@@ -257,6 +260,7 @@ export default function AppNavigator() {
 
   if (
     screen === 'Dashboard' ||
+    screen === 'Projects' ||
     screen === 'UserManagement' ||
     screen === 'SurveyorProjectDetails' ||
     screen === 'SurveyorAreaDetails'
@@ -297,14 +301,28 @@ export default function AppNavigator() {
                 onPress={() => setScreen('Dashboard')}
                 style={[
                   styles.mobileNavItem,
-                  screen !== 'UserManagement' && styles.mobileNavItemActive,
+                  screen === 'Dashboard' && styles.mobileNavItemActive,
                 ]}>
                 <Text
                   style={[
                     styles.mobileNavText,
-                    screen !== 'UserManagement' && styles.mobileNavTextActive,
+                    screen === 'Dashboard' && styles.mobileNavTextActive,
                   ]}>
                   Dashboard
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setScreen('Projects')}
+                style={[
+                  styles.mobileNavItem,
+                  ['Projects', 'SurveyorProjectDetails', 'SurveyorAreaDetails'].includes(screen) && styles.mobileNavItemActive,
+                ]}>
+                <Text
+                  style={[
+                    styles.mobileNavText,
+                    ['Projects', 'SurveyorProjectDetails', 'SurveyorAreaDetails'].includes(screen) && styles.mobileNavTextActive,
+                  ]}>
+                  Projects
                 </Text>
               </TouchableOpacity>
               {canManageUsers && (
@@ -328,11 +346,15 @@ export default function AppNavigator() {
           </View>
         ) : (
           <Sidebar
-            active={screen === 'UserManagement' ? screen : 'Dashboard'}
+            active={
+              screen === 'SurveyorProjectDetails' || screen === 'SurveyorAreaDetails'
+                ? projectDetailsReturnScreen
+                : screen
+            }
             userName={currentUser.name}
             userRole={currentUser.role}
             onNavigate={key => {
-              if (key === 'Dashboard' || key === 'UserManagement') {
+              if (key === 'Dashboard' || key === 'Projects' || key === 'UserManagement') {
                 setSelectedProjectId('');
                 setSelectedAreaId('');
                 setScreen(key as Screen);
@@ -347,6 +369,7 @@ export default function AppNavigator() {
             <SurveyorDashboardScreen
               userName={currentUser.name}
               onProjectPress={projectId => {
+                setProjectDetailsReturnScreen('Dashboard');
                 setSelectedProjectId(projectId);
                 setSelectedAreaId('');
                 setScreen('SurveyorProjectDetails');
@@ -365,10 +388,29 @@ export default function AppNavigator() {
                 .filter((u: any) => u.role?.toLowerCase() === 'client')
                 .map((u: any) => ({id: u.id, displayName: u.displayName}))}
             />
+          ) : screen === 'Projects' ? (
+            <ProjectsScreen
+              isSurveyor={currentUser.role.toLowerCase() === 'surveyor'}
+              onSurveyorProjectPress={projectId => {
+                setProjectDetailsReturnScreen('Projects');
+                setSelectedProjectId(projectId);
+                setSelectedAreaId('');
+                setScreen('SurveyorProjectDetails');
+              }}
+              surveyors={approvedUsers
+                .filter((u: any) => u.role?.toLowerCase() === 'surveyor')
+                .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+              qcUsers={approvedUsers
+                .filter((u: any) => u.role?.toLowerCase() === 'qc')
+                .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+              clients={approvedUsers
+                .filter((u: any) => u.role?.toLowerCase() === 'client')
+                .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+            />
           ) : screen === 'SurveyorProjectDetails' && selectedProjectId ? (
             <SurveyorProjectDetailsScreen
               projectId={selectedProjectId}
-              onBack={() => setScreen('Dashboard')}
+              onBack={() => setScreen(projectDetailsReturnScreen)}
               onAreaPress={areaId => {
                 setSelectedAreaId(areaId);
                 setScreen('SurveyorAreaDetails');
@@ -417,14 +459,14 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     minHeight: '100vh' as any,
-    backgroundColor: '#f4f6fb',
+    backgroundColor: '#f7f9ff',
   },
   appShellMobile: {flexDirection: 'column'},
   mainContent: {flex: 1, minWidth: 0},
   mobileHeader: {
-    backgroundColor: '#fff',
+    backgroundColor: '#242d52',
     borderBottomWidth: 1,
-    borderBottomColor: '#e4e7f0',
+    borderBottomColor: '#3e4974',
   },
   mobileBrandRow: {
     minHeight: 58,
@@ -436,16 +478,16 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 8,
-    backgroundColor: '#3f47d6',
+    backgroundColor: '#b8a5f8',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  mobileLogoText: {color: '#fff', fontSize: 12, fontWeight: '800'},
+  mobileLogoText: {color: '#242d52', fontSize: 12, fontWeight: '900'},
   mobileIdentity: {flex: 1, marginLeft: 9},
-  mobileBrand: {color: '#171a4b', fontSize: 15, fontWeight: '800'},
-  mobileRole: {color: '#777d92', fontSize: 10.5, marginTop: 1},
+  mobileBrand: {color: '#fff', fontSize: 15, fontWeight: '800'},
+  mobileRole: {color: '#c9cded', fontSize: 10.5, marginTop: 1},
   mobileLogout: {paddingVertical: 9, paddingLeft: 14},
-  mobileLogoutText: {color: '#3f47d6', fontSize: 12.5, fontWeight: '700'},
+  mobileLogoutText: {color: '#b8a5f8', fontSize: 12.5, fontWeight: '800'},
   mobileNav: {
     minHeight: 42,
     paddingHorizontal: 12,
@@ -461,7 +503,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
-  mobileNavItemActive: {borderBottomColor: '#3f47d6'},
-  mobileNavText: {fontSize: 12.5, fontWeight: '700', color: '#777d92'},
-  mobileNavTextActive: {color: '#3038bd'},
+  mobileNavItemActive: {borderBottomColor: '#b8a5f8'},
+  mobileNavText: {fontSize: 12.5, fontWeight: '700', color: '#c9cded'},
+  mobileNavTextActive: {color: '#b8a5f8'},
 });

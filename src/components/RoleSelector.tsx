@@ -43,13 +43,13 @@
 //   row: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
 //   chip: {
 //     borderWidth: 1.5,
-//     borderColor: '#e1e4ee',
+//     borderColor: '#dce5dd',
 //     borderRadius: 20,
 //     paddingHorizontal: 14,
 //     paddingVertical: 8,
 //     backgroundColor: '#f8f9fc',
 //   },
-//   chipActive: {backgroundColor: '#1a237e', borderColor: '#1a237e'},
+//   chipActive: {backgroundColor: '#718be8', borderColor: '#718be8'},
 //   chipText: {fontSize: 13, color: '#4a4f63', fontWeight: '600'},
 //   chipTextActive: {color: '#fff'},
 // });
@@ -102,14 +102,14 @@ const styles = StyleSheet.create({
   chip: {
     flex: 1,
     borderWidth: 1.5,
-    borderColor: '#e1e4ee',
+    borderColor: '#dce5dd',
     borderRadius: 20,
     paddingVertical: 8,
     paddingHorizontal: 4,
     backgroundColor: '#f8f9fc',
     alignItems: 'center',
   },
-  chipActive: {backgroundColor: '#1a237e', borderColor: '#1a237e'},
+  chipActive: {backgroundColor: '#718be8', borderColor: '#718be8'},
   chipText: {fontSize: 11, color: '#4a4f63', fontWeight: '600'},
   chipTextActive: {color: '#fff'},
 });
