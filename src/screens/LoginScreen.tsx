@@ -109,3 +109,4 @@ const styles = StyleSheet.create({
   footerText: {fontSize: 13, color: '#6a6f83'},
   footerLink: {fontSize: 13, color: '#718be8', fontWeight: '800'},
 });
+

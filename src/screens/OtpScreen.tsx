@@ -21,7 +21,6 @@ type Props = {
 };
 
 const OTP_LENGTH = 4;
-
 export default function OtpScreen({email, onVerify, onResend, onBack, loading}: Props) {
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [error, setError] = useState('');

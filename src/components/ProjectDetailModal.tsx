@@ -74,10 +74,6 @@ const STATUS_OPTIONS = [
   {label: 'Completed', icon: '✅', color: '#3b68aa', bg: '#e5eef7'},
   {label: 'On Hold', icon: '⛔', color: '#ba4e3c', bg: '#fde8e2'},
 ];
-
-// TODO: confirm exact field names the backend uses once these responses are
-// checked directly in Swagger — falls back across a few likely names so the
-// modal still works whichever shape comes back.
 const pick = (obj: any, ...keys: string[]) => {
   for (const k of keys) {
     if (obj?.[k] !== undefined && obj?.[k] !== null && obj?.[k] !== '') return obj[k];
@@ -97,7 +93,7 @@ const emptyAreaRow = (): AreaRow => ({
 
 function confirmAction(message: string, confirmLabel: string, onConfirm: () => void) {
   if (Platform.OS === 'web') {
-    // eslint-disable-next-line no-alert
+
     if (window.confirm(message)) onConfirm();
     return;
   }
@@ -170,16 +166,12 @@ export default function ProjectDetailModal({
   useEffect(() => {
     if (visible && project) {
       setEditing(false);
-      // Show what we already have immediately, then refresh with the full
-      // record (this also gives us the areas list, which the dashboard's
-      // project list doesn't include).
       applyDetail(project);
       setLoadingDetail(true);
       getProject(projectId)
         .then(res => applyDetail(res.data))
         .catch(err => {
           console.error(err?.response?.data || err.message);
-          // Not fatal — we already applied what the list gave us above.
         })
         .finally(() => setLoadingDetail(false));
 
@@ -195,9 +187,6 @@ export default function ProjectDetailModal({
   if (!project) return null;
 
   const handleSave = async () => {
-    // Anyone can type into a new area card and then reach straight for the
-    // main "Save Changes" button instead of that card's own "Add Area"
-    // button — save any such pending areas first so nothing gets lost.
     const pendingAreaIdxs = areas
       .map((a, i) =>
         a.isNew || (a.name.trim() && (a.file || a.name !== a.savedName)) ? i : -1,
