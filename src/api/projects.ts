@@ -78,6 +78,8 @@ export type ProjectAreaEquipment = {
   manufacturer?: string | null;
   protectionDetails?: string | null;
   certificateNumber?: string | null;
+  createdAt: string;
+  inspectionStatus: string;
 };
 
 export type ProjectAreaPhoto = {
