@@ -241,6 +241,13 @@ export default function AppNavigator() {
                 projectId={route.params.projectId}
                 areaId={route.params.areaId}
                 onBack={() => navigation.goBack()}
+                onEquipmentPress={equipmentId =>
+                  navigation.navigate('SurveyorEquipmentDetails', {
+                    projectId: route.params.projectId,
+                    areaId: route.params.areaId,
+                    equipmentId,
+                  })
+                }
                 onEquipmentAdded={() =>
                   setSurveyorRefreshVersion(version => version + 1)
                 }

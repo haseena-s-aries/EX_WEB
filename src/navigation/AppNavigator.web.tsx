@@ -357,7 +357,11 @@ export default function AppNavigator() {
               projectId={selectedProjectId}
               areaId={selectedAreaId}
               onBack={() => setScreen('SurveyorProjectDetails')}
-           onEquipmentAdded={() =>
+              onEquipmentPress={equipmentId => {
+                setSelectedEquipmentId(equipmentId);
+                setScreen('SurveyorEquipmentDetails');
+              }}
+              onEquipmentAdded={() =>
                 setSurveyorRefreshVersion(version => version + 1)
               }
             />
@@ -370,7 +374,7 @@ export default function AppNavigator() {
               areaId={selectedAreaId}
               equipmentId={selectedEquipmentId}
               refreshVersion={surveyorRefreshVersion}
-              onBack={() => setScreen('SurveyorProjectDetails')}
+              onBack={() => setScreen('SurveyorAreaDetails')}
               onInspect={() => setScreen('SurveyorInspection')}
             />
           ) : screen === 'SurveyorInspection' && selectedEquipmentId ? (

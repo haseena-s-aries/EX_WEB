@@ -107,6 +107,12 @@ export default function SurveyorInspectionScreen({
     [activeTab, answers],
   );
   const checkedCount = answers.filter(answer => answer.isChecked).length;
+  const totalChecklistCount = answers.length;
+  const progressPercent = totalChecklistCount === 0
+    ? 0
+    : Math.round((checkedCount / totalChecklistCount) * 100);
+  const allVisibleChecked = visibleAnswers.length > 0 &&
+    visibleAnswers.every(answer => answer.isChecked);
   const editable = inspection?.isEditable !== false;
 
   const toggleAnswer = (checklistItemId: string) => {
@@ -114,6 +120,16 @@ export default function SurveyorInspectionScreen({
     setAnswers(current => current.map(answer =>
       answer.checklistItemId === checklistItemId
         ? {...answer, isChecked: !answer.isChecked}
+        : answer,
+    ));
+  };
+
+  const toggleAllVisibleAnswers = () => {
+    if (!editable || visibleAnswers.length === 0) return;
+    const nextChecked = !allVisibleChecked;
+    setAnswers(current => current.map(answer =>
+      answer.inspectionType === activeTab
+        ? {...answer, isChecked: nextChecked}
         : answer,
     ));
   };
@@ -248,6 +264,17 @@ export default function SurveyorInspectionScreen({
         </View>
 
         <View style={styles.checklist}>
+          <TouchableOpacity
+            accessibilityRole="checkbox"
+            accessibilityState={{checked: allVisibleChecked, disabled: !editable}}
+            disabled={!editable || visibleAnswers.length === 0}
+            onPress={toggleAllVisibleAnswers}
+            style={styles.selectAllRow}>
+            <View style={[styles.checkbox, allVisibleChecked && styles.checkboxChecked]}>
+              <Text style={styles.checkmark}>{allVisibleChecked ? '✓' : ''}</Text>
+            </View>
+            <Text style={styles.selectAllText}>Select All</Text>
+          </TouchableOpacity>
           {visibleAnswers.map(answer => (
             <TouchableOpacity
               key={answer.checklistItemId}
@@ -260,6 +287,20 @@ export default function SurveyorInspectionScreen({
               <Text style={styles.checkText}>{answer.text}</Text>
             </TouchableOpacity>
           ))}
+        </View>
+
+        <View style={styles.progressSection}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressText}>
+              Progress: {checkedCount} / {totalChecklistCount} checked
+            </Text>
+            <Text style={styles.progressPercent}>{progressPercent}%</Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <View
+              style={[styles.progressFill, {width: `${progressPercent}%`}]}
+            />
+          </View>
         </View>
 
         <Field label="Comments">
@@ -365,12 +406,20 @@ const styles = StyleSheet.create({
   tabActive: {borderBottomColor: '#8fa7f8'},
   tabText: {fontSize: 12, color: '#838798', fontWeight: '800'},
   tabTextActive: {color: '#4d5f9e'},
-  checklist: {marginBottom: 20},
+  checklist: {marginBottom: 14},
+  selectAllRow: {minHeight: 48, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#dfe3ef', paddingVertical: 10, gap: 12},
+  selectAllText: {flex: 1, fontSize: 13, color: '#242d52', fontWeight: '800'},
   checkRow: {minHeight: 52, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#eef0f5', paddingVertical: 10, gap: 12},
   checkbox: {width: 23, height: 23, borderWidth: 2, borderColor: '#c4c9d9', borderRadius: 4, alignItems: 'center', justifyContent: 'center'},
   checkboxChecked: {borderColor: '#718be8', backgroundColor: '#718be8'},
   checkmark: {color: '#fff', fontSize: 14, fontWeight: '900'},
   checkText: {flex: 1, fontSize: 13, color: '#3b3f59', lineHeight: 19},
+  progressSection: {marginBottom: 22},
+  progressHeader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8},
+  progressText: {fontSize: 12, color: '#4b5064', fontWeight: '800'},
+  progressPercent: {fontSize: 12, color: '#566dbd', fontWeight: '900'},
+  progressTrack: {height: 10, overflow: 'hidden', borderRadius: 5, backgroundColor: '#e8ebf4'},
+  progressFill: {height: '100%', borderRadius: 5, backgroundColor: '#718be8'},
   photoSection: {marginTop: 2},
   photoGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 14},
   photoTile: {width: 150, borderWidth: 1, borderColor: '#e1e4ef', borderRadius: 7, overflow: 'hidden', backgroundColor: '#fafbff'},

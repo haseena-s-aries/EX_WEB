@@ -39,20 +39,42 @@ const equipment = {
 };
 
 const checklist = [
-  {
-    checklistItemId: 'visual-1',
-    inspectionType: 'Visual',
-    text: 'Enclosure is intact',
-    sortOrder: 1,
+  ...[
+    'Enclosure is intact',
+    'Gaskets are in good condition',
+    'No excessive corrosion',
+    'Rating plate is legible',
+  ].map((text, index) => ({
+    checklistItemId: `visual-${index + 1}`,
+    inspectionType: 'Visual' as const,
+    text,
+    sortOrder: index + 1,
     isRequired: true,
-  },
-  {
-    checklistItemId: 'close-1',
-    inspectionType: 'Close',
-    text: 'Cable entries are secure',
-    sortOrder: 1,
+  })),
+  ...[
+    'All bolts and fasteners are tight',
+    'Cable entries are properly sealed',
+    'Covers and lids properly fitted',
+    'Grounding/bonding connections intact',
+  ].map((text, index) => ({
+    checklistItemId: `close-${index + 1}`,
+    inspectionType: 'Close' as const,
+    text,
+    sortOrder: index + 1,
     isRequired: true,
-  },
+  })),
+  ...[
+    'No unauthorized modifications',
+    'Flame paths clean and undamaged',
+    'No excessive paint buildup',
+    'Internal components properly mounted',
+  ].map((text, index) => ({
+    checklistItemId: `detailed-${index + 1}`,
+    inspectionType: 'Detailed' as const,
+    text,
+    sortOrder: index + 1,
+    isRequired: true,
+  })),
 ];
 
 const inspection = (status: 'InProgress' | 'Completed', checked = false) => ({
@@ -106,12 +128,13 @@ test('starts a draft and reloads the completed inspection after save', async () 
     'equipment-1',
     expect.objectContaining({isCompleted: false}),
   );
-  expect(textOf(renderer.root)).toContain('0/2');
+  expect(textOf(renderer.root)).toContain('0/12');
+  expect(textOf(renderer.root)).toContain('Progress: 0 / 12 checked');
 
   await ReactTestRenderer.act(async () => {
     buttonNamed(renderer.root, 'Enclosure is intact')?.props.onPress();
   });
-  expect(textOf(renderer.root)).toContain('1/2');
+  expect(textOf(renderer.root)).toContain('1/12');
 
   await ReactTestRenderer.act(async () => {
     buttonNamed(renderer.root, 'Save Inspection')?.props.onPress();
@@ -129,4 +152,49 @@ test('starts a draft and reloads the completed inspection after save', async () 
   expect(getSurveyorEquipmentInspection).toHaveBeenCalledTimes(2);
   expect(onSaved).toHaveBeenCalledTimes(1);
   expect(onBack).toHaveBeenCalledTimes(1);
+});
+
+test('select all affects only the active tab and preserves other tabs', async () => {
+  (getSurveyorEquipmentDetails as jest.Mock).mockResolvedValue({data: equipment});
+  (getSurveyorChecklist as jest.Mock).mockResolvedValue({data: checklist});
+  (getSurveyorEquipmentInspection as jest.Mock).mockResolvedValue({
+    data: inspection('InProgress'),
+  });
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(
+      <SurveyorInspectionScreen
+        equipmentId="equipment-1"
+        inspectorName="Surveyor One"
+        onBack={jest.fn()}
+        onSaved={jest.fn()}
+      />,
+    );
+  });
+
+  await ReactTestRenderer.act(async () => {
+    buttonNamed(renderer.root, 'Select All')?.props.onPress();
+  });
+  expect(textOf(renderer.root)).toContain('Progress: 4 / 12 checked');
+
+  await ReactTestRenderer.act(async () => {
+    buttonNamed(renderer.root, 'Close')?.props.onPress();
+  });
+  expect(textOf(renderer.root)).toContain('All bolts and fasteners are tight');
+  expect(
+    buttonNamed(renderer.root, 'Select All')?.props.accessibilityState.checked,
+  ).toBe(false);
+
+  await ReactTestRenderer.act(async () => {
+    buttonNamed(renderer.root, 'Select All')?.props.onPress();
+  });
+  expect(textOf(renderer.root)).toContain('Progress: 8 / 12 checked');
+
+  await ReactTestRenderer.act(async () => {
+    buttonNamed(renderer.root, 'Visual')?.props.onPress();
+  });
+  expect(
+    buttonNamed(renderer.root, 'Select All')?.props.accessibilityState.checked,
+  ).toBe(true);
 });

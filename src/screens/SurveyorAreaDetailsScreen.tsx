@@ -32,6 +32,7 @@ type Props = {
   projectId: string;
   areaId: string;
   onBack: () => void;
+  onEquipmentPress: (equipmentId: string) => void;
   onEquipmentAdded?: () => void;
 };
 type PinPosition = {xPercent: number; yPercent: number};
@@ -61,6 +62,7 @@ export default function SurveyorAreaDetailsScreen({
   projectId,
   areaId,
   onBack,
+  onEquipmentPress,
   onEquipmentAdded,
 }: Props) {
   const {width} = useWindowDimensions();
@@ -383,6 +385,7 @@ export default function SurveyorAreaDetailsScreen({
             selectedId={selectedEquipmentId}
             deletingId={deletingId}
             onSelect={setSelectedEquipmentId}
+            onView={onEquipmentPress}
             onEdit={openEditForm}
             onDelete={deleteEquipment}
           />
@@ -404,16 +407,22 @@ export default function SurveyorAreaDetailsScreen({
   );
 }
 
-function EquipmentTable({equipment, selectedId, deletingId, onSelect, onEdit, onDelete}: {
+function EquipmentTable({equipment, selectedId, deletingId, onSelect, onView, onEdit, onDelete}: {
   equipment: AreaEquipment[];
   selectedId: string | null;
   deletingId: string | null;
   onSelect: (id: string) => void;
+  onView: (id: string) => void;
   onEdit: (equipment: AreaEquipment) => void;
   onDelete: (equipment: AreaEquipment) => void;
 }) {
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator>
+    <ScrollView
+      contentContainerStyle={styles.tableScrollContent}
+      horizontal
+      showsHorizontalScrollIndicator>
       <View style={styles.table}>
         <View style={styles.tableHeader}>
           <TableCell text="SEQ" width={55} header />
@@ -422,14 +431,22 @@ function EquipmentTable({equipment, selectedId, deletingId, onSelect, onEdit, on
           <TableCell text="TYPE" width={110} header />
           <TableCell text="LOCATION" width={170} header />
           <TableCell text="MANUFACTURER" width={135} header />
-          <TableCell text="STATUS" width={85} header />
-          <TableCell text="ACTIONS" width={145} header />
+          <TableCell text="STATUS" width={135} header />
+          <TableCell text="ACTIONS" width={225} header />
         </View>
-        {equipment.map(item => (
-          <TouchableOpacity
+        {equipment.map((item, index) => (
+          <Pressable
             key={item.id}
+            accessibilityRole="button"
+            onHoverIn={() => setHoveredId(item.id)}
+            onHoverOut={() => setHoveredId(current => current === item.id ? null : current)}
             onPress={() => onSelect(item.id)}
-            style={[styles.tableRow, selectedId === item.id && styles.tableRowSelected]}>
+            style={[
+              styles.tableRow,
+              index % 2 === 1 && styles.tableRowAlternate,
+              hoveredId === item.id && styles.tableRowHovered,
+              selectedId === item.id && styles.tableRowSelected,
+            ]}>
             <TableCell text={String(item.sequenceNo)} width={55} strong />
             <TableCell text={item.tagNumber} width={125} strong />
             <TableCell text={item.equipmentId || '--'} width={130} />
@@ -437,23 +454,73 @@ function EquipmentTable({equipment, selectedId, deletingId, onSelect, onEdit, on
             <TableCell text={item.location || '--'} width={170} />
             <TableCell text={item.manufacturer || '--'} width={135} />
             <View style={[styles.tableCell, styles.statusCell]}>
-              <View style={styles.activeBadge}><Text style={styles.activeText}>{item.status}</Text></View>
+              <StatusBadge status={item.status} />
             </View>
             <View style={[styles.tableCell, styles.actionsCell]}>
-              <TouchableOpacity onPress={() => onEdit(item)} style={styles.editButton}>
+              <TouchableOpacity
+                onPress={event => {
+                  event.stopPropagation?.();
+                  onView(item.id);
+                }}
+                style={styles.viewButton}>
+                <Text style={styles.viewButtonText}>View</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={event => {
+                  event.stopPropagation?.();
+                  onEdit(item);
+                }}
+                style={styles.editButton}>
                 <Text style={styles.editButtonText}>Edit</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 disabled={deletingId === item.id}
-                onPress={() => onDelete(item)}
+                onPress={event => {
+                  event.stopPropagation?.();
+                  onDelete(item);
+                }}
                 style={styles.deleteButton}>
                 <Text style={styles.deleteButtonText}>{deletingId === item.id ? '...' : 'Delete'}</Text>
               </TouchableOpacity>
             </View>
-          </TouchableOpacity>
+          </Pressable>
         ))}
       </View>
     </ScrollView>
+  );
+}
+
+const statusLabel = (status: string) => status
+  .replace('Qc', 'QC ')
+  .replace(/([a-z])([A-Z])/g, '$1 $2');
+
+function StatusBadge({status}: {status: string}) {
+  const normalizedStatus = status.replace(/\s+/g, '').toLowerCase();
+  const badgeStyle = normalizedStatus === 'inprogress'
+    ? styles.statusInProgress
+    : normalizedStatus === 'completed'
+      ? styles.statusCompleted
+      : normalizedStatus === 'changesrequested'
+        ? styles.statusChangesRequested
+        : normalizedStatus === 'qcapproved'
+          ? styles.statusQcApproved
+          : styles.statusNotStarted;
+  const textStyle = normalizedStatus === 'inprogress'
+    ? styles.statusInProgressText
+    : normalizedStatus === 'completed'
+      ? styles.statusCompletedText
+      : normalizedStatus === 'changesrequested'
+        ? styles.statusChangesRequestedText
+        : normalizedStatus === 'qcapproved'
+          ? styles.statusQcApprovedText
+          : styles.statusNotStartedText;
+
+  return (
+    <View style={[styles.statusBadge, badgeStyle]}>
+      <Text numberOfLines={1} style={[styles.statusBadgeText, textStyle]}>
+        {statusLabel(status)}
+      </Text>
+    </View>
   );
 }
 
@@ -580,21 +647,36 @@ const styles = StyleSheet.create({
   sectionHeader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 27, marginBottom: 12},
   sectionTitle: {fontSize: 18, color: '#242d52', fontWeight: '800'},
   sectionCount: {fontSize: 12, color: '#73788c', fontWeight: '700'},
-  table: {minWidth: 955, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e1e4ed', borderRadius: 8, overflow: 'hidden'},
-  tableHeader: {flexDirection: 'row', backgroundColor: '#f0f2f8'},
-  tableRow: {flexDirection: 'row', minHeight: 58, borderTopWidth: 1, borderTopColor: '#eceef4'},
-  tableRowSelected: {backgroundColor: '#eef0ff'},
-  tableCell: {paddingHorizontal: 10, justifyContent: 'center'},
-  tableText: {fontSize: 12, color: '#55596e'},
-  tableHeaderText: {fontSize: 9, color: '#777c8e', fontWeight: '800'},
+  tableScrollContent: {minWidth: '100%', paddingBottom: 4},
+  table: {minWidth: 1085, flexGrow: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: '#dfe3ee', borderRadius: 8, overflow: 'hidden'},
+  tableHeader: {flexDirection: 'row', minHeight: 46, backgroundColor: '#eef1f8'},
+  tableRow: {flexDirection: 'row', minHeight: 64, borderTopWidth: 1, borderTopColor: '#e9ecf3'},
+  tableRowAlternate: {backgroundColor: '#fafbfe'},
+  tableRowHovered: {backgroundColor: '#f1f3ff'},
+  tableRowSelected: {backgroundColor: '#e8ecff', borderLeftWidth: 3, borderLeftColor: '#5961e2'},
+  tableCell: {paddingHorizontal: 12, justifyContent: 'center'},
+  tableText: {fontSize: 12, lineHeight: 17, color: '#55596e'},
+  tableHeaderText: {fontSize: 9, color: '#666d84', fontWeight: '900'},
   tableStrongText: {color: '#292d4e', fontWeight: '800'},
-  actionsCell: {width: 145, flexDirection: 'row', alignItems: 'center', gap: 6},
-  statusCell: {width: 85},
-  activeBadge: {alignSelf: 'flex-start', backgroundColor: '#e5f6ec', borderRadius: 5, paddingHorizontal: 8, paddingVertical: 5},
-  activeText: {fontSize: 10, color: '#237348', fontWeight: '800'},
-  editButton: {paddingHorizontal: 10, paddingVertical: 7, borderRadius: 5, backgroundColor: '#e9ebff'},
+  actionsCell: {width: 225, flexDirection: 'row', alignItems: 'center', gap: 7},
+  statusCell: {width: 135},
+  statusBadge: {alignSelf: 'flex-start', maxWidth: 125, borderRadius: 5, paddingHorizontal: 9, paddingVertical: 6},
+  statusBadgeText: {fontSize: 9, fontWeight: '900'},
+  statusNotStarted: {backgroundColor: '#edf0f5'},
+  statusNotStartedText: {color: '#5e6677'},
+  statusInProgress: {backgroundColor: '#fff1cf'},
+  statusInProgressText: {color: '#8a6413'},
+  statusCompleted: {backgroundColor: '#e4f6eb'},
+  statusCompletedText: {color: '#237348'},
+  statusChangesRequested: {backgroundColor: '#fde8eb'},
+  statusChangesRequestedText: {color: '#b43242'},
+  statusQcApproved: {backgroundColor: '#ece9ff'},
+  statusQcApprovedText: {color: '#5345b8'},
+  viewButton: {paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5, backgroundColor: '#4c54d9'},
+  viewButtonText: {fontSize: 10, color: '#fff', fontWeight: '900'},
+  editButton: {paddingHorizontal: 11, paddingVertical: 8, borderRadius: 5, backgroundColor: '#e9ebff'},
   editButtonText: {fontSize: 10, color: '#3f47d6', fontWeight: '800'},
-  deleteButton: {paddingHorizontal: 10, paddingVertical: 7, borderRadius: 5, backgroundColor: '#fdebed'},
+  deleteButton: {paddingHorizontal: 11, paddingVertical: 8, borderRadius: 5, backgroundColor: '#fdebed'},
   deleteButtonText: {fontSize: 10, color: '#bf3441', fontWeight: '800'},
   emptyState: {minHeight: 160, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e3e6ee', borderRadius: 8, alignItems: 'center', justifyContent: 'center', padding: 24},
   modalOverlay: {flex: 1, backgroundColor: 'rgba(20, 23, 46, 0.54)', alignItems: 'center', justifyContent: 'center', padding: 18},

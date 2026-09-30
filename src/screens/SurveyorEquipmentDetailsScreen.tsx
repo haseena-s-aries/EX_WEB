@@ -95,7 +95,7 @@ export default function SurveyorEquipmentDetailsScreen({
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <TouchableOpacity onPress={onBack} style={styles.backButton}>
-        <Text style={styles.backText}>&lt; Back to project</Text>
+        <Text style={styles.backText}>&lt; Back to area</Text>
       </TouchableOpacity>
 
       <View style={styles.header}>
