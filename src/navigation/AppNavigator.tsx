@@ -175,8 +175,16 @@ export default function AppNavigator() {
               ) : currentUser?.role?.toLowerCase() === 'surveyor' ? (
                <SurveyorDashboardScreen
                   userName={currentUser.displayName || 'Surveyor'}
+                  refreshVersion={surveyorRefreshVersion}
                   onProjectPress={projectId =>
                     navigation.navigate('SurveyorProjectDetails', {projectId})
+                  }
+                  onFeedbackPress={feedback =>
+                    navigation.navigate('SurveyorEquipmentDetails', {
+                      projectId: feedback.projectId,
+                      areaId: feedback.areaId,
+                      equipmentId: feedback.equipmentId,
+                    })
                   }
                 />
               ) : (

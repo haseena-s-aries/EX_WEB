@@ -284,6 +284,12 @@ export default function AppNavigator() {
                 setSelectedAreaId('');
                 setScreen('SurveyorProjectDetails');
               }}
+              onFeedbackPress={feedback => {
+                setSelectedProjectId(feedback.projectId);
+                setSelectedAreaId(feedback.areaId);
+                setSelectedEquipmentId(feedback.equipmentId);
+                setScreen('SurveyorEquipmentDetails');
+              }}
             />
           ) : screen === 'Dashboard' ? (
             <DashboardScreen

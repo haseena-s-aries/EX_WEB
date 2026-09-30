@@ -196,7 +196,7 @@ export const uploadProjectAreaPhoto = (
   return apiClient.post<ProjectAreaPhoto[]>(
     `/projects/${projectId}/areas/${areaId}/photos`,
     formData,
-  );
+  );  
 };
 
 export const getProjectAreaPhotos = (projectId: string, areaId: string) =>
@@ -218,6 +218,31 @@ export type SurveyorProjectSummary = {
   createdDate: string;
   areaCount: number;
   status: string;
+};
+
+export type SurveyorQcFeedback = {
+  projectId: string;
+  areaId: string;
+  equipmentId: string;
+  projectName: string;
+  areaName: string;
+  sequenceNo: number;
+  tagNumber: string;
+  type: string;
+  qcComments: string;
+  severity?: QcSeverity | null;
+  reviewedDate?: string | null;
+};
+
+export type SurveyorDashboard = {
+  myProjectCount: number;
+  inProgress: number;
+  onHold: number;
+  notStarted: number;
+  awaitingQcReview: number;
+  changesRequested: number;
+  qcApproved: number;
+  qcFeedback: SurveyorQcFeedback[];
 };
 
 export type SurveyorAreaSummary = {
@@ -343,6 +368,9 @@ export type SurveyorAreaDetails = {
 
 export const getSurveyorProjects = () =>
   apiClient.get<SurveyorProjectSummary[]>('/surveyor/projects');
+
+export const getSurveyorDashboard = () =>
+  apiClient.get<SurveyorDashboard>('/surveyor/dashboard');
 
 export const getSurveyorProject = (projectId: string) =>
   apiClient.get<SurveyorProjectDetails>(`/surveyor/projects/${projectId}`);
