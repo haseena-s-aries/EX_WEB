@@ -18,6 +18,7 @@ type UserOption = {id: string; displayName: string};
 type Props = {
   isSurveyor?: boolean;
   onSurveyorProjectPress?: (projectId: string) => void;
+  onProjectPress?: (projectId: string, project: any) => void;
   surveyors?: UserOption[];
   qcUsers?: UserOption[];
   clients?: UserOption[];
@@ -37,6 +38,7 @@ const statusOf = (project: any) => project?.status || project?.projectStatus || 
 export default function ProjectsScreen({
   isSurveyor = false,
   onSurveyorProjectPress,
+  onProjectPress,
   surveyors = [],
   qcUsers = [],
   clients = [],
@@ -164,6 +166,7 @@ export default function ProjectsScreen({
                 activeOpacity={0.82}
                 onPress={() => {
                   if (isSurveyor) onSurveyorProjectPress?.(projectId);
+                  else if (onProjectPress) onProjectPress(projectId, project);
                   else setSelectedProject(project);
                 }}
                 style={[

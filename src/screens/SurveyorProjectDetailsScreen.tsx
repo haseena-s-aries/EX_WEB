@@ -9,8 +9,10 @@ import {
 } from 'react-native';
 import {getApiErrorMessage} from '../api/errors';
 import {
+  AreaEquipment,
   getSurveyorProject,
   getSurveyorProjectAreas,
+  getSurveyorEquipment,
   getProjectAreaPhotos,
   SurveyorAreaSummary,
   SurveyorProjectDetails,
@@ -21,11 +23,20 @@ type Props = {
   projectId: string;
   onBack: () => void;
   onAreaPress: (areaId: string) => void;
+  onEquipmentPress: (areaId: string, equipmentId: string) => void;
+  refreshVersion?: number;
 };
 
 const formatDate = (value: string) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? 'Not set' : date.toLocaleDateString();
+};
+
+const formatInspectionStatus = (value?: string | null) => {
+  const status = value || 'NotStarted';
+  if (status === 'NotStarted') return 'Pending Inspection';
+  if (status === 'QcApproved') return 'QC Approved';
+  return status.replace(/([a-z])([A-Z])/g, '$1 $2');
 };
 
 const STATUS_BADGES: Record<string, {backgroundColor: string; color: string}> = {
@@ -41,11 +52,21 @@ export default function SurveyorProjectDetailsScreen({
   projectId,
   onBack,
   onAreaPress,
+  onEquipmentPress,
+  refreshVersion,
 }: Props) {
   const [project, setProject] = useState<SurveyorProjectDetails | null>(null);
   const [areas, setAreas] = useState<SurveyorAreaSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [equipmentByArea, setEquipmentByArea] = useState<
+    Record<string, AreaEquipment[]>
+  >({});
+  const [areasExpanded, setAreasExpanded] = useState(false);
+  const [equipmentExpanded, setEquipmentExpanded] = useState(false);
+  const [expandedEquipmentAreaId, setExpandedEquipmentAreaId] = useState<
+    string | null
+  >(null);
 
   const loadProject = useCallback(async () => {
     setLoading(true);
@@ -56,22 +77,33 @@ export default function SurveyorProjectDetailsScreen({
         getSurveyorProjectAreas(projectId),
       ]);
       setProject(projectResponse.data);
-      const areasWithImages = await Promise.all(
+      const loadedAreas = await Promise.all(
         areaResponse.data.map(async area => {
-          if (area.layoutImagePath) return area;
-          try {
-            const photos = await getProjectAreaPhotos(projectId, area.areaId);
-            return {
+          const [photos, equipment] = await Promise.all([
+            area.layoutImagePath
+              ? Promise.resolve(null)
+              : getProjectAreaPhotos(projectId, area.areaId).catch(() => null),
+            getSurveyorEquipment(projectId, area.areaId),
+          ]);
+          return {
+            area: {
               ...area,
               layoutImagePath:
-                photos.data?.[0]?.downloadUrl || photos.data?.[0]?.filePath,
-            };
-          } catch {
-            return area;
-          }
+                area.layoutImagePath ||
+                photos?.data?.[0]?.downloadUrl ||
+                photos?.data?.[0]?.filePath,
+            },
+            equipment: equipment.data,
+          };
         }),
       );
-      setAreas(areasWithImages);
+      setAreas(loadedAreas.map(item => item.area));
+      setEquipmentByArea(
+        Object.fromEntries(
+          loadedAreas.map(item => [item.area.areaId, item.equipment]),
+        ),
+      );
+      setExpandedEquipmentAreaId(null);
     } catch (requestError) {
       setError(
         getApiErrorMessage(requestError, 'Could not load project details.'),
@@ -83,7 +115,7 @@ export default function SurveyorProjectDetailsScreen({
 
   useEffect(() => {
     loadProject();
-  }, [loadProject]);
+  }, [loadProject, refreshVersion]);
 
   if (loading) {
     return <PageState message="Loading project details..." />;
@@ -108,6 +140,14 @@ export default function SurveyorProjectDetailsScreen({
 
   const status = project.status || 'Assigned';
   const statusBadge = STATUS_BADGES[status.toLowerCase()] || STATUS_BADGES.assigned;
+  const totalEquipment = Object.values(equipmentByArea).reduce(
+    (total, equipment) => total + equipment.length,
+    0,
+  );
+
+  const toggleEquipmentArea = (areaId: string) => {
+    setExpandedEquipmentAreaId(current => current === areaId ? null : areaId);
+  };
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -150,40 +190,144 @@ export default function SurveyorProjectDetailsScreen({
         </View>
       </View>
 
-      <View style={styles.sectionHeader}>
-        <View>
-          <Text style={styles.sectionTitle}>Project Areas</Text>
-          <Text style={styles.sectionSubtitle}>Open an area to view its layout and equipment.</Text>
-        </View>
-        <Text style={styles.areaCount}>{areas.length} areas</Text>
-      </View>
-
-      {areas.length === 0 ? (
-        <View style={styles.emptyAreas}>
-          <Text style={styles.stateTitle}>No areas available</Text>
-          <Text style={styles.stateMessage}>No areas have been added to this project.</Text>
-        </View>
-      ) : (
-        <View style={styles.areaGrid}>
-          {areas.map(area => (
-            <View key={area.areaId} style={styles.areaCard}>
-              <AuthenticatedImage path={area.layoutImagePath} style={styles.thumbnail} />
-              <View style={styles.areaBody}>
-                <Text style={styles.areaName}>{area.areaName}</Text>
-                <Text style={styles.areaStats}>
-                  {area.photoCount} photos   |   {area.equipmentCount} equipment
-                </Text>
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  onPress={() => onAreaPress(area.areaId)}
-                  style={styles.viewAreaButton}>
-                  <Text style={styles.viewAreaText}>View Area</Text>
-                </TouchableOpacity>
-              </View>
+      <View style={styles.accordions}>
+        <View style={styles.accordionSection}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{expanded: areasExpanded}}
+            onPress={() => setAreasExpanded(current => !current)}
+            style={styles.accordionHeader}>
+            <View style={styles.accordionHeading}>
+              <Text style={styles.chevron}>{areasExpanded ? 'v' : '>'}</Text>
+              <Text style={styles.sectionTitle}>Project Areas</Text>
             </View>
-          ))}
+            <Text style={styles.sectionCount}>{areas.length}</Text>
+          </TouchableOpacity>
+
+          {areasExpanded && (
+            <View style={styles.accordionContent}>
+              {areas.length === 0 ? (
+                <View style={styles.emptyAreas}>
+                  <Text style={styles.stateTitle}>No areas available</Text>
+                  <Text style={styles.stateMessage}>
+                    No areas have been added to this project.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.areaGrid}>
+                  {areas.map(area => (
+                    <View key={area.areaId} style={styles.areaCard}>
+                      <AuthenticatedImage
+                        path={area.layoutImagePath}
+                        style={styles.thumbnail}
+                      />
+                      <View style={styles.areaBody}>
+                        <Text style={styles.areaName}>{area.areaName}</Text>
+                        <Text style={styles.areaStats}>
+                          {area.photoCount} photos   |   {area.equipmentCount} equipment
+                        </Text>
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          onPress={() => onAreaPress(area.areaId)}
+                          style={styles.viewAreaButton}>
+                          <Text style={styles.viewAreaText}>View Area</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
         </View>
-      )}
+
+        <View style={styles.accordionSection}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{expanded: equipmentExpanded}}
+            onPress={() => {
+              setEquipmentExpanded(current => !current);
+              setExpandedEquipmentAreaId(null);
+            }}
+            style={styles.accordionHeader}>
+            <View style={styles.accordionHeading}>
+              <Text style={styles.chevron}>{equipmentExpanded ? 'v' : '>'}</Text>
+              <Text style={styles.sectionTitle}>All Equipment</Text>
+            </View>
+            <Text style={styles.sectionCount}>{totalEquipment}</Text>
+          </TouchableOpacity>
+
+          {equipmentExpanded && (
+            <View style={styles.equipmentGroups}>
+              {areas.length === 0 ? (
+                <Text style={styles.emptyInline}>No equipment areas available.</Text>
+              ) : (
+                areas.map(area => {
+                  const areaEquipment = equipmentByArea[area.areaId] || [];
+                  const areaOpen = expandedEquipmentAreaId === area.areaId;
+                  return (
+                    <View key={area.areaId} style={styles.equipmentGroup}>
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityState={{expanded: areaOpen}}
+                        onPress={() => toggleEquipmentArea(area.areaId)}
+                        style={styles.equipmentGroupHeader}>
+                        <View style={styles.accordionHeading}>
+                          <Text style={styles.smallChevron}>{areaOpen ? 'v' : '>'}</Text>
+                          <Text style={styles.equipmentAreaName}>{area.areaName}</Text>
+                        </View>
+                        <Text style={styles.equipmentAreaCount}>{areaEquipment.length}</Text>
+                      </TouchableOpacity>
+
+                      {areaOpen && (
+                        <View style={styles.equipmentList}>
+                          {areaEquipment.length === 0 ? (
+                            <Text style={styles.emptyInline}>No equipment in this area.</Text>
+                          ) : (
+                            <View style={styles.equipmentCardGrid}>
+                              {areaEquipment.map(equipment => (
+                                <TouchableOpacity
+                                  key={equipment.id}
+                                  accessibilityRole="button"
+                                  onPress={() => onEquipmentPress(area.areaId, equipment.id)}
+                                  style={styles.equipmentCard}>
+                                  <View style={styles.equipmentSequence}>
+                                    <Text style={styles.equipmentSequenceText}>
+                                      {equipment.sequenceNo}
+                                    </Text>
+                                  </View>
+                                  <View style={styles.equipmentCardBody}>
+                                    <Text style={styles.equipmentTag}>{equipment.tagNumber}</Text>
+                                    <Text style={styles.equipmentType}>{equipment.type}</Text>
+                                    <Text style={styles.equipmentMeta}>
+                                      {equipment.equipmentId || 'No equipment ID'}
+                                    </Text>
+                                    <Text style={styles.equipmentMeta}>
+                                      {equipment.location || 'Location not set'}
+                                    </Text>
+                                    <Text style={styles.equipmentMeta}>
+                                      {equipment.manufacturer || 'Manufacturer not set'}
+                                    </Text>
+                                  </View>
+                                  <View style={styles.inspectionStatus}>
+                                    <Text style={styles.inspectionStatusText}>
+                                      {formatInspectionStatus(equipment.status)}
+                                    </Text>
+                                  </View>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          )}
+        </View>
+      </View>
     </ScrollView>
   );
 }
@@ -247,10 +391,15 @@ const styles = StyleSheet.create({
   teamCopy: {flex: 1, marginLeft: 10},
   teamRole: {fontSize: 9, fontWeight: '800', color: '#979baa', textTransform: 'uppercase'},
   teamName: {fontSize: 13, color: '#343851', fontWeight: '700', marginTop: 3},
-  sectionHeader: {marginTop: 28, marginBottom: 13, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14},
   sectionTitle: {fontSize: 18, color: '#242d52', fontWeight: '800'},
-  sectionSubtitle: {fontSize: 12, color: '#838798', marginTop: 4},
-  areaCount: {fontSize: 12, color: '#707589', fontWeight: '700'},
+  accordions: {marginTop: 24, gap: 12},
+  accordionSection: {backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e9f6', borderRadius: 8, overflow: 'hidden'},
+  accordionHeader: {minHeight: 62, paddingHorizontal: 18, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12},
+  accordionHeading: {flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10},
+  accordionContent: {borderTopWidth: 1, borderTopColor: '#eef0f5', padding: 16},
+  chevron: {width: 16, fontSize: 16, color: '#718be8', fontWeight: '800'},
+  smallChevron: {width: 14, fontSize: 13, color: '#718be8', fontWeight: '800'},
+  sectionCount: {minWidth: 28, textAlign: 'center', fontSize: 12, color: '#4d5577', fontWeight: '800', backgroundColor: '#f0eeff', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4},
   areaGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 14},
   areaCard: {flexGrow: 1, flexBasis: 280, maxWidth: 380, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e9f6', borderRadius: 8, overflow: 'hidden'},
   thumbnail: {width: '100%', height: 132},
@@ -260,6 +409,23 @@ const styles = StyleSheet.create({
   viewAreaButton: {marginTop: 15, minHeight: 38, borderRadius: 10, backgroundColor: '#b8a5f8', alignItems: 'center', justifyContent: 'center'},
   viewAreaText: {fontSize: 12, color: '#242d52', fontWeight: '800'},
   emptyAreas: {minHeight: 170, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e9f6', alignItems: 'center', justifyContent: 'center', padding: 24},
+  equipmentGroups: {borderTopWidth: 1, borderTopColor: '#eef0f5'},
+  equipmentGroup: {borderBottomWidth: 1, borderBottomColor: '#eef0f5'},
+  equipmentGroupHeader: {minHeight: 52, paddingHorizontal: 18, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, backgroundColor: '#fafbff'},
+  equipmentAreaName: {fontSize: 13, color: '#343851', fontWeight: '800'},
+  equipmentAreaCount: {fontSize: 11, color: '#707589', fontWeight: '800'},
+  equipmentList: {paddingHorizontal: 18, paddingBottom: 10},
+  equipmentCardGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 12},
+  equipmentCard: {flexGrow: 1, flexBasis: 270, maxWidth: 360, minHeight: 150, borderWidth: 1, borderColor: '#e1e5f1', borderRadius: 8, padding: 14, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'flex-start', gap: 12},
+  equipmentSequence: {width: 38, height: 38, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0eeff'},
+  equipmentSequenceText: {fontSize: 15, color: '#566dbd', fontWeight: '900'},
+  equipmentCardBody: {flex: 1},
+  equipmentTag: {fontSize: 15, color: '#242d52', fontWeight: '800'},
+  equipmentType: {fontSize: 12, color: '#566dbd', fontWeight: '700', marginTop: 4},
+  equipmentMeta: {fontSize: 10, color: '#7d8192', marginTop: 5},
+  inspectionStatus: {position: 'absolute', right: 10, bottom: 10, backgroundColor: '#f7f9ff', borderRadius: 11, paddingHorizontal: 8, paddingVertical: 4},
+  inspectionStatusText: {fontSize: 9, color: '#58617f', fontWeight: '800'},
+  emptyInline: {fontSize: 12, color: '#838798', paddingHorizontal: 18, paddingVertical: 18},
   fullState: {flex: 1, minHeight: 400, backgroundColor: '#f7f9ff', alignItems: 'center', justifyContent: 'center', padding: 28},
   stateTitle: {fontSize: 17, color: '#242d52', fontWeight: '800'},
   stateMessage: {fontSize: 13, color: '#7d8192', lineHeight: 19, textAlign: 'center', marginTop: 10},

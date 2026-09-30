@@ -16,10 +16,13 @@ import DashboardScreen from '../screens/DashboardScreen';
 import SurveyorDashboardScreen from '../screens/SurveyorDashboardScreen';
 import SurveyorProjectDetailsScreen from '../screens/SurveyorProjectDetailsScreen';
 import SurveyorAreaDetailsScreen from '../screens/SurveyorAreaDetailsScreen';
+import SurveyorEquipmentDetailsScreen from '../screens/SurveyorEquipmentDetailsScreen';
+import SurveyorInspectionScreen from '../screens/SurveyorInspectionScreen';
 import {sendOtp, verifyOtp, completeRegistration, loginUser} from '../api/auth';
 import {getAssignmentOptions} from '../api/projects';
 import {setAuthToken} from '../api/client';
-
+import QcDashboardScreen from '../screens/QcDashboardScreen';
+import QcProjectDetailsScreen from '../screens/QcProjectDetailsScreen';
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
@@ -30,6 +33,7 @@ export default function AppNavigator() {
     role: string;
   } | null>(null);
   const [assignmentOptions, setAssignmentOptions] = useState<any[]>([]);
+  const [surveyorRefreshVersion, setSurveyorRefreshVersion] = useState(0);
 
   return (
     <NavigationContainer>
@@ -161,8 +165,15 @@ export default function AppNavigator() {
                   <Text style={styles.logoutText}>Log out</Text>
                 </TouchableOpacity>
               </View>
-              {currentUser?.role?.toLowerCase() === 'surveyor' ? (
-                <SurveyorDashboardScreen
+              {currentUser?.role?.toLowerCase() === 'qc' ? (
+                <QcDashboardScreen
+                  userName={currentUser.displayName || 'QC'}
+                  onProjectPress={(projectId, projectSummary) =>
+                    navigation.navigate('QcProjectDetails', {projectId, projectSummary})
+                  }
+                />
+              ) : currentUser?.role?.toLowerCase() === 'surveyor' ? (
+               <SurveyorDashboardScreen
                   userName={currentUser.displayName || 'Surveyor'}
                   onProjectPress={projectId =>
                     navigation.navigate('SurveyorProjectDetails', {projectId})
@@ -186,16 +197,36 @@ export default function AppNavigator() {
           )}
         </Stack.Screen>
 
+        <Stack.Screen name="QcProjectDetails">
+          {({navigation, route}: any) => (
+            <SafeAreaView style={styles.dashboardShell}>
+              <QcProjectDetailsScreen
+                projectId={route.params.projectId}
+                projectSummary={route.params.projectSummary}
+                onBack={() => navigation.goBack()}
+              />
+            </SafeAreaView>
+          )}
+        </Stack.Screen>
+
         <Stack.Screen name="SurveyorProjectDetails">
           {({navigation, route}: any) => (
             <SafeAreaView style={styles.dashboardShell}>
               <SurveyorProjectDetailsScreen
                 projectId={route.params.projectId}
+                refreshVersion={surveyorRefreshVersion}
                 onBack={() => navigation.goBack()}
                 onAreaPress={areaId =>
                   navigation.navigate('SurveyorAreaDetails', {
                     projectId: route.params.projectId,
                     areaId,
+                  })
+                }
+                onEquipmentPress={(areaId, equipmentId) =>
+                  navigation.navigate('SurveyorEquipmentDetails', {
+                    projectId: route.params.projectId,
+                    areaId,
+                    equipmentId,
                   })
                 }
               />
@@ -210,6 +241,45 @@ export default function AppNavigator() {
                 projectId={route.params.projectId}
                 areaId={route.params.areaId}
                 onBack={() => navigation.goBack()}
+                onEquipmentAdded={() =>
+                  setSurveyorRefreshVersion(version => version + 1)
+                }
+              />
+            </SafeAreaView>
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen name="SurveyorEquipmentDetails">
+          {({navigation, route}: any) => (
+            <SafeAreaView style={styles.dashboardShell}>
+              <SurveyorEquipmentDetailsScreen
+                projectId={route.params.projectId}
+                areaId={route.params.areaId}
+                equipmentId={route.params.equipmentId}
+                refreshVersion={surveyorRefreshVersion}
+                onBack={() => navigation.goBack()}
+                onInspect={() =>
+                  navigation.navigate('SurveyorInspection', {
+                    projectId: route.params.projectId,
+                    areaId: route.params.areaId,
+                    equipmentId: route.params.equipmentId,
+                  })
+                }
+              />
+            </SafeAreaView>
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen name="SurveyorInspection">
+          {({navigation, route}: any) => (
+            <SafeAreaView style={styles.dashboardShell}>
+              <SurveyorInspectionScreen
+                equipmentId={route.params.equipmentId}
+                inspectorName={currentUser?.displayName || 'Surveyor'}
+                onBack={() => navigation.goBack()}
+                onSaved={() =>
+                  setSurveyorRefreshVersion(version => version + 1)
+                }
               />
             </SafeAreaView>
           )}

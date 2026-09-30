@@ -14,7 +14,12 @@ import ProjectsScreen from '../screens/ProjectsScreen';
 import SurveyorDashboardScreen from '../screens/SurveyorDashboardScreen';
 import SurveyorProjectDetailsScreen from '../screens/SurveyorProjectDetailsScreen';
 import SurveyorAreaDetailsScreen from '../screens/SurveyorAreaDetailsScreen';
+import SurveyorEquipmentDetailsScreen from '../screens/SurveyorEquipmentDetailsScreen';
+import SurveyorInspectionScreen from '../screens/SurveyorInspectionScreen';
 import UserManagementScreen from '../screens/UserManagementScreen';
+import QcDashboardScreen from '../screens/QcDashboardScreen';
+import QcProjectDetailsScreen from '../screens/QcProjectDetailsScreen';
+import ProjectDetailsScreen from '../screens/ProjectDetailsScreen';
 import Sidebar from '../components/Sidebar';
 import {sendOtp, verifyOtp, completeRegistration, loginUser} from '../api/auth';
 import {getAssignmentOptions} from '../api/projects';
@@ -28,7 +33,12 @@ type Screen =
   | 'Projects'
   | 'UserManagement'
   | 'SurveyorProjectDetails'
-  | 'SurveyorAreaDetails';
+  | 'SurveyorAreaDetails'
+  | 'QcProjectDetails'
+  | 'QcProjects'
+  | 'ProjectDetails'
+  | 'SurveyorEquipmentDetails'
+  | 'SurveyorInspection';
 
 export default function AppNavigator() {
   const {width} = useWindowDimensions();
@@ -41,8 +51,14 @@ export default function AppNavigator() {
   const [approvedUsers, setApprovedUsers] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [selectedAreaId, setSelectedAreaId] = useState('');
+  const [qcProjectId, setQcProjectId] = useState('');
+  const [qcProjectSummary, setQcProjectSummary] = useState<any>(null);
+  const [qcProjectReturnScreen, setQcProjectReturnScreen] = useState<
+    'Dashboard' | 'QcProjects'
+  >('Dashboard');
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState('');
   const [projectDetailsReturnScreen, setProjectDetailsReturnScreen] = useState<'Dashboard' | 'Projects'>('Dashboard');
-
+  const [surveyorRefreshVersion, setSurveyorRefreshVersion] = useState(0);
   if (screen === 'Otp') {
     return (
       <OtpScreen
@@ -108,7 +124,12 @@ export default function AppNavigator() {
     screen === 'Projects' ||
     screen === 'UserManagement' ||
     screen === 'SurveyorProjectDetails' ||
-    screen === 'SurveyorAreaDetails'
+    screen === 'SurveyorAreaDetails' ||
+    screen === 'QcProjectDetails' ||
+    screen === 'QcProjects' ||
+    screen === 'SurveyorEquipmentDetails' ||
+    screen === 'SurveyorInspection' ||
+    screen === 'ProjectDetails'
   ) {
     if (!currentUser) {
       setScreen('Login');
@@ -120,6 +141,9 @@ export default function AppNavigator() {
       setApprovedUsers([]);
       setSelectedProjectId('');
       setSelectedAreaId('');
+      setSelectedEquipmentId('');
+      setQcProjectId('');
+      setQcProjectSummary(null);
       setScreen('Login');
     };
     const canManageUsers =
@@ -157,15 +181,23 @@ export default function AppNavigator() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => setScreen('Projects')}
+                onPress={() =>
+                  setScreen(
+                    currentUser.role.toLowerCase() === 'qc'
+                      ? 'QcProjects'
+                      : 'Projects',
+                  )
+                }
                 style={[
                   styles.mobileNavItem,
-                  ['Projects', 'SurveyorProjectDetails', 'SurveyorAreaDetails'].includes(screen) && styles.mobileNavItemActive,
+                  ['Projects', 'SurveyorProjectDetails', 'SurveyorAreaDetails', 'QcProjectDetails',
+                  'SurveyorEquipmentDetails','SurveyorInspection', 'QcProjects', 'ProjectDetails'].includes(screen) && styles.mobileNavItemActive,
                 ]}>
                 <Text
                   style={[
                     styles.mobileNavText,
-                    ['Projects', 'SurveyorProjectDetails', 'SurveyorAreaDetails'].includes(screen) && styles.mobileNavTextActive,
+                    ['Projects', 'SurveyorProjectDetails', 'SurveyorAreaDetails', 'QcProjectDetails',
+                     'SurveyorEquipmentDetails', 'SurveyorInspection','QcProjects', 'ProjectDetails'].includes(screen) && styles.mobileNavTextActive,
                   ]}>
                   Projects
                 </Text>
@@ -192,16 +224,27 @@ export default function AppNavigator() {
         ) : (
           <Sidebar
             active={
-              screen === 'SurveyorProjectDetails' || screen === 'SurveyorAreaDetails'
+              screen === 'SurveyorProjectDetails' ||
+              screen === 'SurveyorAreaDetails' ||
+              screen === 'SurveyorEquipmentDetails' ||
+              screen === 'SurveyorInspection'
                 ? projectDetailsReturnScreen
+                : screen === 'ProjectDetails' || screen === 'QcProjects' || screen === 'QcProjectDetails'
+                  ? 'Projects'
                 : screen
             }
             userName={currentUser.name}
             userRole={currentUser.role}
             onNavigate={key => {
               if (key === 'Dashboard' || key === 'Projects' || key === 'UserManagement') {
+                if (key === 'UserManagement' && !canManageUsers) return;
+                if (key === 'Projects' && currentUser.role.toLowerCase() === 'qc') {
+                  setScreen('QcProjects');
+                  return;
+                }
                 setSelectedProjectId('');
                 setSelectedAreaId('');
+                 setSelectedEquipmentId('');
                 setScreen(key as Screen);
               }
             }}
@@ -209,10 +252,32 @@ export default function AppNavigator() {
           />
         )}
         <View style={styles.mainContent}>
-          {screen === 'Dashboard' &&
+          {screen === 'Dashboard' && currentUser.role.toLowerCase() === 'qc' ? (
+            <QcDashboardScreen
+              userName={currentUser.name}
+              onProjectPress={(id, project) => {
+                setQcProjectId(id);
+                setQcProjectSummary(project);
+                setQcProjectReturnScreen('Dashboard');
+                setScreen('QcProjectDetails');
+              }}
+            />
+          ) : screen === 'QcProjects' ? (
+            <QcDashboardScreen
+              projectsOnly
+              userName={currentUser.name}
+              onProjectPress={(id, project) => {
+                setQcProjectId(id);
+                setQcProjectSummary(project);
+                setQcProjectReturnScreen('QcProjects');
+                setScreen('QcProjectDetails');
+              }}
+            />
+          ) : screen === 'Dashboard' &&
           currentUser.role.toLowerCase() === 'surveyor' ? (
             <SurveyorDashboardScreen
               userName={currentUser.name}
+              refreshVersion={surveyorRefreshVersion}
               onProjectPress={projectId => {
                 setProjectDetailsReturnScreen('Dashboard');
                 setSelectedProjectId(projectId);
@@ -233,9 +298,19 @@ export default function AppNavigator() {
                 .filter((u: any) => u.role?.toLowerCase() === 'client')
                 .map((u: any) => ({id: u.id, displayName: u.displayName}))}
             />
+          ) : screen === 'QcProjectDetails' && qcProjectId ? (
+            <QcProjectDetailsScreen
+              projectId={qcProjectId}
+              projectSummary={qcProjectSummary}
+              onBack={() => setScreen(qcProjectReturnScreen)}
+            />
           ) : screen === 'Projects' ? (
             <ProjectsScreen
               isSurveyor={currentUser.role.toLowerCase() === 'surveyor'}
+              onProjectPress={canManageUsers ? projectId => {
+                setSelectedProjectId(projectId);
+                setScreen('ProjectDetails');
+              } : undefined}
               onSurveyorProjectPress={projectId => {
                 setProjectDetailsReturnScreen('Projects');
                 setSelectedProjectId(projectId);
@@ -252,13 +327,27 @@ export default function AppNavigator() {
                 .filter((u: any) => u.role?.toLowerCase() === 'client')
                 .map((u: any) => ({id: u.id, displayName: u.displayName}))}
             />
+          ) : screen === 'ProjectDetails' && selectedProjectId ? (
+            <ProjectDetailsScreen
+              projectId={selectedProjectId}
+              onBack={() => setScreen('Projects')}
+              surveyors={approvedUsers.filter((u: any) => u.role?.toLowerCase() === 'surveyor').map((u: any) => ({id: u.id, displayName: u.displayName}))}
+              qcUsers={approvedUsers.filter((u: any) => u.role?.toLowerCase() === 'qc').map((u: any) => ({id: u.id, displayName: u.displayName}))}
+              clients={approvedUsers.filter((u: any) => u.role?.toLowerCase() === 'client').map((u: any) => ({id: u.id, displayName: u.displayName}))}
+            />
           ) : screen === 'SurveyorProjectDetails' && selectedProjectId ? (
             <SurveyorProjectDetailsScreen
               projectId={selectedProjectId}
+              refreshVersion={surveyorRefreshVersion}
               onBack={() => setScreen(projectDetailsReturnScreen)}
               onAreaPress={areaId => {
                 setSelectedAreaId(areaId);
                 setScreen('SurveyorAreaDetails');
+              }}
+                onEquipmentPress={(areaId, equipmentId) => {
+                setSelectedAreaId(areaId);
+                setSelectedEquipmentId(equipmentId);
+                setScreen('SurveyorEquipmentDetails');
               }}
             />
           ) : screen === 'SurveyorAreaDetails' &&
@@ -268,9 +357,35 @@ export default function AppNavigator() {
               projectId={selectedProjectId}
               areaId={selectedAreaId}
               onBack={() => setScreen('SurveyorProjectDetails')}
+           onEquipmentAdded={() =>
+                setSurveyorRefreshVersion(version => version + 1)
+              }
             />
-          ) : (
+          ) : screen === 'SurveyorEquipmentDetails' &&
+            selectedProjectId &&
+            selectedAreaId &&
+            selectedEquipmentId ? (
+            <SurveyorEquipmentDetailsScreen
+              projectId={selectedProjectId}
+              areaId={selectedAreaId}
+              equipmentId={selectedEquipmentId}
+              refreshVersion={surveyorRefreshVersion}
+              onBack={() => setScreen('SurveyorProjectDetails')}
+              onInspect={() => setScreen('SurveyorInspection')}
+            />
+          ) : screen === 'SurveyorInspection' && selectedEquipmentId ? (
+            <SurveyorInspectionScreen
+              equipmentId={selectedEquipmentId}
+              inspectorName={currentUser.name || 'Surveyor'}
+              onBack={() => setScreen('SurveyorEquipmentDetails')}
+              onSaved={() =>
+                setSurveyorRefreshVersion(version => version + 1)
+              }
+            />
+          ) : screen === 'UserManagement' ? (
             <UserManagementScreen onBack={() => setScreen('Dashboard')} />
+          ) : (
+            <DashboardScreen userName={currentUser.name} />
           )}
         </View>
       </View>

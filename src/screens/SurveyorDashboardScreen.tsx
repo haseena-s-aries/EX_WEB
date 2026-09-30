@@ -17,6 +17,7 @@ import {
 type Props = {
   userName: string;
   onProjectPress: (projectId: string) => void;
+  refreshVersion?: number;
 };
 
 const projectStatus = (project: SurveyorProjectSummary) =>
@@ -34,6 +35,7 @@ const STATUS_BADGES: Record<string, {backgroundColor: string; color: string}> = 
 export default function SurveyorDashboardScreen({
   userName,
   onProjectPress,
+  refreshVersion,
 }: Props) {
   const [projects, setProjects] = useState<SurveyorProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +60,7 @@ export default function SurveyorDashboardScreen({
 
   useEffect(() => {
     loadProjects();
-  }, [loadProjects]);
+  }, [loadProjects, refreshVersion]);
 
   return (
     <ScrollView

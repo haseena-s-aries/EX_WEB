@@ -28,7 +28,12 @@ import {
 } from '../api/projects';
 import AuthenticatedImage from '../components/AuthenticatedImage';
 
-type Props = {projectId: string; areaId: string; onBack: () => void};
+type Props = {
+  projectId: string;
+  areaId: string;
+  onBack: () => void;
+  onEquipmentAdded?: () => void;
+};
 type PinPosition = {xPercent: number; yPercent: number};
 type EquipmentForm = {
   tagNumber: string;
@@ -52,7 +57,12 @@ const emptyForm = (): EquipmentForm => ({
   certificateNumber: '',
 });
 
-export default function SurveyorAreaDetailsScreen({projectId, areaId, onBack}: Props) {
+export default function SurveyorAreaDetailsScreen({
+  projectId,
+  areaId,
+  onBack,
+  onEquipmentAdded,
+}: Props) {
   const {width} = useWindowDimensions();
   const isPhone = width < 700;
   const [area, setArea] = useState<SurveyorAreaDetails | null>(null);
@@ -195,6 +205,9 @@ export default function SurveyorAreaDetailsScreen({projectId, areaId, onBack}: P
         ? await updateSurveyorEquipment(projectId, areaId, editingEquipment.id, payload)
         : await createSurveyorEquipment(projectId, areaId, payload);
       await refreshEquipment();
+      if (!editingEquipment) {
+        onEquipmentAdded?.();
+      }
       setSelectedEquipmentId(response.data.id);
       setNotice(
         editingEquipment

@@ -1,4 +1,6 @@
 import apiClient from './client';
+import {Platform} from 'react-native';
+
 export type ProjectStatus =
   | 'Pending'
   | 'Active'
@@ -8,9 +10,14 @@ export type ProjectStatus =
 
 export const normalizeProjectStatus = (value: unknown): ProjectStatus => {
   if (typeof value === 'number') {
-    return ['Pending', 'Active', 'InProgress', 'Completed', 'OnHold'][value] as
-      | ProjectStatus
-      | undefined || 'Pending';
+    const statuses: ProjectStatus[] = [
+      'Pending',
+      'Active',
+      'InProgress',
+      'Completed',
+      'OnHold',
+    ];
+    return statuses[value] || 'Pending';
   }
 
   switch (String(value ?? '').replace(/\s+/g, '').toLowerCase()) {
@@ -34,15 +41,71 @@ export const projectStatusLabel = (value: unknown) => {
   return status;
 };
 
-export const getAssignmentOptions = () => apiClient.get('/projects/assignment-options');
+export type ProjectAssignableUser = {
+  id: string;
+  displayName: string;
+  email: string;
+  role: string;
+};
 
-export const getProjects = () => apiClient.get('/projects');
+export type ProjectSummary = {
+  id: string;
+  projectName: string;
+  sector: string;
+  jobNo: string;
+  location: string;
+  vesselOrSiteName: string;
+  status: ProjectStatus;
+  assignedSurveyorId: string;
+  assignedQcId: string;
+  assignedClientId: string;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  areaCount: number;
+};
 
-// NEW: fetches the full record for one project (used by the project
-// detail/edit modal) — matches GET /api/projects/{id} confirmed in Swagger.
-export const getProject = (projectId: string) => apiClient.get(`/projects/${projectId}`);
+export type ProjectAreaEquipment = {
+  id: string;
+  sequenceNo: number;
+  xPercent: number;
+  yPercent: number;
+  tagNumber: string;
+  equipmentCode?: string | null;
+  type: string;
+  circuitId?: string | null;
+  location?: string | null;
+  manufacturer?: string | null;
+  protectionDetails?: string | null;
+  certificateNumber?: string | null;
+};
 
-export const createProject = (data: {
+export type ProjectAreaPhoto = {
+  id: string;
+  projectAreaId?: string;
+  fileName?: string | null;
+  filePath?: string | null;
+  downloadUrl?: string | null;
+  uploadedByUserId?: string;
+  uploadedAt?: string;
+};
+
+export type ProjectArea = {
+  id: string;
+  projectId: string;
+  areaName: string;
+  layoutImagePath?: string | null;
+  createdAt: string;
+  equipmentCount: number;
+  photos: ProjectAreaPhoto[];
+  equipment: ProjectAreaEquipment[];
+};
+
+export type ProjectDetails = Omit<ProjectSummary, 'areaCount'> & {
+  areas: ProjectArea[];
+};
+
+export type ProjectWriteRequest = {
   projectName: string;
   sector: string;
   jobNo: string;
@@ -51,25 +114,34 @@ export const createProject = (data: {
   assignedSurveyorId: string;
   assignedQcId: string;
   assignedClientId: string;
-}) => apiClient.post('/projects', data);
+  status?: ProjectStatus | string;
+};
+
+export const getAssignmentOptions = () =>
+  apiClient.get<ProjectAssignableUser[]>('/projects/assignment-options');
+
+export const getProjects = () => apiClient.get<ProjectSummary[]>('/projects');
+
+export const getProject = (projectId: string) =>
+  apiClient.get<ProjectDetails>(`/projects/${projectId}`);
+
+export const createProject = (data: ProjectWriteRequest) =>
+  apiClient.post<ProjectDetails>('/projects', {
+    ...data,
+    status: normalizeProjectStatus(data.status),
+  });
 
 export const updateProject = (
   projectId: string,
-  data: {
-    projectName: string;
-    sector: string;
-    jobNo: string;
-    location: string;
-    vesselOrSiteName: string;
-    assignedSurveyorId: string;
-    assignedQcId: string;
-    assignedClientId: string;
-    status: ProjectStatus;
-  },
-) => apiClient.put(`/projects/${projectId}`, data);
+  data: ProjectWriteRequest & {status: ProjectStatus | string},
+) =>
+  apiClient.put<ProjectDetails>(`/projects/${projectId}`, {
+    ...data,
+    status: normalizeProjectStatus(data.status),
+  });
 
 export const addProjectArea = (projectId: string, name: string, file: any) => {
-  const request = apiClient.post(`/projects/${projectId}/areas`, {
+  const request = apiClient.post<ProjectArea>(`/projects/${projectId}/areas`, {
     areaName: name,
   });
   return request.then(async response => {
@@ -99,7 +171,7 @@ export const updateProjectArea = (
   name: string,
   file?: any,
 ) => {
-  const request = apiClient.put(`/projects/${projectId}/areas/${areaId}`, {
+  const request = apiClient.put<ProjectArea>(`/projects/${projectId}/areas/${areaId}`, {
     areaName: name,
   });
   return request.then(async response => {
@@ -110,13 +182,6 @@ export const updateProjectArea = (
     }
     return response;
   });
-};
-
-export type ProjectAreaPhoto = {
-  id: string;
-  fileName?: string | null;
-  filePath?: string | null;
-  downloadUrl?: string | null;
 };
 
 export const uploadProjectAreaPhoto = (
@@ -187,6 +252,84 @@ export type AreaEquipment = {
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
+  inspectionId?: string | null;
+  qcReviewStatus?: string | null;
+  qcComments?: string | null;
+  qcSeverity?: string | null;
+};
+
+export type EquipmentInspectionStatus =
+  | 'NotStarted'
+  | 'InProgress'
+  | 'Completed'
+  | 'ChangesRequested'
+  | 'QcApproved';
+
+export type SurveyorEquipmentDetails = Omit<
+  AreaEquipment,
+  'status' | 'updatedAt' | 'createdByUserId'
+> & {
+  areaName: string;
+  inspectionStatus: EquipmentInspectionStatus;
+  inspectionEditable: boolean;
+};
+
+export type InspectionType = 'Visual' | 'Close' | 'Detailed';
+
+export type SurveyorChecklistItem = {
+  checklistItemId: string;
+  inspectionType: InspectionType;
+  text: string;
+  sortOrder: number;
+  isRequired: boolean;
+};
+
+export type SurveyorInspectionAnswer = SurveyorChecklistItem & {
+  isChecked: boolean;
+  remarks?: string | null;
+};
+
+export type SurveyorInspectionPhoto = {
+  id: string;
+  fileName: string;
+  photoPath: string;
+  uploadedAt: string;
+};
+
+export type SurveyorEquipmentInspection = {
+  inspectionId: string;
+  equipmentId: string;
+  inspectionDate: string;
+  inspectorName: string;
+  comments?: string | null;
+  status: EquipmentInspectionStatus;
+  isEditable: boolean;
+  createdAt: string;
+  updatedAt: string;
+  answers: SurveyorInspectionAnswer[];
+  photos: SurveyorInspectionPhoto[];
+  qcComments?: string | null;
+  qcSeverity?: string | null;
+};
+
+export type SaveEquipmentInspectionRequest = {
+  inspectionDate: string;
+  inspectorName: string;
+  comments?: string | null;
+  isCompleted: boolean;
+  answers: Array<{
+    checklistItemId: string;
+    isChecked: boolean;
+    remarks?: string | null;
+  }>;
+};
+
+export type InspectionPhotoFile = {
+  uri?: string;
+  type?: string;
+  fileName?: string;
+  name?: string;
+  webFile?: any;
 };
 
 export type SurveyorAreaDetails = {
@@ -256,3 +399,230 @@ export const deleteSurveyorEquipment = (
   apiClient.delete(
     `${surveyorEquipmentUrl(projectId, areaId)}/${equipmentId}`,
   );
+
+export const getSurveyorEquipmentDetails = (equipmentId: string) =>
+  apiClient.get<SurveyorEquipmentDetails>(`/surveyor/equipment/${equipmentId}`);
+
+export const getSurveyorEquipmentInspection = (equipmentId: string) =>
+  apiClient.get<SurveyorEquipmentInspection>(
+    `/surveyor/equipment/${equipmentId}/inspection`,
+  );
+
+export const getSurveyorChecklist = () =>
+  apiClient.get<SurveyorChecklistItem[]>('/surveyor/checklist');
+
+export const createSurveyorInspection = (
+  equipmentId: string,
+  data: SaveEquipmentInspectionRequest,
+) =>
+  apiClient.post<SurveyorEquipmentInspection>(
+    `/surveyor/equipment/${equipmentId}/inspection`,
+    data,
+  );
+
+export const updateSurveyorInspection = (
+  inspectionId: string,
+  data: SaveEquipmentInspectionRequest,
+) =>
+  apiClient.put<SurveyorEquipmentInspection>(
+    `/surveyor/inspections/${inspectionId}`,
+    data,
+  );
+
+export const uploadSurveyorInspectionPhotos = (
+  inspectionId: string,
+  files: InspectionPhotoFile[],
+) => {
+  const formData = new FormData();
+  files.forEach(file => {
+    const value = Platform.OS === 'web'
+      ? file.webFile
+      : {
+          uri: file.uri,
+          type: file.type || 'image/jpeg',
+          name: file.fileName || file.name || 'inspection-photo.jpg',
+        };
+    formData.append('Files', value as any);
+  });
+  return apiClient.post<SurveyorInspectionPhoto[]>(
+    `/surveyor/inspections/${inspectionId}/photos`,
+    formData,
+  );
+};
+
+export const deleteSurveyorInspectionPhoto = (
+  inspectionId: string,
+  photoId: string,
+) => apiClient.delete(`/surveyor/inspections/${inspectionId}/photos/${photoId}`);
+
+export type QcSeverity = 'Low' | 'Medium' | 'High' | 'Critical';
+export type QcReviewStatus =
+  | 'PendingReview'
+  | 'InReview'
+  | 'ChangesRequested'
+  | 'Approved';
+
+export type QcDashboard = {
+  awaitingQcReview: number;
+  changesRequested: number;
+  approved: number;
+  overdue: number;
+};
+
+export type QcProjectSummary = {
+  projectId: string;
+  projectName: string;
+  jobNo: string;
+  location: string;
+  surveyorName: string;
+  projectStatus: ProjectStatus;
+  qcReviewStatus: QcReviewStatus;
+  submissionDate?: string | null;
+  dueDate?: string | null;
+};
+
+export type QcEquipmentDetails = {
+  equipmentId: string;
+  sequenceNo: number;
+  xPercent: number;
+  yPercent: number;
+  tagNumber: string;
+  equipmentCode?: string | null;
+  type: string;
+  circuitId?: string | null;
+  location?: string | null;
+  manufacturer?: string | null;
+  protectionDetails?: string | null;
+  certificateNumber?: string | null;
+};
+
+export type QcAreaEquipment = QcEquipmentDetails & {
+  inspectionId?: string | null;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  qcReviewStatus: QcReviewStatus;
+};
+
+export type QcAreaDetails = {
+  areaId: string;
+  areaName: string;
+  layoutImagePath?: string | null;
+  equipment: QcAreaEquipment[];
+};
+
+export type QcProjectDetails = {
+  projectId: string;
+  projectName: string;
+  sector: string;
+  jobNo: string;
+  location: string;
+  vesselOrSiteName: string;
+  projectStatus: ProjectStatus;
+  createdAt: string;
+  assignedSurveyor: string;
+  assignedQc: string;
+  assignedClient: string;
+  areas: Array<{
+    areaId: string;
+    areaName: string;
+    layoutImagePath?: string | null;
+    equipmentCount: number;
+    pendingQcCount: number;
+    approvedCount: number;
+    changesRequestedCount: number;
+  }>;
+  equipmentCount: number;
+  pendingQcCount: number;
+  approvedCount: number;
+  changesRequestedCount: number;
+};
+
+export type QcEquipmentInspection = {
+  inspectionId: string;
+  projectId: string;
+  areaId: string;
+  equipment: QcEquipmentDetails;
+  checklistAnswers: Array<{
+    answerId: string;
+    questionId: string;
+    question: string;
+    sortOrder: number;
+    value?: string | null;
+    comment?: string | null;
+  }>;
+  inspectionPhotos: Array<{
+    fileId: string;
+    fileName: string;
+    storageKey: string;
+    contentType: string;
+    uploadedAt: string;
+  }>;
+  findings: Array<{
+    findingId: string;
+    observation: string;
+    recommendation?: string | null;
+    severity?: string | null;
+    status: string;
+  }>;
+  surveyorRemarks?: string | null;
+  certificateNumber?: string | null;
+  certificateDetails?: string | null;
+  inspectionTimestamp?: string | null;
+  submissionDate?: string | null;
+  dueDate?: string | null;
+  qcComments?: string | null;
+  qcReviewStatus: QcReviewStatus;
+  severity?: QcSeverity | null;
+  reviewedByUserId?: string | null;
+  reviewedAt?: string | null;
+};
+
+export type QcReview = {
+  inspectionId: string;
+  qcReviewStatus: QcReviewStatus;
+  qcComments?: string | null;
+  severity?: QcSeverity | null;
+  reviewedByUserId: string;
+  startedAt?: string | null;
+  reviewedAt?: string | null;
+};
+
+export const getQcDashboard = () => apiClient.get<QcDashboard>('/qc/dashboard');
+
+export const getQcProjects = () => apiClient.get<QcProjectSummary[]>('/qc/projects');
+
+export const getQcProject = (projectId: string) =>
+  apiClient.get<QcProjectDetails>(`/qc/projects/${projectId}`);
+
+export const getQcArea = (projectId: string, areaId: string) =>
+  apiClient.get<QcAreaDetails>(`/qc/projects/${projectId}/areas/${areaId}`);
+
+export const getQcEquipmentInspection = (equipmentId: string) =>
+  apiClient.get<QcEquipmentInspection>(`/qc/equipment/${equipmentId}/inspection`);
+
+export const startQcReview = (inspectionId: string) =>
+  apiClient.post<QcReview>(`/qc/inspections/${inspectionId}/start-review`);
+
+export const approveQcInspection = (
+  inspectionId: string,
+  comments?: string,
+) =>
+  apiClient.post<QcReview>(`/qc/inspections/${inspectionId}/approve`, {
+    comments: comments || null,
+  });
+
+export const requestQcChanges = (
+  inspectionId: string,
+  comments: string,
+  severity: QcSeverity,
+) =>
+  apiClient.post<QcReview>(`/qc/inspections/${inspectionId}/request-changes`, {
+    comments,
+    severity,
+  });
+
+export const updateQcComments = (inspectionId: string, comments: string) =>
+  apiClient.put<QcReview>(`/qc/inspections/${inspectionId}/comments`, {
+    comments,
+  });
