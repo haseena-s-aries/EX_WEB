@@ -3,6 +3,7 @@ import {ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, Touch
 import {getApiErrorMessage} from '../api/errors';
 import {approveQcInspection, getQcArea, getQcEquipmentInspection, getQcProject, requestQcChanges, startQcReview, updateQcComments} from '../api/projects';
 import AuthenticatedImage from '../components/AuthenticatedImage';
+import ZoomableImageViewer, {ViewerPin} from '../components/ZoomableImageViewer';
 
 type Props = {projectId: string; projectSummary?: any; onBack: () => void};
 const first = (obj: any, ...keys: string[]) => {
@@ -51,6 +52,14 @@ const rollupQcStatus = (statuses: string[], fallback?: string) => {
   if (statuses.some(s => /in.?review/i.test(s))) return 'InReview';
   return 'PendingReview';
 };
+// Status text colour next to the "Review / View inspection" button.
+const statusColor = (status: any) => {
+  const value = String(status ?? '');
+  if (/changes.?requested|changes required/i.test(value)) return '#d12f3a'; // red
+  if (/approved/i.test(value)) return '#1f7a4d'; // green
+  if (/pending.?review|in.?review/i.test(value)) return '#e07b00'; // orange
+  return undefined; // anything else keeps the default grey
+};
 const imagePath = (item: any) => first(item, 'downloadUrl', 'filePath', 'layoutImagePath', 'layoutPath', 'areaImagePath', 'imagePath', 'photoPath', 'equipmentImagePath', 'equipmentPhotoPath', 'storageKey', 'path', 'url');
 
 export default function QcProjectDetailsScreen({projectId, projectSummary, onBack}: Props) {
@@ -60,6 +69,7 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
   const [inspections, setInspections] = useState<Record<string, any>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
   const [severities, setSeverities] = useState<Record<string, 'Low' | 'Medium' | 'High' | 'Critical'>>({});
+  const [viewer, setViewer] = useState<{images: string[]; index: number; title: string; subtitle?: string; pins?: ViewerPin[]} | null>(null);
   const [busyEquipmentId, setBusyEquipmentId] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<{item: any; areaName: string} | null>(null);
   const [notice, setNotice] = useState('');
@@ -217,6 +227,8 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
     return {equipmentId, inspection, fullEquipment, hasSubmittedInspection, statusText, locked};
   };
 
+  const viewerNode = <ZoomableImageViewer visible={!!viewer} onClose={() => setViewer(null)} images={viewer?.images || []} startIndex={viewer?.index || 0} title={viewer?.title} subtitle={viewer?.subtitle} pins={viewer?.pins} />;
+
   const renderReviewModal = () => {
     if (!reviewing) return null;
     const {item, areaName} = reviewing;
@@ -271,7 +283,7 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
 
           {photoPaths.length > 0 && <>
             <Text style={styles.blockTitle}>Photos</Text>
-            <View style={styles.photoGrid}>{photoPaths.map((path: any, i: number) => <AuthenticatedImage key={`${path}-${i}`} path={path} resizeMode="cover" style={styles.photo} />)}</View>
+            <View style={styles.photoGrid}>{photoPaths.map((path: any, i: number) => <TouchableOpacity key={`${path}-${i}`} accessibilityLabel="View photo" activeOpacity={0.85} onPress={() => setViewer({images: photoPaths.filter(Boolean), index: photoPaths.filter(Boolean).indexOf(path), title: String(first(equipmentInfo, 'tagNumber') || 'Inspection photo'), subtitle: areaName})}><AuthenticatedImage path={path} resizeMode="cover" style={styles.photo} /></TouchableOpacity>)}</View>
           </>}
 
           {checklist.length > 0 && <>
@@ -318,6 +330,7 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
             </>}
         </View>
       </View></View>
+      {viewerNode}
     </Modal>;
   };
 
@@ -351,7 +364,22 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
       return <View key={areaId} style={styles.area}>
         <View style={styles.areaHead}><Text style={styles.areaName}>{first(area, 'areaName', 'name') || `Area ${index + 1}`}</Text><Text style={styles.muted}>{equipment.length || first(area, 'equipmentCount') || 0} equipment · {first(area, 'photoCount') ?? photos.length} images</Text></View>
         <View style={styles.areaBody}>
-          {photos.length > 0 && <ScrollView horizontal>{photos.map((photo: any, photoIndex: number) => <AuthenticatedImage key={photoIndex} path={typeof photo === 'string' ? photo : imagePath(photo)} resizeMode="contain" style={styles.areaImage} />)}</ScrollView>}
+          {photos.length > 0 && <ScrollView horizontal>{photos.map((photo: any, photoIndex: number) => {
+            const photoPaths = photos.map((entry: any) => (typeof entry === 'string' ? entry : imagePath(entry))).filter(Boolean) as string[];
+            const photoPath = typeof photo === 'string' ? photo : imagePath(photo);
+            const pins: ViewerPin[] = equipment.map((item: any, pinIndex: number) => {
+              const view = equipmentView(item, pinIndex);
+              return {
+                id: String(view.equipmentId),
+                label: String(first(view.fullEquipment, 'sequenceNo') ?? pinIndex + 1),
+                xPercent: Number(first(item, 'xPercent') ?? first(view.fullEquipment, 'xPercent')) || 0,
+                yPercent: Number(first(item, 'yPercent') ?? first(view.fullEquipment, 'yPercent')) || 0,
+                title: String(first(view.fullEquipment, 'tagNumber', 'equipmentId', 'name') || `Equipment ${pinIndex + 1}`),
+                lines: [[first(view.fullEquipment, 'type'), first(view.fullEquipment, 'location')].filter(Boolean).join(' · '), `QC status: ${view.statusText}`],
+              };
+            });
+            return <TouchableOpacity key={photoIndex} accessibilityLabel="View area image" activeOpacity={0.85} onPress={() => setViewer({images: photoPaths, index: Math.max(0, photoPaths.indexOf(photoPath as string)), title: String(first(area, 'areaName', 'name') || `Area ${index + 1}`), subtitle: `${equipment.length} equipment`, pins})}><AuthenticatedImage path={photoPath} resizeMode="contain" style={styles.areaImage} /></TouchableOpacity>;
+          })}</ScrollView>}
           {equipment.length === 0 ? <Text style={styles.muted}>No equipment listed in this area.</Text> : equipment.map((item: any, equipmentIndex: number) => {
             const {equipmentId, fullEquipment, hasSubmittedInspection, statusText, locked} = equipmentView(item, equipmentIndex);
             const areaLabel = String(first(area, 'areaName', 'name') || `Area ${index + 1}`);
@@ -361,7 +389,7 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
                 <Text numberOfLines={1} style={styles.muted}>{[first(fullEquipment, 'type'), first(fullEquipment, 'equipmentCode'), first(fullEquipment, 'location')].filter(Boolean).join(' · ') || 'Equipment'}</Text>
                 {!hasSubmittedInspection && <Text style={styles.awaiting}>Waiting for the surveyor to submit the inspection.</Text>}
               </View>
-              <Text style={styles.status}>{statusText}</Text>
+              <Text style={[styles.status, {fontWeight: '900'}, statusColor(statusText) ? {color: statusColor(statusText)} : null]}>{statusText}</Text>
               <TouchableOpacity disabled={!hasSubmittedInspection || busyEquipmentId === equipmentId} onPress={() => reviewEquipment(item, areaLabel)} style={[styles.rowButton, !hasSubmittedInspection && styles.disabledButton]}><Text style={styles.buttonText}>{busyEquipmentId === equipmentId ? 'Opening…' : locked ? 'View inspection' : 'Review inspection'}</Text></TouchableOpacity>
             </View>;
           })}
@@ -369,6 +397,7 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
       </View>;
     })}
     {reviewing && renderReviewModal()}
+    {!reviewing && viewerNode}
   </ScrollView>;
 }
 

@@ -43,6 +43,7 @@ export default function QcDashboardScreen({userName, onProjectPress, projectsOnl
     const count = (keys: string[], fromProjects: number) =>
       Math.max(fromProjects, Number(value(summary, ...keys)) || 0);
     return [
+      ['Total Projects', projects.length, '#eceeff', '#3f47d6'],
       ['Awaiting QC Review', count(['awaitingQcReview', 'awaitingQCReview', 'awaitingReview'], awaiting), '#fff0d7', '#a75a0b'],
       ['Changes Required', count(['changesRequested', 'changesRequired', 'changeRequired'], changes), '#fdebed', '#bf3441'],
       ['Approved', count(['approved'], approved), '#e5f6ec', '#237348'],

@@ -21,6 +21,8 @@ import QcDashboardScreen from '../screens/QcDashboardScreen';
 import QcProjectDetailsScreen from '../screens/QcProjectDetailsScreen';
 import ProjectDetailsScreen from '../screens/ProjectDetailsScreen';
 import Sidebar from '../components/Sidebar';
+import NotificationBell from '../components/NotificationBell';
+import type {AppNotification} from '../notifications/notifications';
 import {sendOtp, verifyOtp, completeRegistration, loginUser} from '../api/auth';
 import {getAssignmentOptions} from '../api/projects';
 import {setAuthToken} from '../api/client';
@@ -148,6 +150,42 @@ export default function AppNavigator() {
     };
     const canManageUsers =
       currentUser.role === 'Admin' || currentUser.role === 'Manager';
+    const openNotification = (notification: AppNotification) => {
+      const target = notification.target;
+      if (!target) return;
+      if (target.kind === 'qcProject') {
+        setQcProjectId(target.projectId);
+        setQcProjectSummary(target.summary || null);
+        setQcProjectReturnScreen('Dashboard');
+        setScreen('QcProjectDetails');
+      } else if (target.kind === 'project') {
+        if (!canManageUsers) return;
+        setSelectedProjectId(target.projectId);
+        setScreen('ProjectDetails');
+      } else if (target.kind === 'users') {
+        if (canManageUsers) setScreen('UserManagement');
+      } else if (target.kind === 'surveyorProject') {
+        setProjectDetailsReturnScreen('Dashboard');
+        setSelectedProjectId(target.projectId);
+        setSelectedAreaId('');
+        setScreen('SurveyorProjectDetails');
+      } else if (target.kind === 'surveyorEquipment') {
+        setProjectDetailsReturnScreen('Dashboard');
+        setSelectedProjectId(target.projectId);
+        setSelectedAreaId(target.areaId);
+        setSelectedEquipmentId(target.equipmentId);
+        setScreen('SurveyorEquipmentDetails');
+      }
+    };
+    const bell = (compact?: boolean) => (
+      <NotificationBell
+        role={currentUser.role}
+        userKey={`${currentUser.role}:${currentUser.name}`}
+        refreshKey={screen}
+        onSelect={openNotification}
+        compact={compact}
+      />
+    );
 
     return (
       <View style={[styles.appShell, isMobile && styles.appShellMobile]}>
@@ -161,6 +199,7 @@ export default function AppNavigator() {
                 <Text style={styles.mobileBrand}>Ex-Survey</Text>
                 <Text style={styles.mobileRole}>{currentUser.role}</Text>
               </View>
+              {bell(true)}
               <TouchableOpacity onPress={logout} style={styles.mobileLogout}>
                 <Text style={styles.mobileLogoutText}>Log out</Text>
               </TouchableOpacity>
@@ -252,6 +291,7 @@ export default function AppNavigator() {
           />
         )}
         <View style={styles.mainContent}>
+          {!isMobile && <View style={styles.topBar}>{bell()}</View>}
           {screen === 'Dashboard' && currentUser.role.toLowerCase() === 'qc' ? (
             <QcDashboardScreen
               userName={currentUser.name}
@@ -433,6 +473,7 @@ const styles = StyleSheet.create({
   },
   appShellMobile: {flexDirection: 'column'},
   mainContent: {flex: 1, minWidth: 0},
+  topBar: {height: 56, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', backgroundColor: '#f7f9ff', borderBottomWidth: 1, borderBottomColor: '#e2e6f0', zIndex: 20},
   mobileHeader: {
     backgroundColor: '#242d52',
     borderBottomWidth: 1,

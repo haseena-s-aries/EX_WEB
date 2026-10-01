@@ -10,9 +10,9 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   {key: 'Dashboard', label: 'Dashboard', icon: '⌂'},
-  {key: 'UserManagement', label: 'User Management', icon: '◎', adminOnly: true},
   {key: 'Projects', label: 'Projects', icon: '▦'},
   {key: 'Reports', label: 'Reports', icon: '↗'},
+  {key: 'UserManagement', label: 'User Management', icon: '◎', adminOnly: true},
 ];
 
 type Props = {
