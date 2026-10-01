@@ -274,3 +274,8 @@ export const loadReadIds = (userKey: string): Set<string> => {
   try { return new Set<string>(JSON.parse(storage.get(readKey(userKey)) || '[]')); } catch { return new Set(); }
 };
 export const saveReadIds = (userKey: string, ids: Set<string>) => storage.set(readKey(userKey), JSON.stringify(Array.from(ids).slice(-500)));
+const dismissedKey = (userKey: string) => `exsurvey.notifications.dismissed.${userKey}`;
+export const loadDismissedIds = (userKey: string): Set<string> => {
+  try { return new Set<string>(JSON.parse(storage.get(dismissedKey(userKey)) || '[]')); } catch { return new Set<string>(); }
+};
+export const saveDismissedIds = (userKey: string, ids: Set<string>) => storage.set(dismissedKey(userKey), JSON.stringify(Array.from(ids).slice(-500)));

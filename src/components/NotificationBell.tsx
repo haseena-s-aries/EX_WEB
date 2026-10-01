@@ -1,6 +1,6 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
-import {AppNotification, buildNotifications, loadReadIds, NotificationType, saveReadIds} from '../notifications/notifications';
+import {AppNotification, buildNotifications, loadDismissedIds, loadReadIds, NotificationType, saveDismissedIds, saveReadIds} from '../notifications/notifications';
 
 type Props = {
   role: string;
@@ -39,13 +39,14 @@ const timeAgo = (value?: string | null) => {
 export default function NotificationBell({role, userKey, refreshKey, onSelect, compact}: Props) {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(() => loadReadIds(userKey));
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => loadDismissedIds(userKey));
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const alive = useRef(true);
 
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  useEffect(() => { setReadIds(loadReadIds(userKey)); }, [userKey]);
+  useEffect(() => { setReadIds(loadReadIds(userKey)); setDismissedIds(loadDismissedIds(userKey)); }, [userKey]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -67,12 +68,14 @@ export default function NotificationBell({role, userKey, refreshKey, onSelect, c
   useEffect(() => { if (open) refresh(); }, [open, refresh]);
 
   const persist = (next: Set<string>) => { setReadIds(next); saveReadIds(userKey, next); };
-  const markRead = (id: string) => { if (!readIds.has(id)) persist(new Set(readIds).add(id)); };
+  const markRead = (id: string) => { if (!readIds.has(id)) persist(new Set<string>(readIds).add(id)); };
   const markAllRead = () => persist(new Set<string>([...Array.from(readIds), ...items.map(item => item.id)]));
 
-  const unread = items.filter(item => !readIds.has(item.id)).length;
+  const dismiss = (id: string) => { const next = new Set<string>(dismissedIds); next.add(id); setDismissedIds(next); saveDismissedIds(userKey, next); };
+  const visible = items.filter(item => !dismissedIds.has(item.id));
+  const unread = visible.filter(item => !readIds.has(item.id)).length;
   // unread first, then read; order inside each group is already newest-first
-  const sorted = [...items.filter(item => !readIds.has(item.id)), ...items.filter(item => readIds.has(item.id))];
+  const sorted = [...visible.filter(item => !readIds.has(item.id)), ...visible.filter(item => readIds.has(item.id))];
 
   return <>
     <TouchableOpacity accessibilityLabel={`Notifications${unread ? `, ${unread} unread` : ''}`} onPress={() => setOpen(true)} style={[styles.bell, compact && styles.bellCompact]}>
@@ -93,22 +96,25 @@ export default function NotificationBell({role, userKey, refreshKey, onSelect, c
             <TouchableOpacity accessibilityLabel="Close notifications" onPress={() => setOpen(false)} style={styles.closeBtn}><Text style={styles.closeText}>×</Text></TouchableOpacity>
           </View>
           <ScrollView style={{flexGrow: 0}} contentContainerStyle={{paddingBottom: 6}}>
-            {failed && items.length === 0 && <Text style={styles.empty}>Could not load notifications. Try again in a moment.</Text>}
-            {!failed && !loading && items.length === 0 && <View style={styles.emptyBox}><Text style={styles.emptyIcon}>🔔</Text><Text style={styles.emptyTitle}>No notifications</Text><Text style={styles.empty}>New activity will appear here.</Text></View>}
+            {failed && visible.length === 0 && <Text style={styles.empty}>Could not load notifications. Try again in a moment.</Text>}
+            {!failed && !loading && visible.length === 0 && <View style={styles.emptyBox}><Text style={styles.emptyIcon}>🔔</Text><Text style={styles.emptyTitle}>No notifications</Text><Text style={styles.empty}>New activity will appear here.</Text></View>}
             {sorted.map(item => {
               const style = ICONS[item.type as NotificationType];
               const isUnread = !readIds.has(item.id);
-              return <TouchableOpacity key={item.id} onPress={() => { markRead(item.id); setOpen(false); onSelect?.(item); }} style={[styles.row, isUnread && styles.rowUnread]}>
-                <View style={[styles.iconBox, {backgroundColor: style.bg}]}><Text style={styles.iconText}>{style.icon}</Text></View>
-                <View style={{flex: 1, minWidth: 0}}>
-                  <View style={styles.rowTop}>
-                    <Text numberOfLines={1} style={[styles.rowTitle, {color: isUnread ? '#242d52' : '#5a6078'}]}>{item.title}</Text>
-                    {!!item.time && <Text style={styles.rowTime}>{timeAgo(item.time)}</Text>}
+              return <View key={item.id} style={[styles.row, isUnread && styles.rowUnread]}>
+                <TouchableOpacity onPress={() => { markRead(item.id); setOpen(false); onSelect?.(item); }} style={styles.rowMain}>
+                  <View style={[styles.iconBox, {backgroundColor: style.bg}]}><Text style={styles.iconText}>{style.icon}</Text></View>
+                  <View style={{flex: 1, minWidth: 0}}>
+                    <View style={styles.rowTop}>
+                      <Text numberOfLines={1} style={[styles.rowTitle, {color: isUnread ? '#242d52' : '#5a6078'}]}>{item.title}</Text>
+                      {!!item.time && <Text style={styles.rowTime}>{timeAgo(item.time)}</Text>}
+                    </View>
+                    <Text numberOfLines={3} style={styles.rowMessage}>{item.message}</Text>
                   </View>
-                  <Text numberOfLines={3} style={styles.rowMessage}>{item.message}</Text>
-                </View>
-                {isUnread && <View style={styles.dot} />}
-              </TouchableOpacity>;
+                  {isUnread && <View style={styles.dot} />}
+                </TouchableOpacity>
+                <TouchableOpacity accessibilityLabel="Remove notification" onPress={() => dismiss(item.id)} style={styles.removeBtn}><Text style={styles.removeText}>×</Text></TouchableOpacity>
+              </View>;
             })}
           </ScrollView>
         </Pressable>
@@ -132,7 +138,10 @@ const styles = StyleSheet.create({
   headBtnText: {fontSize: 10.5, color: '#3f47d6', fontWeight: '800'},
   closeBtn: {width: 28, height: 28, borderRadius: 14, backgroundColor: '#eef0f6', alignItems: 'center', justifyContent: 'center'},
   closeText: {fontSize: 17, color: '#424865', fontWeight: '800', marginTop: -2},
-  row: {flexDirection: 'row', alignItems: 'flex-start', gap: 11, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderColor: '#f0f2f8'},
+  row: {flexDirection: 'row', alignItems: 'flex-start', paddingLeft: 16, paddingRight: 10, paddingVertical: 12, borderBottomWidth: 1, borderColor: '#f0f2f8'},
+  rowMain: {flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 11},
+  removeBtn: {width: 24, height: 24, marginLeft: 8, borderRadius: 12, backgroundColor: '#eef0f6', alignItems: 'center', justifyContent: 'center'},
+  removeText: {fontSize: 15, color: '#6b7188', fontWeight: '800', marginTop: -2},
   rowUnread: {backgroundColor: '#f7f8ff'},
   iconBox: {width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center'},
   iconText: {fontSize: 15},
