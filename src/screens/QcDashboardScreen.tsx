@@ -3,7 +3,7 @@ import {ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, Touchab
 import {getApiErrorMessage} from '../api/errors';
 import {getQcDashboard, getQcProjects} from '../api/projects';
 
-type Props = {userName: string; onProjectPress: (id: string, project?: any) => void; projectsOnly?: boolean};
+type Props = {userName: string; onProjectPress: (id: string, project?: any) => void; projectsOnly?: boolean; refreshVersion?: number};
 const value = (obj: any, ...keys: string[]) => {
   for (const key of keys) if (obj?.[key] != null) return obj[key];
   return undefined;
@@ -14,7 +14,7 @@ const isOverdue = (project: any) => {
   return !!due && new Date(due).getTime() < Date.now() && !/approved|complete/i.test(statusOf(project));
 };
 
-export default function QcDashboardScreen({userName, onProjectPress, projectsOnly = false}: Props) {
+export default function QcDashboardScreen({userName, onProjectPress, projectsOnly = false, refreshVersion}: Props) {
   const [projects, setProjects] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>({});
   const [loading, setLoading] = useState(true);
@@ -31,7 +31,7 @@ export default function QcDashboardScreen({userName, onProjectPress, projectsOnl
       setError(getApiErrorMessage(err, 'Could not load QC assignments.'));
     } finally { setLoading(false); setRefreshing(false); }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, refreshVersion]);
   const counts = useMemo(() => {
     const approved = projects.filter(p => /approved|complete/i.test(statusOf(p))).length;
     const changes = projects.filter(p => /change|revision|rework/i.test(statusOf(p))).length;

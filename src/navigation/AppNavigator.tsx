@@ -35,6 +35,8 @@ export default function AppNavigator() {
   const [assignmentOptions, setAssignmentOptions] = useState<any[]>([]);
   const [surveyorRefreshVersion, setSurveyorRefreshVersion] = useState(0);
 
+  const [qcRefreshVersion, setQcRefreshVersion] = useState(0);
+
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Login" screenOptions={{headerShown: false}}>
@@ -168,6 +170,7 @@ export default function AppNavigator() {
               {currentUser?.role?.toLowerCase() === 'qc' ? (
                 <QcDashboardScreen
                   userName={currentUser.displayName || 'QC'}
+                  refreshVersion={qcRefreshVersion}
                   onProjectPress={(projectId, projectSummary) =>
                     navigation.navigate('QcProjectDetails', {projectId, projectSummary})
                   }
@@ -211,7 +214,10 @@ export default function AppNavigator() {
               <QcProjectDetailsScreen
                 projectId={route.params.projectId}
                 projectSummary={route.params.projectSummary}
-                onBack={() => navigation.goBack()}
+                onBack={() => {
+                  setQcRefreshVersion(version => version + 1);
+                  navigation.goBack();
+                }}
               />
             </SafeAreaView>
           )}

@@ -18,9 +18,11 @@ const first = (obj: any, ...keys: string[]) => {
   return undefined;
 };
 const dateLabel = (value: any) => {
-  if (!value) return 'Not set';
+  if (!value) return '—';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString();
+  if (Number.isNaN(date.getTime())) return String(value);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
 };
 
 export default function ProjectDetailsScreen({projectId, onBack, surveyors, qcUsers, clients}: Props) {
