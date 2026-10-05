@@ -13,10 +13,11 @@ import {
   ImageSourcePropType,
   StyleProp,
   ViewStyle,
-  useColorScheme,
   useWindowDimensions,
 } from 'react-native';
 import AnimatedCard from '../components/AnimatedCard';
+import ThemeToggle from '../components/ThemeToggle';
+import {useThemeMode} from '../theme/useThemeMode';
 import {
   HexLogo,
   MailIcon,
@@ -28,8 +29,6 @@ import {
   GoogleMark,
   MicrosoftMark,
   FaceIdIcon,
-  SunIcon,
-  MoonIcon,
   RefineryScene,
 } from '../components/LoginArt';
 
@@ -684,78 +683,8 @@ type Props = {
   showRememberMe?: boolean;
 };
 
-const THEME_STORAGE_KEY = 'exsurvey-theme'; // same key App.tsx uses
-
-/** Web only: remembers the toggle in the browser. Native has no storage dependency yet. */
-function readStoredTheme(): ThemeMode | null {
-  if (Platform.OS !== 'web') {
-    return null;
-  }
-  try {
-    const v = (globalThis as any).localStorage?.getItem(THEME_STORAGE_KEY);
-    return v === 'dark' || v === 'light' ? v : null;
-  } catch {
-    return null;
-  }
-}
-
-function storeTheme(mode: ThemeMode) {
-  if (Platform.OS !== 'web') {
-    return;
-  }
-  const g = globalThis as any;
-  try {
-    g.localStorage?.setItem(THEME_STORAGE_KEY, mode);
-  } catch {
-    // storage unavailable (private mode etc.) - the toggle still works for this visit
-  }
-  // Tell App.tsx so the rest of the app switches theme as well.
-  if (g.document?.documentElement) {
-    g.document.documentElement.dataset.exsurveyTheme = mode;
-  }
-  g.dispatchEvent?.(new g.Event('exsurvey-theme-change'));
-}
-
-function ThemeToggle({onPress}: {onPress: () => void}) {
-  const {c, dark} = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={6}
-      accessibilityRole="button"
-      accessibilityLabel={dark ? 'Switch to light theme' : 'Switch to dark theme'}
-      style={({pressed}: any) => [
-        {
-          position: 'absolute',
-          top: Platform.OS === 'web' ? 16 : 52,
-          right: 16,
-          zIndex: 10,
-          width: 44,
-          height: 44,
-          borderRadius: 22,
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderWidth: 1,
-          borderColor: c.border,
-          backgroundColor: pressed ? c.surfaceAlt : c.card,
-        },
-        web({boxShadow: dark ? '0 0 20px rgba(245,158,11,0.12)' : '0 2px 10px rgba(15,23,42,0.08)', cursor: 'pointer'}),
-      ]}>
-      {dark ? <SunIcon /> : <MoonIcon color={c.label} cutColor={c.card} />}
-    </Pressable>
-  );
-}
-
 export default function LoginScreen(props: Props) {
-  const system = useColorScheme();
-  const [chosen, setChosen] = useState<ThemeMode | null>(readStoredTheme);
-  const initial: ThemeMode =
-    props.theme === 'light' || props.theme === 'dark'
-      ? props.theme
-      : system === 'dark'
-      ? 'dark'
-      : 'light';
-  const mode: ThemeMode = chosen ?? initial;
+  const mode: ThemeMode = useThemeMode(props.theme);
 
   const value = useMemo<ThemeValue>(() => {
     const dark = mode === 'dark';
@@ -763,18 +692,11 @@ export default function LoginScreen(props: Props) {
     return {c, s: makeStyles(c, dark), dark};
   }, [mode]);
 
-  const toggle = () => {
-    const next: ThemeMode = mode === 'dark' ? 'light' : 'dark';
-    setChosen(next);
-    storeTheme(next);
-    props.onThemeChange?.(next);
-  };
-
   return (
     <ThemeCtx.Provider value={value}>
       <View style={value.s.screen}>
         <LoginBody {...props} mode={mode} />
-        {props.showThemeToggle === false ? null : <ThemeToggle onPress={toggle} />}
+        {props.showThemeToggle === false ? null : <ThemeToggle onChange={props.onThemeChange} />}
       </View>
     </ThemeCtx.Provider>
   );

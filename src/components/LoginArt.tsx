@@ -455,6 +455,82 @@ export function MoonIcon({
 }
 
 /* ------------------------------------------------------------------ */
+/* Sign-up helpers                                                     */
+/* ------------------------------------------------------------------ */
+
+export function UserIcon({size = 18, color = '#94A3B8'}: IconProps) {
+  const head = size * 0.38;
+  return (
+    <View style={{width: size, height: size, alignItems: 'center', justifyContent: 'center'}}>
+      <View
+        style={{
+          width: head,
+          height: head,
+          borderRadius: head / 2,
+          borderWidth: STROKE,
+          borderColor: color,
+        }}
+      />
+      <View
+        style={{
+          width: size * 0.78,
+          height: size * 0.34,
+          marginTop: size * 0.06,
+          borderWidth: STROKE,
+          borderBottomWidth: 0,
+          borderColor: color,
+          borderTopLeftRadius: size * 0.4,
+          borderTopRightRadius: size * 0.4,
+        }}
+      />
+    </View>
+  );
+}
+
+const SKYLINE: Array<{x: number; w: number; h: number}> = [
+  {x: 0, w: 14, h: 30},
+  {x: 22, w: 10, h: 50},
+  {x: 40, w: 16, h: 38},
+  {x: 64, w: 9, h: 58},
+  {x: 81, w: 18, h: 28},
+  {x: 107, w: 11, h: 44},
+];
+
+/** Small flat silhouette of distillation towers for footers. */
+export function SkylineStrip({color = '#334155', height = 60}: {color?: string; height?: number}) {
+  return (
+    <View style={{width: 126, height}}>
+      {SKYLINE.map(t => (
+        <View
+          key={t.x}
+          style={{
+            position: 'absolute',
+            left: t.x,
+            bottom: 2,
+            width: t.w,
+            height: t.h,
+            backgroundColor: color,
+            borderTopLeftRadius: t.w / 2,
+            borderTopRightRadius: t.w / 2,
+          }}
+        />
+      ))}
+      <View
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 2,
+          borderRadius: 1,
+          backgroundColor: color,
+        }}
+      />
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Refinery illustration                                               */
 /* ------------------------------------------------------------------ */
 

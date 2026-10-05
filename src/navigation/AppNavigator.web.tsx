@@ -26,6 +26,10 @@ import type {AppNotification} from '../notifications/notifications';
 import {sendOtp, verifyOtp, completeRegistration, loginUser} from '../api/auth';
 import {getAssignmentOptions} from '../api/projects';
 import {setAuthToken} from '../api/client';
+import BottomTabBar, {AppTab} from '../components/BottomTabBar';
+import AdminEquipmentListScreen from '../screens/AdminEquipmentListScreen';
+import {useThemeMode} from '../theme/useThemeMode';
+import {DARK, LIGHT} from '../theme/palette';
 
 type Screen =
   | 'Signup'
@@ -40,7 +44,8 @@ type Screen =
   | 'QcProjects'
   | 'ProjectDetails'
   | 'SurveyorEquipmentDetails'
-  | 'SurveyorInspection';
+  | 'SurveyorInspection'
+  | 'AdminEquipmentList';
 
 export default function AppNavigator() {
   const {width} = useWindowDimensions();
@@ -61,6 +66,7 @@ export default function AppNavigator() {
   const [selectedEquipmentId, setSelectedEquipmentId] = useState('');
   const [projectDetailsReturnScreen, setProjectDetailsReturnScreen] = useState<'Dashboard' | 'Projects'>('Dashboard');
   const [surveyorRefreshVersion, setSurveyorRefreshVersion] = useState(0);
+  const themeMode = useThemeMode();
   if (screen === 'Otp') {
     return (
       <OtpScreen
@@ -131,6 +137,7 @@ export default function AppNavigator() {
     screen === 'QcProjects' ||
     screen === 'SurveyorEquipmentDetails' ||
     screen === 'SurveyorInspection' ||
+    screen === 'AdminEquipmentList' ||
     screen === 'ProjectDetails'
   ) {
     if (!currentUser) {
@@ -150,6 +157,31 @@ export default function AppNavigator() {
     };
     const canManageUsers =
       currentUser.role === 'Admin' || currentUser.role === 'Manager';
+    // Admin / Manager phone layout: brand header on the dashboard + bottom tab bar.
+    const adminMobile = isMobile && canManageUsers;
+    const tc = themeMode === 'dark' ? DARK : LIGHT;
+    const activeTab: AppTab =
+      screen === 'Dashboard'
+        ? 'Home'
+        : screen === 'Projects' || screen === 'ProjectDetails'
+          ? 'Surveys'
+          : screen === 'AdminEquipmentList'
+            ? 'Equipment'
+            : 'User'; // UserManagement
+    const onTabChange = (tab: AppTab) => {
+      setSelectedProjectId('');
+      setSelectedAreaId('');
+      setSelectedEquipmentId('');
+      setScreen(
+        tab === 'Home'
+          ? 'Dashboard'
+          : tab === 'Surveys'
+            ? 'Projects'
+            : tab === 'Equipment'
+              ? 'AdminEquipmentList'
+              : 'UserManagement',
+      );
+    };
     const openNotification = (notification: AppNotification) => {
       const target = notification.target;
       if (!target) return;
@@ -188,8 +220,13 @@ export default function AppNavigator() {
     );
 
     return (
-      <View style={[styles.appShell, isMobile && styles.appShellMobile]}>
-        {isMobile ? (
+      <View
+        style={[
+          styles.appShell,
+          isMobile && styles.appShellMobile,
+          adminMobile && {backgroundColor: tc.bg},
+        ]}>
+        {adminMobile ? null : isMobile ? (
           <View style={styles.mobileHeader}>
             <View style={styles.mobileBrandRow}>
               <View style={styles.mobileLogo}>
@@ -334,6 +371,9 @@ export default function AppNavigator() {
           ) : screen === 'Dashboard' ? (
             <DashboardScreen
               userName={currentUser.name}
+              userRole={currentUser.role}
+              showBrand={adminMobile}
+              accessory={adminMobile ? bell(true) : undefined}
               surveyors={approvedUsers
                 .filter((u: any) => u.role?.toLowerCase() === 'surveyor')
                 .map((u: any) => ({id: u.id, displayName: u.displayName}))}
@@ -432,12 +472,20 @@ export default function AppNavigator() {
                 setSurveyorRefreshVersion(version => version + 1)
               }
             />
+          ) : screen === 'AdminEquipmentList' ? (
+            <AdminEquipmentListScreen
+              onEquipmentPress={projectId => {
+                setSelectedProjectId(projectId);
+                setScreen('ProjectDetails');
+              }}
+            />
           ) : screen === 'UserManagement' ? (
-            <UserManagementScreen onBack={() => setScreen('Dashboard')} />
+<UserManagementScreen onBack={() => setScreen('Dashboard')} />
           ) : (
             <DashboardScreen userName={currentUser.name} />
           )}
         </View>
+        {adminMobile ? <BottomTabBar active={activeTab} onChange={onTabChange} c={tc} onLogout={logout} /> : null}
       </View>
     );
   }

@@ -51,9 +51,11 @@ function confirmAction(message: string, confirmLabel: string, onConfirm: () => v
 
 type Props = {
   onBack: () => void;
+  /** When set, a Log out button is shown at the bottom (used by the phone tab layout). */
+  onLogout?: () => void;
 };
 
-export default function UserManagementScreen({onBack}: Props) {
+export default function UserManagementScreen({onBack, onLogout}: Props) {
   const {width} = useWindowDimensions();
   const isMobile = width < 1100;
   const [pending, setPending] = useState<UserRow[]>([]);
@@ -367,6 +369,11 @@ export default function UserManagementScreen({onBack}: Props) {
           </>
         )}
       />
+      {onLogout ? (
+        <TouchableOpacity accessibilityRole="button" onPress={onLogout} style={styles.logoutBtn}>
+          <Text style={styles.logoutBtnText}>Log out</Text>
+        </TouchableOpacity>
+      ) : null}
     </ScrollView>
   );
 }
@@ -586,6 +593,8 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   headerMobile: {flexDirection: 'column', alignItems: 'stretch', gap: 14, marginBottom: 22},
+  logoutBtn: {marginTop: 24, marginBottom: 90, minHeight: 50, borderRadius: 12, borderWidth: 1, borderColor: '#efcdd1', backgroundColor: '#fdf0f1', alignItems: 'center', justifyContent: 'center'},
+  logoutBtnText: {fontSize: 14.5, fontWeight: '800', color: '#b43242'},
   title: {fontSize: 22, fontWeight: '800', color: '#252f50'},
   titleMobile: {fontSize: 20, lineHeight: 26},
   subtitle: {fontSize: 13, color: '#8a8fa3', marginTop: 4},
