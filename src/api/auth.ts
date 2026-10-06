@@ -1,5 +1,5 @@
 import apiClient from './client';
-
+// git updated
 export const sendOtp = (name: string, email: string, role: string) =>
   apiClient.post('/auth/register/send-otp', {name, email, role});
 
