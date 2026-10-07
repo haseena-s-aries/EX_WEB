@@ -3,12 +3,13 @@ import QcPendingBadge from './QcPendingBadge';
 import {Platform, Text, TouchableOpacity, View} from 'react-native';
 import {Colors} from '../theme/palette';
 
-export type AppTab = 'Home' | 'Surveys' | 'Equipment' | 'User' | 'QCReview' | 'QCPending';
+export type AppTab = 'Home' | 'Surveys' | 'Equipment' | 'User' | 'QCReview' | 'QCPending' | 'Reports';
 
 const TABS: {key: AppTab; label: string; glyph: string}[] = [
   {key: 'Home', label: 'Home', glyph: '⌂'},
   {key: 'Surveys', label: 'Surveys', glyph: '▤'},
   {key: 'Equipment', label: 'Equipment', glyph: '⬡'},
+  {key: 'Reports', label: 'Reports', glyph: '↗'},
   {key: 'User', label: 'User', glyph: '☻'},
 ];
 

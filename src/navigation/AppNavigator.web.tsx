@@ -1,4 +1,5 @@
 import ManagerQcReviewScreen from '../screens/ManagerQcReviewScreen';
+import ReportsScreen from '../screens/ReportsScreen';
 import useQcPendingCount from '../hooks/useQcPendingCount';
 import React, {useState} from 'react';
 import {
@@ -49,6 +50,7 @@ type Screen =
   | 'SurveyorInspection'
   | 'AdminEquipmentList'
   | 'ManagerQcReview'
+  | 'Reports'
   | 'QcPending';
 
 export default function AppNavigator() {
@@ -135,6 +137,7 @@ export default function AppNavigator() {
   if (
     screen === 'Dashboard' ||
     screen === 'Projects' ||
+    screen === 'Reports' ||
     screen === 'UserManagement' ||
     screen === 'SurveyorProjectDetails' ||
     screen === 'SurveyorAreaDetails' ||
@@ -170,6 +173,7 @@ export default function AppNavigator() {
     const activeTab: AppTab =
       screen === 'QcPending' || (screen === 'QcProjectDetails' && qcProjectReturnScreen === 'QcPending')
         ? 'QCPending'
+        : screen === 'Reports' ? 'Reports'
         : screen === 'ManagerQcReview'
         ? 'QCReview'
         : screen === 'Dashboard'
@@ -184,7 +188,8 @@ export default function AppNavigator() {
       setSelectedAreaId('');
       setSelectedEquipmentId('');
       setScreen(
-        tab === 'QCPending'
+        tab === 'Reports' ? 'Reports'
+          : tab === 'QCPending'
           ? 'QcPending'
           : tab === 'QCReview'
           ? 'ManagerQcReview'
@@ -338,7 +343,7 @@ export default function AppNavigator() {
                 if (canManageUsers) setScreen('ManagerQcReview');
                 return;
               }
-              if (key === 'Dashboard' || key === 'Projects' || key === 'UserManagement') {
+              if (key === 'Dashboard' || key === 'Projects' || key === 'UserManagement' || key === 'Reports') {
                 if (key === 'UserManagement' && !canManageUsers) return;
                 if (key === 'Projects' && currentUser.role.toLowerCase() === 'qc') {
                   setScreen('QcProjects');
@@ -355,7 +360,7 @@ export default function AppNavigator() {
         )}
         <View style={styles.mainContent}>
           {!isMobile && <View style={styles.topBar}>{bell()}</View>}
-          {screen === 'QcPending' && (canManageUsers || currentUser.role.toLowerCase() === 'qc') ? (
+          {screen === 'Reports' ? <ReportsScreen /> : screen === 'QcPending' && (canManageUsers || currentUser.role.toLowerCase() === 'qc') ? (
             <QcDashboardScreen pendingWorkspace userName={currentUser.name}
               onProjectPress={(id, project) => {
                 setQcProjectId(id); setQcProjectSummary(project);

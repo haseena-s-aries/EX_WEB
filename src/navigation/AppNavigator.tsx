@@ -1,4 +1,5 @@
 import ManagerQcReviewScreen from '../screens/ManagerQcReviewScreen';
+import ReportsScreen from '../screens/ReportsScreen';
 import useQcPendingCount from '../hooks/useQcPendingCount';
 import QcPendingBadge from '../components/QcPendingBadge';
 import React, {useState} from 'react';
@@ -175,6 +176,7 @@ export default function AppNavigator() {
                   <Text style={styles.logoutText}>Log out</Text>
                 </TouchableOpacity>
               </View>
+              {currentUser && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('Reports')} style={styles.logoutButton}><Text style={styles.logoutText}>Reports</Text></TouchableOpacity>}
               {(currentUser?.role === 'Manager' || currentUser?.role === 'Admin') && (
                 <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('ManagerQcReview')} style={styles.logoutButton}>
                   <Text style={styles.logoutText}>QC Review</Text>
@@ -227,6 +229,9 @@ export default function AppNavigator() {
           )}
         </Stack.Screen>
 
+        <Stack.Screen name="Reports">
+          {({navigation}) => <SafeAreaView style={styles.dashboardShell}><ReportsScreen onBack={() => navigation.goBack()} /></SafeAreaView>}
+        </Stack.Screen>
         {(currentUser?.role === 'Manager' || currentUser?.role === 'Admin') && (
           <Stack.Screen name="ManagerQcReview">
             {({navigation}) => <SafeAreaView style={styles.dashboardShell}>

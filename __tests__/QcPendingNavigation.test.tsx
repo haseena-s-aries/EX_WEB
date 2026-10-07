@@ -28,6 +28,7 @@ jest.mock('../src/screens/QcProjectDetailsScreen', () => 'QcProjectDetailsScreen
 jest.mock('../src/screens/ProjectDetailsScreen', () => 'ProjectDetailsScreen');
 jest.mock('../src/screens/AdminEquipmentListScreen', () => 'AdminEquipmentListScreen');
 jest.mock('../src/screens/ManagerQcReviewScreen', () => 'ManagerQcReviewScreen');
+jest.mock('../src/screens/ReportsScreen', () => 'ReportsScreen');
 jest.mock('../src/components/Sidebar', () => 'Sidebar');
 jest.mock('../src/components/BottomTabBar', () => 'BottomTabBar');
 jest.mock('../src/components/NotificationBell', () => 'NotificationBell');
