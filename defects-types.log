@@ -1,0 +1,38 @@
+App.tsx(375,14): error TS2584: Cannot find name 'document'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+App.tsx(377,30): error TS2304: Cannot find name 'CSSRuleList'.
+App.tsx(381,31): error TS2304: Cannot find name 'CSSGroupingRule'.
+App.tsx(383,31): error TS2304: Cannot find name 'CSSStyleRule'.
+App.tsx(405,63): error TS7006: Parameter 'selector' implicitly has an 'any' type.
+App.tsx(410,41): error TS2584: Cannot find name 'document'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+App.tsx(411,19): error TS2584: Cannot find name 'document'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+App.tsx(413,46): error TS2812: Property 'id' does not exist on type 'Element'. Try changing the 'lib' compiler option to include 'dom'.
+App.tsx(424,39): error TS2304: Cannot find name 'window'.
+App.tsx(426,12): error TS2304: Cannot find name 'window'.
+App.tsx(439,41): error TS2584: Cannot find name 'document'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+App.tsx(442,19): error TS2584: Cannot find name 'document'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+App.tsx(444,17): error TS2584: Cannot find name 'document'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+App.tsx(445,9): error TS18047: 'style' is possibly 'null'.
+App.tsx(445,15): error TS2812: Property 'id' does not exist on type 'HTMLStyleElement'. Try changing the 'lib' compiler option to include 'dom'.
+App.tsx(446,9): error TS2584: Cannot find name 'document'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+App.tsx(448,7): error TS18047: 'style' is possibly 'null'.
+App.tsx(448,13): error TS2812: Property 'textContent' does not exist on type 'HTMLStyleElement'. Try changing the 'lib' compiler option to include 'dom'.
+App.tsx(451,5): error TS2584: Cannot find name 'document'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+App.tsx(456,5): error TS2304: Cannot find name 'window'.
+App.tsx(458,26): error TS2304: Cannot find name 'MutationObserver'.
+App.tsx(459,11): error TS2584: Cannot find name 'document'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+App.tsx(463,22): error TS2584: Cannot find name 'document'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+App.tsx(463,57): error TS2584: Cannot find name 'document'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+App.tsx(469,7): error TS2304: Cannot find name 'window'.
+src/components/ProjectDetailModal.tsx(105,9): error TS2304: Cannot find name 'window'.
+src/navigation/AppNavigator.web.tsx(88,13): error TS2304: Cannot find name 'alert'.
+src/navigation/AppNavigator.web.tsx(125,13): error TS2304: Cannot find name 'alert'.
+src/navigation/AppNavigator.web.tsx(543,11): error TS2304: Cannot find name 'alert'.
+src/screens/OtpScreen.tsx(14,3): error TS2724: '"react-native"' has no exported member named 'TextInputKeyPressEventData'. Did you mean 'TextInputKeyPressEvent'?
+src/screens/OtpScreen.tsx(81,33): error TS2339: Property 'focus' does not exist on type 'TextInputType'.
+src/screens/OtpScreen.tsx(90,34): error TS2339: Property 'focus' does not exist on type 'TextInputType'.
+src/screens/OtpScreen.tsx(108,24): error TS2339: Property 'focus' does not exist on type 'TextInputType'.
+src/screens/OtpScreen.tsx(334,17): error TS2322: Type '_TextInputInstance | null' is not assignable to type 'TextInputType | null'.
+  Type '_TextInputInstance' is not assignable to type 'TextInputType'.
+    Type '_TextInputInstance' is not assignable to type 'InternalTextInput'.
+      Type '_TextInputInstance' provides no match for the signature '(props: Omit<TextInputProps, "ref"> & { ref?: Ref<_TextInputInstance> | undefined; }): ReactNode'.
+src/screens/UserManagementScreen.tsx(43,9): error TS2304: Cannot find name 'window'.

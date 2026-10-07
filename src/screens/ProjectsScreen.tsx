@@ -1,7 +1,9 @@
+import DeleteProjectButton from '../components/DeleteProjectButton';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,11 +13,13 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import ProjectDetailModal from '../components/ProjectDetailModal';
+import {getApiErrorMessage} from '../api/errors';
 import {getProjects, getSurveyorProjects, updateProject} from '../api/projects';
 
-type UserOption = {id: string; displayName: string};
+type UserOption = {id: string; displayName: string; managerId?: string | null; managerName?: string | null};
 
 type Props = {
+  userRole?: string;
   isSurveyor?: boolean;
   onSurveyorProjectPress?: (projectId: string) => void;
   onProjectPress?: (projectId: string, project: any) => void;
@@ -36,6 +40,7 @@ const projectIdOf = (project: any) => project?.id || project?.projectId;
 const statusOf = (project: any) => project?.status || project?.projectStatus || 'Pending';
 
 export default function ProjectsScreen({
+  userRole,
   isSurveyor = false,
   onSurveyorProjectPress,
   onProjectPress,
@@ -87,7 +92,7 @@ export default function ProjectsScreen({
     vesselOrSiteName: string;
     assignedSurveyorId: string;
     assignedQcId: string;
-    assignedClientId: string;
+    assignedClientId?: string | null;
     status: string;
   }) => {
     if (!selectedProject) return;
@@ -97,7 +102,9 @@ export default function ProjectsScreen({
       setSelectedProject(null);
       await loadProjects();
     } catch (saveError: any) {
-      Alert.alert('Could not save project', saveError?.response?.data?.message || 'Please try again.');
+      const message = getApiErrorMessage(saveError, 'Could not save project. Please try again.');
+      if (Platform.OS === 'web') (globalThis as any).alert(message);
+      else Alert.alert('Could not save project', message);
     } finally {
       setSaving(false);
     }
@@ -195,6 +202,7 @@ export default function ProjectsScreen({
                 <View style={styles.cardFooter}>
                   <Text style={styles.openProject}>Open project details</Text>
                   <Text style={styles.arrow}>↗</Text>
+                  <DeleteProjectButton userRole={userRole} projectId={projectId} projectName={project.projectName} onDeleted={loadProjects} />
                 </View>
               </TouchableOpacity>
             );
@@ -204,6 +212,8 @@ export default function ProjectsScreen({
 
       {!isSurveyor && (
         <ProjectDetailModal
+          userRole={userRole}
+          onDeleted={loadProjects}
           visible={!!selectedProject}
           project={selectedProject}
           onClose={() => setSelectedProject(null)}

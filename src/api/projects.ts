@@ -1,3 +1,4 @@
+import {HazardousAreaPlanFile, validateHazardousAreaPlan} from '../components/hazardousAreaPlan';
 import apiClient from './client';
 import {Platform} from 'react-native';
 
@@ -46,6 +47,8 @@ export type ProjectAssignableUser = {
   displayName: string;
   email: string;
   role: string;
+  managerId?: string | null;
+  managerName?: string | null;
 };
 
 export type ProjectSummary = {
@@ -58,7 +61,7 @@ export type ProjectSummary = {
   status: ProjectStatus;
   assignedSurveyorId: string;
   assignedQcId: string;
-  assignedClientId: string;
+  assignedClientId?: string | null;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
@@ -105,9 +108,13 @@ export type ProjectArea = {
 
 export type ProjectDetails = Omit<ProjectSummary, 'areaCount'> & {
   areas: ProjectArea[];
+  hazardousAreaPlanPath?: string | null;
+  hazardousAreaPlanFileName?: string | null;
+  hazardousAreaPlanContentType?: string | null;
 };
 
 export type ProjectWriteRequest = {
+  hazardousAreaPlan?: HazardousAreaPlanFile | null;
   projectName: string;
   sector: string;
   jobNo: string;
@@ -115,7 +122,7 @@ export type ProjectWriteRequest = {
   vesselOrSiteName: string;
   assignedSurveyorId: string;
   assignedQcId: string;
-  assignedClientId: string;
+  assignedClientId?: string | null;
   status?: ProjectStatus | string;
 };
 
@@ -124,23 +131,35 @@ export const getAssignmentOptions = () =>
 
 export const getProjects = () => apiClient.get<ProjectSummary[]>('/projects');
 
+export const deleteProject = (projectId: string) => apiClient.delete(`/projects/${projectId}`);
+
 export const getProject = (projectId: string) =>
   apiClient.get<ProjectDetails>(`/projects/${projectId}`);
 
+const projectWriteBody = (data: ProjectWriteRequest) => {
+  const {hazardousAreaPlan, ...fields} = data;
+  const payload = {...fields, assignedClientId: fields.assignedClientId || null,
+    projectName: fields.projectName.toUpperCase(), jobNo: fields.jobNo.toUpperCase(),
+    location: fields.location.toUpperCase(), vesselOrSiteName: fields.vesselOrSiteName.toUpperCase(),
+    status: normalizeProjectStatus(data.status)};
+  if (!hazardousAreaPlan) return payload;
+  const error = validateHazardousAreaPlan(hazardousAreaPlan);
+  if (error) throw new Error(error);
+  const form = new FormData();
+  Object.entries(payload).forEach(([key, value]) => {if (value != null) form.append(key, String(value));});
+  form.append('hazardousAreaPlan', (Platform.OS === 'web'
+    ? hazardousAreaPlan.webFile
+    : {uri: hazardousAreaPlan.uri, name: hazardousAreaPlan.name, type: hazardousAreaPlan.type}) as any);
+  return form;
+};
+
 export const createProject = (data: ProjectWriteRequest) =>
-  apiClient.post<ProjectDetails>('/projects', {
-    ...data,
-    status: normalizeProjectStatus(data.status),
-  });
+  apiClient.post<ProjectDetails>('/projects', projectWriteBody(data));
 
 export const updateProject = (
   projectId: string,
   data: ProjectWriteRequest & {status: ProjectStatus | string},
-) =>
-  apiClient.put<ProjectDetails>(`/projects/${projectId}`, {
-    ...data,
-    status: normalizeProjectStatus(data.status),
-  });
+) => apiClient.put<ProjectDetails>(`/projects/${projectId}`, projectWriteBody(data));
 
 export const addProjectArea = (projectId: string, name: string, file: any) => {
   const request = apiClient.post<ProjectArea>(`/projects/${projectId}/areas`, {
@@ -500,6 +519,7 @@ export type QcDashboard = {
 };
 
 export type QcProjectSummary = {
+  assignedQcName?: string | null;
   projectId: string;
   projectName: string;
   jobNo: string;
@@ -569,6 +589,7 @@ export type QcProjectDetails = {
 };
 
 export type QcEquipmentInspection = {
+  inspectorName?: string | null;
   inspectionId: string;
   projectId: string;
   areaId: string;
@@ -620,7 +641,9 @@ export type QcReview = {
 
 export const getQcDashboard = () => apiClient.get<QcDashboard>('/qc/dashboard');
 
-export const getQcProjects = () => apiClient.get<QcProjectSummary[]>('/qc/projects');
+export const getQcProjects = (pendingOnly = false) => apiClient.get<QcProjectSummary[]>(
+  '/qc/projects', pendingOnly ? {params: {pendingOnly: true}} : undefined,
+);
 
 export const getQcProject = (projectId: string) =>
   apiClient.get<QcProjectDetails>(`/qc/projects/${projectId}`);

@@ -1,0 +1,30 @@
+import React from 'react';
+import Renderer from 'react-test-renderer';
+import {Pressable, TouchableOpacity} from 'react-native';
+import SurveyorAreaDetailsScreen from '../src/screens/SurveyorAreaDetailsScreen';
+import {getSurveyorArea, getSurveyorEquipment, getProjectAreaPhotos} from '../src/api/projects';
+
+jest.mock('../src/api/projects', () => ({getSurveyorArea: jest.fn(), getSurveyorEquipment: jest.fn(), getProjectAreaPhotos: jest.fn()}));
+jest.mock('../src/components/AuthenticatedImage', () => 'AuthenticatedImage');
+jest.mock('../src/components/ZoomableImageViewer', () => 'LayoutViewer');
+const textOf = (node: Renderer.ReactTestInstance): string => node.children.map(child => typeof child === 'string' ? child : textOf(child)).join('');
+test('View Layout reuses zoom viewer with original path and equipment pins', async () => {
+  const equipment = {id: 'equipment-1', sequenceNo: 1, tagNumber: 'MOTOR-1', type: 'Motor', xPercent: 25, yPercent: 50, status: 'PendingReview'};
+  (getSurveyorArea as jest.Mock).mockResolvedValue({data: {areaId: 'area', areaName: 'Deck', layoutImagePath: '/api/projects/p/areas/a/photos/image', equipment: [equipment]}});
+  (getSurveyorEquipment as jest.Mock).mockResolvedValue({data: [equipment]});
+  (getProjectAreaPhotos as jest.Mock).mockResolvedValue({data: []});
+  let renderer!: Renderer.ReactTestRenderer;
+  await Renderer.act(async () => {renderer = Renderer.create(<SurveyorAreaDetailsScreen projectId="project" areaId="area" onBack={jest.fn()} onEquipmentPress={jest.fn()} />);});
+  expect(textOf(renderer.root)).toContain('Deck');
+  const pin = renderer.root.find(node => node.props.accessibilityLabel === 'Equipment 1: MOTOR-1');
+  expect(pin).toBeDefined();
+  expect(pin.props.style).toEqual(expect.arrayContaining([expect.objectContaining({left: '25%', top: '50%'})]));
+  await Renderer.act(async () => {renderer.root.findAllByType(TouchableOpacity).find(node => textOf(node) === 'View Layout')!.props.onPress();});
+  const viewer = renderer.root.findByType('LayoutViewer' as any);
+  expect(viewer.props.images).toEqual(['/api/projects/p/areas/a/photos/image']);
+  expect(viewer.props.pins).toEqual([expect.objectContaining({id: 'equipment-1', label: '1', xPercent: 25, yPercent: 50})]);
+  await Renderer.act(async () => {viewer.props.onClose(); pin.props.onPress();});
+  expect(renderer.root.findAllByType('LayoutViewer' as any)).toHaveLength(0);
+  expect(renderer.root.findAll(node => node.props.accessibilityLabel === 'Equipment 1: MOTOR-1').length).toBeGreaterThan(0);
+  await Renderer.act(async () => {renderer.unmount();});
+});

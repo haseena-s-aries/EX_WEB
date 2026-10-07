@@ -1,3 +1,6 @@
+import {qcAssignmentLabel} from './projectAssignmentLabels';
+import HazardousAreaPlanUpload from './HazardousAreaPlanUpload';
+import {HazardousAreaPlanFile} from './hazardousAreaPlan';
 import React, {useState, useRef, useEffect} from 'react';
 import {
   Modal,
@@ -12,7 +15,7 @@ import {
   Alert,
 } from 'react-native';
 
-type UserOption = {id: string; displayName: string};
+type UserOption = {id: string; displayName: string; managerId?: string | null; managerName?: string | null};
 
 type AreaInput = {
   name: string;
@@ -21,6 +24,7 @@ type AreaInput = {
 };
 
 type ProjectFormData = {
+  hazardousAreaPlan?: HazardousAreaPlanFile | null;
   projectName: string;
   sector: string;
   jobNumber: string;
@@ -72,6 +76,7 @@ export default function NewProjectModal({
   const [clientId, setClientId] = useState('');
   const [areas, setAreas] = useState<AreaInput[]>([emptyArea()]);
   const [error, setError] = useState('');
+  const [hazardousAreaPlan, setHazardousAreaPlan] = useState<HazardousAreaPlanFile | null>(null);
 
   const scale = useRef(new Animated.Value(0.9)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -79,6 +84,7 @@ export default function NewProjectModal({
 
   useEffect(() => {
     if (visible) {
+      setHazardousAreaPlan(null);
       scale.setValue(0.9);
       opacity.setValue(0);
       progress.setValue(0);
@@ -105,6 +111,7 @@ export default function NewProjectModal({
   }, [visible, scale, opacity, progress]);
 
   const reset = () => {
+    setHazardousAreaPlan(null);
     setProjectName('');
     setJobNumber('');
     setLocation('');
@@ -134,8 +141,8 @@ export default function NewProjectModal({
       setError('Please fill all required fields (marked *)');
       return;
     }
-    if (!surveyorId || !qcId || !clientId) {
-      setError('Please assign a Surveyor, QC, and Client');
+    if (!surveyorId || !qcId) {
+      setError('Please assign a Surveyor and QC');
       return;
     }
     const filledAreas = areas.filter(a => a.name.trim());
@@ -154,15 +161,16 @@ export default function NewProjectModal({
       qcId,
       clientId,
       areas: filledAreas,
+      hazardousAreaPlan,
     });
   };
 
-  const requiredFilled = [projectName, location, vesselName, surveyorId, qcId, clientId].filter(
+  const requiredFilled = [projectName, location, vesselName, surveyorId, qcId].filter(
     Boolean,
   ).length;
   const hasArea = areas.some(a => a.name.trim()) ? 1 : 0;
   const filledCount = requiredFilled + hasArea;
-  const totalRequired = 7;
+  const totalRequired = 6;
   const progressPct = Math.round((filledCount / totalRequired) * 100);
 
   return (
@@ -206,7 +214,8 @@ export default function NewProjectModal({
                 placeholder="e.g. MV Resolute Annual Inspection"
                 placeholderTextColor="#9aa0b4"
                 value={projectName}
-                onChangeText={setProjectName}
+                onChangeText={value => setProjectName(value.toUpperCase())}
+                autoCapitalize="characters"
               />
             </Field>
 
@@ -223,7 +232,8 @@ export default function NewProjectModal({
                     placeholder="JOB-2026-0453"
                     placeholderTextColor="#9aa0b4"
                     value={jobNumber}
-                    onChangeText={setJobNumber}
+                    onChangeText={value => setJobNumber(value.toUpperCase())}
+                autoCapitalize="characters"
                   />
                 </Field>
               </View>
@@ -237,7 +247,8 @@ export default function NewProjectModal({
                     placeholder="e.g. Rotterdam, Netherlands"
                     placeholderTextColor="#9aa0b4"
                     value={location}
-                    onChangeText={setLocation}
+                    onChangeText={value => setLocation(value.toUpperCase())}
+                autoCapitalize="characters"
                   />
                 </Field>
               </View>
@@ -248,7 +259,8 @@ export default function NewProjectModal({
                     placeholder="e.g. MV Resolute"
                     placeholderTextColor="#9aa0b4"
                     value={vesselName}
-                    onChangeText={setVesselName}
+                    onChangeText={value => setVesselName(value.toUpperCase())}
+                autoCapitalize="characters"
                   />
                 </Field>
               </View>
@@ -272,13 +284,13 @@ export default function NewProjectModal({
                   <SimpleSelect
                     value={qcId}
                     placeholder="Select QC"
-                    options={qcUsers.map(u => ({label: u.displayName, value: u.id}))}
+                    options={qcUsers.map(u => ({label: qcAssignmentLabel(u), value: u.id}))}
                     onChange={setQcId}
                   />
                 </Field>
               </View>
               <View style={styles.third}>
-                <Field label="Assign Client" required>
+                <Field label="Assign Client (Optional)">
                   <SimpleSelect
                     value={clientId}
                     placeholder="Select client"
@@ -289,7 +301,9 @@ export default function NewProjectModal({
               </View>
             </View>
 
-            <StepHeader index={3} color="#8fa7f8" icon="🗺️" title="Area Details" />
+            <StepHeader index={3} color="#8fa7f8" icon="📄" title="HAZARDOUS AREA PLAN" />
+            <HazardousAreaPlanUpload value={hazardousAreaPlan} onChange={setHazardousAreaPlan} disabled={loading} />
+            <StepHeader index={4} color="#8fa7f8" icon="🗺️" title="Area Details" />
 
             {areas.map((area, idx) => (
               <AreaRow
@@ -404,7 +418,7 @@ function AreaRow({
           onChangeText={onChangeName}
         />
       </Field>
-      <Field label="Area Image (JPG, PNG, WebP; max 10 MB)">
+      <Field label="Area Layout">
         <FileUploadButton fileName={area.fileName} onPick={onPickFile} />
       </Field>
     </Animated.View>
@@ -430,7 +444,7 @@ function FileUploadButton({fileName, onPick}: {fileName: string; onPick: (file: 
         />
         {/* @ts-ignore */}
         <label htmlFor={inputId} style={uploadLabelStyleWeb}>
-          {fileName ? `📎  ${fileName}` : '📤  Click to upload drawing (image or PDF)'}
+          {fileName ? '✓ Layout selected' : '📤  Choose layout image'}
         </label>
       </View>
     );
@@ -440,7 +454,7 @@ function FileUploadButton({fileName, onPick}: {fileName: string; onPick: (file: 
     <TouchableOpacity
       style={styles.uploadBoxNative}
       onPress={() => Alert.alert('Not supported', 'File upload is only available on web for now.')}>
-      <Text style={styles.uploadBoxNativeText}>{fileName || 'Tap to upload (web only)'}</Text>
+      <Text style={styles.uploadBoxNativeText}>{fileName ? '✓ Layout selected' : 'Tap to upload (web only)'}</Text>
     </TouchableOpacity>
   );
 }
@@ -460,6 +474,7 @@ function CreateButton({loading, onPress}: {loading?: boolean; onPress: () => voi
 
 function SimpleSelect({value, options, onChange, placeholder}: {value: string; options: string[] | {label: string; value: string}[]; onChange: (v: string) => void; placeholder?: string}) {
   const normalized = options.map(o => (typeof o === 'string' ? {label: o, value: o} : o));
+  if (Platform.OS !== 'web' && placeholder === 'Select client') normalized.unshift({label: placeholder, value: ''});
 
   if (Platform.OS === 'web') {
     return (

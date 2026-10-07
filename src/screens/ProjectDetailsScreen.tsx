@@ -1,3 +1,6 @@
+import DeleteProjectButton from '../components/DeleteProjectButton';
+import ZoomableImageViewer from '../components/ZoomableImageViewer';
+import HazardousAreaPlanSection from '../components/HazardousAreaPlanSection';
 import React, {useCallback, useEffect, useState} from 'react';
 import {ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {getApiErrorMessage} from '../api/errors';
@@ -5,8 +8,9 @@ import {getProject, updateProject} from '../api/projects';
 import AuthenticatedImage from '../components/AuthenticatedImage';
 import ProjectDetailModal from '../components/ProjectDetailModal';
 
-type UserOption = {id: string; displayName: string};
+type UserOption = {id: string; displayName: string; managerId?: string | null; managerName?: string | null};
 type Props = {
+  userRole?: string;
   projectId: string;
   onBack: () => void;
   surveyors: UserOption[];
@@ -25,7 +29,7 @@ const dateLabel = (value: any) => {
   return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
 };
 
-export default function ProjectDetailsScreen({projectId, onBack, surveyors, qcUsers, clients}: Props) {
+export default function ProjectDetailsScreen({userRole, projectId, onBack, surveyors, qcUsers, clients}: Props) {
   const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -76,7 +80,7 @@ export default function ProjectDetailsScreen({projectId, onBack, surveyors, qcUs
       <TouchableOpacity onPress={onBack} style={styles.back}><Text style={styles.backText}>‹ Back to projects</Text></TouchableOpacity>
       <View style={styles.hero}>
         <View style={{flex: 1}}><Text style={styles.eyebrow}>PROJECT DETAILS</Text><Text style={styles.title}>{project.projectName}</Text><View style={styles.heroMeta}><Text style={styles.heroMetaText}>Job {project.jobNo || 'Not set'}</Text><Text style={styles.heroMetaText}>Created {dateLabel(project.createdAt)}</Text></View></View>
-        <View style={styles.heroActions}><View style={[styles.statusBadge, {backgroundColor: statusStyle.backgroundColor}]}><Text style={[styles.statusText, {color: statusStyle.color}]}>{status}</Text></View><TouchableOpacity onPress={() => setEditing(true)} style={styles.editButton}><Text style={styles.editText}>Edit project</Text></TouchableOpacity></View>
+        <View style={styles.heroActions}><View style={[styles.statusBadge, {backgroundColor: statusStyle.backgroundColor}]}><Text style={[styles.statusText, {color: statusStyle.color}]}>{status}</Text></View><TouchableOpacity onPress={() => setEditing(true)} style={styles.editButton}><Text style={styles.editText}>Edit project</Text></TouchableOpacity><DeleteProjectButton userRole={userRole} projectId={projectId} projectName={project.projectName} onDeleted={onBack} /></View>
       </View>
       {!!error && <View style={styles.errorBox}><Text style={styles.errorText}>{error}</Text></View>}
       <View style={styles.columns}>
@@ -99,6 +103,7 @@ export default function ProjectDetailsScreen({projectId, onBack, surveyors, qcUs
           <TeamMember role="Client" name={assignedName(project.assignedClientId, clients)} />
         </View>
       </View>
+      <View style={styles.detailsCard}><HazardousAreaPlanSection key={project.hazardousAreaPlanPath || 'no-plan'} project={project} /></View>
       <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>Project Areas</Text><Text style={styles.sectionHint}>Area layouts and equipment totals</Text></View><Text style={styles.areaCount}>{areas.length} areas</Text></View>
       {areas.length === 0 ? <View style={styles.empty}><Text style={styles.sectionTitle}>No areas added</Text><Text style={styles.sectionHint}>Use Edit project to add areas.</Text></View> : <View style={styles.projectAreaList}>{areas.map((area: any, index: number) => {
         const photos = Array.isArray(area.photos) ? area.photos : [];
@@ -125,7 +130,7 @@ export default function ProjectDetailsScreen({projectId, onBack, surveyors, qcUs
         </View>;
       })}</View>}
     </ScrollView>
-    <ProjectDetailModal visible={editing} project={project} onClose={() => setEditing(false)} onSave={save} onAreasChanged={load} surveyors={surveyors} qcUsers={qcUsers} clients={clients} loading={saving} />
+    <ProjectDetailModal userRole={userRole} onDeleted={onBack} visible={editing} project={project} onClose={() => setEditing(false)} onSave={save} onAreasChanged={load} surveyors={surveyors} qcUsers={qcUsers} clients={clients} loading={saving} />
     <AreaDetailsModal area={viewingArea} onClose={() => setViewingArea(null)} />
     <EquipmentDetailsModal equipment={selectedEquipment} areaName={selectedAreaName} onClose={() => setSelectedEquipment(null)} />
   </>;
@@ -154,6 +159,7 @@ function EquipmentDetailsModal({equipment, areaName, onClose}: {equipment: any; 
 }
 function AreaDetailsModal({area, onClose}: {area: any; onClose: () => void}) {
   const [aspectRatio, setAspectRatio] = useState(16 / 9);
+  const [viewingLayout, setViewingLayout] = useState(false);
   const [selectedEquipmentId, setSelectedEquipmentId] = useState('');
   if (!area) return null;
   const equipment: any[] = Array.isArray(area.equipment) ? area.equipment : [];
@@ -163,6 +169,8 @@ function AreaDetailsModal({area, onClose}: {area: any; onClose: () => void}) {
         <View style={styles.areaModalHeader}><View><Text style={styles.eyebrow}>AREA DETAILS</Text><Text style={styles.sectionTitle}>{area.areaName || 'Area'}</Text><Text style={styles.areaMeta}>{equipment.length} equipment items</Text></View><TouchableOpacity onPress={onClose} style={styles.modalClose}><Text style={styles.modalCloseText}>Close</Text></TouchableOpacity></View>
         <ScrollView style={styles.areaModalScroll} contentContainerStyle={styles.areaModalContent}>
           <Text style={styles.areaSectionTitle}>Area Layout</Text>
+          {!!(area.imagePath || area.layoutImagePath) && <TouchableOpacity onPress={() => setViewingLayout(true)} style={styles.viewAreaButton}><Text style={styles.viewAreaText}>View Layout</Text></TouchableOpacity>}
+          {viewingLayout && <ZoomableImageViewer visible title="Area Layout" images={[area.imagePath || area.layoutImagePath]} pins={equipment.map(item => ({id: item.id, label: String(item.sequenceNo), xPercent: Number(item.xPercent) || 0, yPercent: Number(item.yPercent) || 0, title: item.tagNumber, lines: [item.type]}))} onClose={() => setViewingLayout(false)} />}
           <View style={[styles.areaLayoutCanvas, {aspectRatio}]}>
             <AuthenticatedImage path={area.imagePath || area.layoutImagePath} resizeMode="contain" onLoad={event => {const source = event?.nativeEvent?.source; if (source?.width > 0 && source?.height > 0) setAspectRatio(source.width / source.height);}} style={styles.areaLayoutImage} />
             {equipment.map((item, index) => <TouchableOpacity key={item.id || index} onPress={() => setSelectedEquipmentId(item.id)} style={[styles.areaPin, selectedEquipmentId === item.id && styles.areaPinSelected, {left: `${Math.max(0, Math.min(100, Number(item.xPercent) || 0))}%` as any, top: `${Math.max(0, Math.min(100, Number(item.yPercent) || 0))}%` as any}]}><Text style={styles.areaPinText}>{item.sequenceNo || index + 1}</Text></TouchableOpacity>)}

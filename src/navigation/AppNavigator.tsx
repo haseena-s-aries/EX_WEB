@@ -1,3 +1,6 @@
+import ManagerQcReviewScreen from '../screens/ManagerQcReviewScreen';
+import useQcPendingCount from '../hooks/useQcPendingCount';
+import QcPendingBadge from '../components/QcPendingBadge';
 import React, {useState} from 'react';
 import {
   Alert,
@@ -36,9 +39,14 @@ export default function AppNavigator() {
   const [surveyorRefreshVersion, setSurveyorRefreshVersion] = useState(0);
 
   const [qcRefreshVersion, setQcRefreshVersion] = useState(0);
+  const [activeScreen, setActiveScreen] = useState('Login');
+  const qcPendingCount = useQcPendingCount(currentUser, activeScreen);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer onStateChange={state => {
+      const route = state?.routes[state.index ?? 0];
+      if (route) setActiveScreen(route.name);
+    }}>
       <Stack.Navigator initialRouteName="Login" screenOptions={{headerShown: false}}>
         <Stack.Screen name="Signup">
           {({navigation}) => (
@@ -167,6 +175,16 @@ export default function AppNavigator() {
                   <Text style={styles.logoutText}>Log out</Text>
                 </TouchableOpacity>
               </View>
+              {(currentUser?.role === 'Manager' || currentUser?.role === 'Admin') && (
+                <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('ManagerQcReview')} style={styles.logoutButton}>
+                  <Text style={styles.logoutText}>QC Review</Text>
+                </TouchableOpacity>
+              )}
+              {(currentUser?.role === 'Manager' || currentUser?.role === 'Admin' || currentUser?.role?.toLowerCase() === 'qc') && (
+                <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('QcPending')} style={styles.logoutButton}>
+                  <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}><Text style={styles.logoutText}>QC Pending</Text><QcPendingBadge count={qcPendingCount} /></View>
+                </TouchableOpacity>
+              )}
               {currentUser?.role?.toLowerCase() === 'qc' ? (
                 <QcDashboardScreen
                   userName={currentUser.displayName || 'QC'}
@@ -192,6 +210,7 @@ export default function AppNavigator() {
                 />
               ) : (
                 <DashboardScreen
+                  userRole={currentUser?.role}
                   userName={currentUser?.displayName || 'User'}
                   surveyors={assignmentOptions.filter(
                     user => user.role === 'Surveyor',
@@ -208,6 +227,23 @@ export default function AppNavigator() {
           )}
         </Stack.Screen>
 
+        {(currentUser?.role === 'Manager' || currentUser?.role === 'Admin') && (
+          <Stack.Screen name="ManagerQcReview">
+            {({navigation}) => <SafeAreaView style={styles.dashboardShell}>
+              <ManagerQcReviewScreen userRole={currentUser.role} onBack={() => navigation.goBack()}
+                onAssignmentsChanged={() => {getAssignmentOptions().then(res => setAssignmentOptions(res.data)).catch(console.error);}} />
+            </SafeAreaView>}
+          </Stack.Screen>
+        )}
+        {(currentUser?.role === 'Manager' || currentUser?.role === 'Admin' || currentUser?.role?.toLowerCase() === 'qc') && (
+          <Stack.Screen name="QcPending">
+            {({navigation}) => <SafeAreaView style={styles.dashboardShell}>
+              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.logoutButton}><Text style={styles.logoutText}>Back</Text></TouchableOpacity>
+              <QcDashboardScreen pendingWorkspace userName={currentUser.displayName} refreshVersion={qcRefreshVersion}
+                onProjectPress={(projectId, projectSummary) => navigation.navigate('QcProjectDetails', {projectId, projectSummary})} />
+            </SafeAreaView>}
+          </Stack.Screen>
+        )}
         <Stack.Screen name="QcProjectDetails">
           {({navigation, route}: any) => (
             <SafeAreaView style={styles.dashboardShell}>

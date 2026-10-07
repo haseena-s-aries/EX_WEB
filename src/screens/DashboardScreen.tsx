@@ -1,3 +1,7 @@
+import DeleteProjectButton from '../components/DeleteProjectButton';
+import DefectsModal from '../components/DefectsModal';
+import {DefectSummary, getDefects} from '../api/defects';
+import {HazardousAreaPlanFile} from '../components/hazardousAreaPlan';
 import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
 import {
   View,
@@ -35,7 +39,7 @@ const statusColor = (c: Colors, status: StatusLabel) =>
     'On Hold': c.critical,
   })[status];
 
-type UserOption = {id: string; displayName: string};
+type UserOption = {id: string; displayName: string; managerId?: string | null; managerName?: string | null};
 
 type Props = {
   userName: string;
@@ -76,8 +80,16 @@ export default function DashboardScreen({
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
   const [savingProject, setSavingProject] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [showDefects, setShowDefects] = useState(false);
+  const [defectSummary, setDefectSummary] = useState<DefectSummary | null>(null);
+  const [defectError, setDefectError] = useState('');
+  const loadDefects = useCallback(async () => {
+    try {const response = await getDefects(); setDefectSummary(response.data.summary); setDefectError('');}
+    catch (err) {setDefectError(getApiErrorMessage(err, 'Could not load defects'));}
+  }, []);
 
   const loadProjects = useCallback(async (isRefresh = false) => {
+    void loadDefects();
     isRefresh ? setRefreshing(true) : setLoadingProjects(true);
     try {
       const res = await getProjects();
@@ -93,7 +105,7 @@ export default function DashboardScreen({
       setLoadingProjects(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [loadDefects]);
 
   useEffect(() => {
     loadProjects();
@@ -129,6 +141,7 @@ export default function DashboardScreen({
   surveyorId: string;
   qcId: string;
   clientId: string;
+  hazardousAreaPlan?: HazardousAreaPlanFile | null;
   areas: {name: string; file: any; fileName: string}[];
 }) => {
   setCreating(true);
@@ -142,6 +155,7 @@ export default function DashboardScreen({
       assignedSurveyorId: data.surveyorId,
       assignedQcId: data.qcId,
       assignedClientId: data.clientId,
+      hazardousAreaPlan: data.hazardousAreaPlan,
     });
 
     const projectId = res.data.id;
@@ -166,8 +180,9 @@ export default function DashboardScreen({
     setShowNewProject(false);
     await loadProjects();
   } catch (err: any) {
-    const errData = err?.response?.data;
-    Alert.alert('Error', errData?.error || errData?.message || 'Could not create project');
+    const message = getApiErrorMessage(err, 'Could not create project');
+    if (Platform.OS === 'web') (globalThis as any).alert(message);
+    else Alert.alert('Error', message);
   } finally {
     setCreating(false);
   }
@@ -181,7 +196,7 @@ export default function DashboardScreen({
     vesselOrSiteName: string;
     assignedSurveyorId: string;
     assignedQcId: string;
-    assignedClientId: string;
+    assignedClientId?: string | null;
     status: string;
   }) => {
     if (!selectedProject) return;
@@ -192,8 +207,9 @@ export default function DashboardScreen({
       setSelectedProject(null);
       await loadProjects();
     } catch (err: any) {
-      const errData = err?.response?.data;
-      Alert.alert('Error', errData?.error || errData?.message || 'Could not save project changes');
+      const message = getApiErrorMessage(err, 'Could not save project changes');
+      if (Platform.OS === 'web') (globalThis as any).alert(message);
+      else Alert.alert('Error', message);
     } finally {
       setSavingProject(false);
     }
@@ -246,7 +262,10 @@ export default function DashboardScreen({
               </View>
             </View>
 
-            <View
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="View flagged defects"
+              onPress={() => setShowDefects(true)}
               style={[
                 s.kpiCard,
                 isWide && s.kpiCardWide,
@@ -257,10 +276,10 @@ export default function DashboardScreen({
               </View>
               <View style={s.kpiBody}>
                 <Text style={s.kpiLabel}>Defects Flagged</Text>
-                <Text style={s.kpiValue}>0</Text>
-                <Text style={s.kpiFoot}>0 total defects</Text>
+                <Text style={s.kpiValue}>{defectError ? '—' : defectSummary ? defectSummary.openCount : '…'}{!defectError && !!defectSummary?.openCount && <Text style={s.kpiValueSub}> Open</Text>}</Text>
+                <Text style={s.kpiFoot}>{defectError ? 'Unable to load · Tap to retry' : !defectSummary ? 'Loading defects' : !defectSummary.openCount ? 'No open defects' : `${defectSummary.high} High · ${defectSummary.medium} Medium · ${defectSummary.low} Low${defectSummary.unspecified ? ` · ${defectSummary.unspecified} Unspecified` : ''}`}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
 
             <View style={[s.kpiCard, isWide && s.kpiCardWide]}>
               <ProgressRing
@@ -328,6 +347,7 @@ export default function DashboardScreen({
                     activeOpacity={0.75}
                     style={s.projectCard}>
                     <View style={{flex: 1, minWidth: 0}}>
+                    
                       <Text style={s.projectName} numberOfLines={2}>
                         {project.projectName}
                       </Text>
@@ -379,7 +399,10 @@ export default function DashboardScreen({
         onCreate={handleCreate}
       />
 
+      {showDefects && <DefectsModal c={c} onSummary={setDefectSummary} onClose={() => {setShowDefects(false); void loadDefects();}} />}
       <ProjectDetailModal
+        userRole={userRole}
+        onDeleted={loadProjects}
         visible={!!selectedProject}
         project={selectedProject}
         onClose={() => setSelectedProject(null)}

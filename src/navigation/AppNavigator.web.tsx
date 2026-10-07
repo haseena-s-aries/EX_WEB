@@ -1,3 +1,5 @@
+import ManagerQcReviewScreen from '../screens/ManagerQcReviewScreen';
+import useQcPendingCount from '../hooks/useQcPendingCount';
 import React, {useState} from 'react';
 import {
   StyleSheet,
@@ -45,7 +47,9 @@ type Screen =
   | 'ProjectDetails'
   | 'SurveyorEquipmentDetails'
   | 'SurveyorInspection'
-  | 'AdminEquipmentList';
+  | 'AdminEquipmentList'
+  | 'ManagerQcReview'
+  | 'QcPending';
 
 export default function AppNavigator() {
   const {width} = useWindowDimensions();
@@ -61,12 +65,13 @@ export default function AppNavigator() {
   const [qcProjectId, setQcProjectId] = useState('');
   const [qcProjectSummary, setQcProjectSummary] = useState<any>(null);
   const [qcProjectReturnScreen, setQcProjectReturnScreen] = useState<
-    'Dashboard' | 'QcProjects'
+    'Dashboard' | 'QcProjects' | 'QcPending'
   >('Dashboard');
   const [selectedEquipmentId, setSelectedEquipmentId] = useState('');
   const [projectDetailsReturnScreen, setProjectDetailsReturnScreen] = useState<'Dashboard' | 'Projects'>('Dashboard');
   const [surveyorRefreshVersion, setSurveyorRefreshVersion] = useState(0);
   const themeMode = useThemeMode();
+  const qcPendingCount = useQcPendingCount(currentUser, screen);
   if (screen === 'Otp') {
     return (
       <OtpScreen
@@ -137,6 +142,8 @@ export default function AppNavigator() {
     screen === 'QcProjects' ||
     screen === 'SurveyorEquipmentDetails' ||
     screen === 'SurveyorInspection' ||
+    screen === 'QcPending' ||
+    screen === 'ManagerQcReview' ||
     screen === 'AdminEquipmentList' ||
     screen === 'ProjectDetails'
   ) {
@@ -161,7 +168,11 @@ export default function AppNavigator() {
     const adminMobile = isMobile && canManageUsers;
     const tc = themeMode === 'dark' ? DARK : LIGHT;
     const activeTab: AppTab =
-      screen === 'Dashboard'
+      screen === 'QcPending' || (screen === 'QcProjectDetails' && qcProjectReturnScreen === 'QcPending')
+        ? 'QCPending'
+        : screen === 'ManagerQcReview'
+        ? 'QCReview'
+        : screen === 'Dashboard'
         ? 'Home'
         : screen === 'Projects' || screen === 'ProjectDetails'
           ? 'Surveys'
@@ -173,7 +184,11 @@ export default function AppNavigator() {
       setSelectedAreaId('');
       setSelectedEquipmentId('');
       setScreen(
-        tab === 'Home'
+        tab === 'QCPending'
+          ? 'QcPending'
+          : tab === 'QCReview'
+          ? 'ManagerQcReview'
+          : tab === 'Home'
           ? 'Dashboard'
           : tab === 'Surveys'
             ? 'Projects'
@@ -305,13 +320,24 @@ export default function AppNavigator() {
               screen === 'SurveyorEquipmentDetails' ||
               screen === 'SurveyorInspection'
                 ? projectDetailsReturnScreen
+                : screen === 'QcProjectDetails' && qcProjectReturnScreen === 'QcPending'
+                  ? 'QcPending'
                 : screen === 'ProjectDetails' || screen === 'QcProjects' || screen === 'QcProjectDetails'
                   ? 'Projects'
                 : screen
             }
             userName={currentUser.name}
             userRole={currentUser.role}
+            qcPendingCount={qcPendingCount}
             onNavigate={key => {
+              if (key === 'QcPending') {
+                if (canManageUsers || currentUser.role.toLowerCase() === 'qc') setScreen('QcPending');
+                return;
+              }
+              if (key === 'ManagerQcReview') {
+                if (canManageUsers) setScreen('ManagerQcReview');
+                return;
+              }
               if (key === 'Dashboard' || key === 'Projects' || key === 'UserManagement') {
                 if (key === 'UserManagement' && !canManageUsers) return;
                 if (key === 'Projects' && currentUser.role.toLowerCase() === 'qc') {
@@ -329,7 +355,17 @@ export default function AppNavigator() {
         )}
         <View style={styles.mainContent}>
           {!isMobile && <View style={styles.topBar}>{bell()}</View>}
-          {screen === 'Dashboard' && currentUser.role.toLowerCase() === 'qc' ? (
+          {screen === 'QcPending' && (canManageUsers || currentUser.role.toLowerCase() === 'qc') ? (
+            <QcDashboardScreen pendingWorkspace userName={currentUser.name}
+              onProjectPress={(id, project) => {
+                setQcProjectId(id); setQcProjectSummary(project);
+                setQcProjectReturnScreen('QcPending'); setScreen('QcProjectDetails');
+              }} />
+          ) : screen === 'ManagerQcReview' && canManageUsers ? (
+            <ManagerQcReviewScreen userRole={currentUser.role} onAssignmentsChanged={() => {
+              getAssignmentOptions().then(res => setApprovedUsers(res.data)).catch(console.error);
+            }} />
+          ) : screen === 'Dashboard' && currentUser.role.toLowerCase() === 'qc' ? (
             <QcDashboardScreen
               userName={currentUser.name}
               onProjectPress={(id, project) => {
@@ -376,13 +412,13 @@ export default function AppNavigator() {
               accessory={adminMobile ? bell(true) : undefined}
               surveyors={approvedUsers
                 .filter((u: any) => u.role?.toLowerCase() === 'surveyor')
-                .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+                .map((u: any) => ({id: u.id, displayName: u.displayName, managerId: u.managerId, managerName: u.managerName}))}
               qcUsers={approvedUsers
                 .filter((u: any) => u.role?.toLowerCase() === 'qc')
-                .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+                .map((u: any) => ({id: u.id, displayName: u.displayName, managerId: u.managerId, managerName: u.managerName}))}
               clients={approvedUsers
                 .filter((u: any) => u.role?.toLowerCase() === 'client')
-                .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+                .map((u: any) => ({id: u.id, displayName: u.displayName, managerId: u.managerId, managerName: u.managerName}))}
             />
           ) : screen === 'QcProjectDetails' && qcProjectId ? (
             <QcProjectDetailsScreen
@@ -392,6 +428,7 @@ export default function AppNavigator() {
             />
           ) : screen === 'Projects' ? (
             <ProjectsScreen
+              userRole={currentUser.role}
               isSurveyor={currentUser.role.toLowerCase() === 'surveyor'}
               onProjectPress={canManageUsers ? projectId => {
                 setSelectedProjectId(projectId);
@@ -405,21 +442,22 @@ export default function AppNavigator() {
               }}
               surveyors={approvedUsers
                 .filter((u: any) => u.role?.toLowerCase() === 'surveyor')
-                .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+                .map((u: any) => ({id: u.id, displayName: u.displayName, managerId: u.managerId, managerName: u.managerName}))}
               qcUsers={approvedUsers
                 .filter((u: any) => u.role?.toLowerCase() === 'qc')
-                .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+                .map((u: any) => ({id: u.id, displayName: u.displayName, managerId: u.managerId, managerName: u.managerName}))}
               clients={approvedUsers
                 .filter((u: any) => u.role?.toLowerCase() === 'client')
-                .map((u: any) => ({id: u.id, displayName: u.displayName}))}
+                .map((u: any) => ({id: u.id, displayName: u.displayName, managerId: u.managerId, managerName: u.managerName}))}
             />
           ) : screen === 'ProjectDetails' && selectedProjectId ? (
             <ProjectDetailsScreen
+              userRole={currentUser.role}
               projectId={selectedProjectId}
               onBack={() => setScreen('Projects')}
-              surveyors={approvedUsers.filter((u: any) => u.role?.toLowerCase() === 'surveyor').map((u: any) => ({id: u.id, displayName: u.displayName}))}
-              qcUsers={approvedUsers.filter((u: any) => u.role?.toLowerCase() === 'qc').map((u: any) => ({id: u.id, displayName: u.displayName}))}
-              clients={approvedUsers.filter((u: any) => u.role?.toLowerCase() === 'client').map((u: any) => ({id: u.id, displayName: u.displayName}))}
+              surveyors={approvedUsers.filter((u: any) => u.role?.toLowerCase() === 'surveyor').map((u: any) => ({id: u.id, displayName: u.displayName, managerId: u.managerId, managerName: u.managerName}))}
+              qcUsers={approvedUsers.filter((u: any) => u.role?.toLowerCase() === 'qc').map((u: any) => ({id: u.id, displayName: u.displayName, managerId: u.managerId, managerName: u.managerName}))}
+              clients={approvedUsers.filter((u: any) => u.role?.toLowerCase() === 'client').map((u: any) => ({id: u.id, displayName: u.displayName, managerId: u.managerId, managerName: u.managerName}))}
             />
           ) : screen === 'SurveyorProjectDetails' && selectedProjectId ? (
             <SurveyorProjectDetailsScreen
@@ -485,7 +523,7 @@ export default function AppNavigator() {
             <DashboardScreen userName={currentUser.name} />
           )}
         </View>
-        {adminMobile ? <BottomTabBar active={activeTab} onChange={onTabChange} c={tc} onLogout={logout} /> : null}
+        {adminMobile ? <BottomTabBar active={activeTab} onChange={onTabChange} c={tc} onLogout={logout} showQcReview={canManageUsers} showQcPending={canManageUsers} qcPendingCount={qcPendingCount} /> : null}
       </View>
     );
   }

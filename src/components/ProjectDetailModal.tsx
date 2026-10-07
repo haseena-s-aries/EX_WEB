@@ -1,3 +1,9 @@
+import DeleteProjectButton from './DeleteProjectButton';
+import {qcAssignmentLabel} from './projectAssignmentLabels';
+import ZoomableImageViewer from './ZoomableImageViewer';
+import HazardousAreaPlanUpload from './HazardousAreaPlanUpload';
+import HazardousAreaPlanSection from './HazardousAreaPlanSection';
+import {HazardousAreaPlanFile} from './hazardousAreaPlan';
 import React, {useEffect, useRef, useState} from 'react';
 import {
   Modal,
@@ -19,15 +25,17 @@ import {
   deleteProjectArea,
 } from '../api/projects';
 import {getApiErrorMessage} from '../api/errors';
-import AuthenticatedImage from './AuthenticatedImage';
 
-type UserOption = {id: string; displayName: string};
+type UserOption = {id: string; displayName: string; managerId?: string | null; managerName?: string | null};
 
 type Props = {
+  userRole?: string;
+  onDeleted?: () => void | Promise<void>;
   visible: boolean;
   project: any | null;
   onClose: () => void;
   onSave: (data: {
+    hazardousAreaPlan?: HazardousAreaPlanFile | null;
     projectName: string;
     sector: string;
     jobNo: string;
@@ -35,7 +43,7 @@ type Props = {
     vesselOrSiteName: string;
     assignedSurveyorId: string;
     assignedQcId: string;
-    assignedClientId: string;
+    assignedClientId?: string | null;
     status: string;
   }) => void;
   onAreasChanged?: () => void;
@@ -104,6 +112,8 @@ function confirmAction(message: string, confirmLabel: string, onConfirm: () => v
 }
 
 export default function ProjectDetailModal({
+  userRole,
+  onDeleted,
   visible,
   project,
   onClose,
@@ -115,6 +125,8 @@ export default function ProjectDetailModal({
   loading,
 }: Props) {
   const [editing, setEditing] = useState(false);
+  const [planDetails, setPlanDetails] = useState<any>({});
+  const [hazardousAreaPlan, setHazardousAreaPlan] = useState<HazardousAreaPlanFile | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   const [projectName, setProjectName] = useState('');
@@ -132,6 +144,8 @@ export default function ProjectDetailModal({
   const opacity = useRef(new Animated.Value(0)).current;
 
   const applyDetail = (detail: any) => {
+    setPlanDetails(detail);
+    setHazardousAreaPlan(null);
     setProjectName(pick(detail, 'projectName'));
     setSector(pick(detail, 'sector') || SECTOR_OPTIONS[0]);
     setJobNo(pick(detail, 'jobNo', 'jobNumber'));
@@ -206,6 +220,7 @@ export default function ProjectDetailModal({
       assignedSurveyorId: surveyorId,
       assignedQcId: qcId,
       assignedClientId: clientId,
+      hazardousAreaPlan,
       status,
     });
   };
@@ -320,7 +335,8 @@ export default function ProjectDetailModal({
             {editing ? (
               <>
                 <Field label="Project Name">
-                  <TextInput style={styles.input} value={projectName} onChangeText={setProjectName} />
+                  <TextInput style={styles.input} value={projectName} onChangeText={value => setProjectName(value.toUpperCase())}
+                autoCapitalize="characters" />
                 </Field>
                 <View style={styles.row}>
                   <View style={styles.half}>
@@ -330,14 +346,16 @@ export default function ProjectDetailModal({
                   </View>
                   <View style={styles.half}>
                     <Field label="Job Number">
-                      <TextInput style={styles.input} value={jobNo} onChangeText={setJobNo} />
+                      <TextInput style={styles.input} value={jobNo} onChangeText={value => setJobNo(value.toUpperCase())}
+                autoCapitalize="characters" />
                     </Field>
                   </View>
                 </View>
                 <View style={styles.row}>
                   <View style={styles.half}>
                     <Field label="Location">
-                      <TextInput style={styles.input} value={location} onChangeText={setLocation} />
+                      <TextInput style={styles.input} value={location} onChangeText={value => setLocation(value.toUpperCase())}
+                autoCapitalize="characters" />
                     </Field>
                   </View>
                   <View style={styles.half}>
@@ -345,7 +363,8 @@ export default function ProjectDetailModal({
                       <TextInput
                         style={styles.input}
                         value={vesselOrSiteName}
-                        onChangeText={setVesselOrSiteName}
+                        onChangeText={value => setVesselOrSiteName(value.toUpperCase())}
+                autoCapitalize="characters"
                       />
                     </Field>
                   </View>
@@ -410,17 +429,17 @@ export default function ProjectDetailModal({
                   </Field>
                 </View>
                 <View style={styles.third}>
-                  <Field label="QC">
+                  <Field label="Assign QC">
                     <SimpleSelect
                       value={qcId}
                       placeholder="Select QC"
-                      options={qcUsers.map(u => ({label: u.displayName, value: u.id}))}
+                      options={qcUsers.map(u => ({label: qcAssignmentLabel(u), value: u.id}))}
                       onChange={setQcId}
                     />
                   </Field>
                 </View>
                 <View style={styles.third}>
-                  <Field label="Client">
+                  <Field label="Client (Optional)">
                     <SimpleSelect
                       value={clientId}
                       placeholder="Select client"
@@ -437,6 +456,10 @@ export default function ProjectDetailModal({
                 <ReadField label="Client" value={clientName} third />
               </View>
             )}
+
+            <SectionHeader color="#8fa7f8" icon="📄" title="HAZARDOUS AREA PLAN" />
+            <HazardousAreaPlanSection key={planDetails.hazardousAreaPlanPath || 'no-plan'} project={planDetails} />
+            {editing && <HazardousAreaPlanUpload value={hazardousAreaPlan} onChange={setHazardousAreaPlan} disabled={loading || loadingDetail} />}
 
             <SectionHeader color="#8fa7f8" icon="🗺️" title={`Areas ${areas.length ? `(${areas.length})` : ''}`} />
 
@@ -483,6 +506,7 @@ export default function ProjectDetailModal({
                 <TouchableOpacity style={styles.editBtn} onPress={() => setEditing(true)}>
                   <Text style={styles.editBtnText}>✎  Edit Project</Text>
                 </TouchableOpacity>
+                <DeleteProjectButton userRole={userRole} projectId={projectId} projectName={projectName} onDeleted={async () => {onClose(); await onDeleted?.();}} />
               </View>
             )}
           </View>
@@ -544,6 +568,9 @@ function AreaCard({
   onPickFile: (file: any) => void;
   onRemove: () => void;
 }) {
+  const [viewingLayout, setViewingLayout] = useState(false);
+  const layoutViewer = viewingLayout && area.layoutImagePath ? <ZoomableImageViewer visible title="Area Layout" images={[area.layoutImagePath]} onClose={() => setViewingLayout(false)} /> : null;
+  const viewLayout = area.layoutImagePath ? <TouchableOpacity onPress={() => setViewingLayout(true)}><Text style={{color: '#718be8', fontWeight: '700'}}>View Layout</Text></TouchableOpacity> : null;
   if (!editing) {
     return (
       <View style={styles.areaReadRow}>
@@ -552,10 +579,8 @@ function AreaCard({
         </View>
         <View style={{flex: 1}}>
           <Text style={styles.areaReadName}>{area.name}</Text>
-          <Text style={styles.areaReadMeta}>
-            {area.layoutImagePath ? 'Drawing uploaded' : 'No drawing uploaded'}
-            {typeof area.photoCount === 'number' ? ` · ${area.photoCount} photo${area.photoCount === 1 ? '' : 's'}` : ''}
-          </Text>
+          {viewLayout}
+          {layoutViewer}
         </View>
       </View>
     );
@@ -582,10 +607,9 @@ function AreaCard({
           onChangeText={onChangeName}
         />
       </Field>
-      <Field label="Area Image (JPG, PNG, WebP; max 10 MB)">
-        {area.layoutImagePath ? (
-          <AuthenticatedImage path={area.layoutImagePath} style={styles.areaPreview} />
-        ) : null}
+      <Field label="Area Layout">
+        {viewLayout}
+        {layoutViewer}
         <FileUploadButton
           fileName={area.fileName || (area.layoutImagePath ? 'Replace existing drawing' : '')}
           onPick={onPickFile}
@@ -614,7 +638,7 @@ function FileUploadButton({fileName, onPick}: {fileName: string; onPick: (file: 
         />
         {/* @ts-ignore */}
         <label htmlFor={inputId} style={uploadLabelStyleWeb}>
-          {fileName ? `📎  ${fileName}` : '📤  Click to upload drawing (image or PDF)'}
+          {fileName ? '✓ Layout selected' : '📤  Choose layout image'}
         </label>
       </View>
     );
@@ -624,7 +648,7 @@ function FileUploadButton({fileName, onPick}: {fileName: string; onPick: (file: 
     <TouchableOpacity
       style={styles.uploadBoxNative}
       onPress={() => Alert.alert('Not supported', 'File upload is only available on web for now.')}>
-      <Text style={styles.uploadBoxNativeText}>{fileName || 'Tap to upload (web only)'}</Text>
+      <Text style={styles.uploadBoxNativeText}>{fileName ? '✓ Layout selected' : 'Tap to upload (web only)'}</Text>
     </TouchableOpacity>
   );
 }
@@ -654,6 +678,7 @@ function SimpleSelect({
   placeholder?: string;
 }) {
   const normalized = options.map(o => (typeof o === 'string' ? {label: o, value: o} : o));
+  if (Platform.OS !== 'web' && placeholder === 'Select client') normalized.unshift({label: placeholder, value: ''});
 
   if (Platform.OS === 'web') {
     return (

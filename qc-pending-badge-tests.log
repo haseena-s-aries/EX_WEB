@@ -1,0 +1,17 @@
+
+> ExSurveyApp@0.0.1 test
+> jest --runInBand QcPendingBadge QcPendingCount QcPendingNavigation QcDashboardScreen ManagerQcReviewScreen EquipmentType SurveyorAreaLayout
+
+PASS __tests__/QcPendingCount.test.tsx
+PASS __tests__/ManagerQcReviewScreen.test.tsx
+PASS __tests__/EquipmentType.test.tsx
+PASS __tests__/QcPendingBadge.test.tsx
+PASS __tests__/QcPendingNavigation.test.tsx
+PASS __tests__/SurveyorAreaLayout.test.tsx
+PASS __tests__/QcDashboardScreen.test.tsx
+
+Test Suites: 7 passed, 7 total
+Tests:       32 passed, 32 total
+Snapshots:   0 total
+Time:        5.861 s, estimated 6 s
+Ran all test suites matching /QcPendingBadge|QcPendingCount|QcPendingNavigation|QcDashboardScreen|ManagerQcReviewScreen|EquipmentType|SurveyorAreaLayout/i.

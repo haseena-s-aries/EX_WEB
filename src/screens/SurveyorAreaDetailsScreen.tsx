@@ -1,3 +1,4 @@
+import ZoomableImageViewer from '../components/ZoomableImageViewer';
 import React, {useCallback, useEffect, useState} from 'react';
 import {
   ActivityIndicator,
@@ -40,6 +41,7 @@ type EquipmentForm = {
   tagNumber: string;
   equipmentId: string;
   type: string;
+  otherType: string;
   circuitId: string;
   location: string;
   manufacturer: string;
@@ -51,12 +53,15 @@ const emptyForm = (): EquipmentForm => ({
   tagNumber: '',
   equipmentId: '',
   type: '',
+  otherType: '',
   circuitId: '',
   location: '',
   manufacturer: '',
   protectionDetails: '',
   certificateNumber: '',
 });
+
+const equipmentTypes = ['Transformer', 'Switchgear', 'Circuit Breaker', 'Motor', 'Generator', 'Panel', 'Cable', 'Lighting', 'Outlet', 'Other'];
 
 export default function SurveyorAreaDetailsScreen({
   projectId,
@@ -72,6 +77,7 @@ export default function SurveyorAreaDetailsScreen({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [placementMode, setPlacementMode] = useState(false);
+  const [viewingLayout, setViewingLayout] = useState(false);
   const [layoutSize, setLayoutSize] = useState({width: 0, height: 0});
   const [imageAspectRatio, setImageAspectRatio] = useState(16 / 9);
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null);
@@ -150,7 +156,8 @@ export default function SurveyorAreaDetailsScreen({
     setForm({
       tagNumber: equipment.tagNumber,
       equipmentId: equipment.equipmentId || '',
-      type: equipment.type,
+      type: equipmentTypes.includes(equipment.type) ? equipment.type : equipment.type ? 'Other' : '',
+      otherType: equipment.type === 'Other' || !equipmentTypes.includes(equipment.type) ? equipment.type || '' : '',
       circuitId: equipment.circuitId || '',
       location: equipment.location || '',
       manufacturer: equipment.manufacturer || '',
@@ -178,6 +185,10 @@ export default function SurveyorAreaDetailsScreen({
       setFormError('Tag Number and Type are required.');
       return;
     }
+    if (form.type === 'Other' && !form.otherType.trim()) {
+      setFormError('Other Equipment Type is required.');
+      return;
+    }
     if (
       !Number.isFinite(pendingPosition.xPercent) ||
       !Number.isFinite(pendingPosition.yPercent) ||
@@ -193,7 +204,7 @@ export default function SurveyorAreaDetailsScreen({
       ...pendingPosition,
       tagNumber: form.tagNumber.trim(),
       equipmentId: form.equipmentId.trim() || null,
-      type: form.type.trim(),
+      type: form.type === 'Other' ? form.otherType.trim() : form.type,
       circuitId: form.circuitId.trim() || null,
       location: form.location.trim() || null,
       manufacturer: form.manufacturer.trim() || null,
@@ -302,7 +313,8 @@ export default function SurveyorAreaDetailsScreen({
           <View style={[styles.cardHeader, isPhone && styles.cardHeaderPhone]}>
             <View style={styles.cardHeaderCopy}>
               <Text style={styles.cardTitle}>Area Layout</Text>
-              <Text style={styles.cardHint}>Pins stay aligned using percentage coordinates.</Text>
+              {!!area.layoutImagePath && <TouchableOpacity onPress={() => setViewingLayout(true)}><Text style={styles.backText}>View Layout</Text></TouchableOpacity>}
+              {viewingLayout && area.layoutImagePath && <ZoomableImageViewer visible title="Area Layout" images={[area.layoutImagePath]} pins={area.equipment.map(item => ({id: item.id, label: String(item.sequenceNo), xPercent: Number(item.xPercent) || 0, yPercent: Number(item.yPercent) || 0, title: item.tagNumber, lines: [item.type]}))} onClose={() => setViewingLayout(false)} />}
             </View>
             <TouchableOpacity
               disabled={!area.layoutImagePath}
@@ -564,7 +576,8 @@ function EquipmentModal({visible, editing, form, error, saving, isPhone, onChang
             <View style={styles.formGrid}>
               <FormField label="Tag Number *" value={form.tagNumber} onChangeText={value => onChange('tagNumber', value)} />
               <FormField label="Equipment ID" value={form.equipmentId} onChangeText={value => onChange('equipmentId', value)} />
-              <FormField label="Type *" value={form.type} onChangeText={value => onChange('type', value)} />
+              <EquipmentTypeSelect value={form.type} onChange={value => onChange('type', value)} disabled={saving} visible={visible} />
+              {form.type === 'Other' && <FormField label="Other Equipment Type *" value={form.otherType} onChangeText={value => onChange('otherType', value)} placeholder="Enter equipment type" />}
               <FormField label="Circuit ID" value={form.circuitId} onChangeText={value => onChange('circuitId', value)} />
               <FormField label="Location" value={form.location} onChangeText={value => onChange('location', value)} />
               <FormField label="Manufacturer" value={form.manufacturer} onChangeText={value => onChange('manufacturer', value)} />
@@ -587,8 +600,36 @@ function EquipmentModal({visible, editing, form, error, saving, isPhone, onChang
   );
 }
 
-function FormField({label, value, onChangeText, multiline = false}: {
-  label: string; value: string; onChangeText: (value: string) => void; multiline?: boolean;
+function EquipmentTypeSelect({value, onChange, disabled, visible}: {
+  value: string; onChange: (value: string) => void; disabled: boolean; visible: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {setExpanded(false);}, [visible]);
+  return <View style={styles.formField}>
+    <Text style={styles.formLabel}>Type *</Text>
+    {Platform.OS === 'web' ? (
+      // @ts-ignore Web uses the existing native HTML select pattern.
+      <select aria-label="Type" required disabled={disabled} value={value} onChange={(event: any) => onChange(event.target.value)} style={{width: '100%', minHeight: 43, border: '1px solid #d8dbe5', borderRadius: 6, backgroundColor: '#fff', padding: '10px 12px', fontSize: 13, fontFamily: 'inherit', color: value ? '#272b49' : '#a0a4b3'}}>
+        {/* @ts-ignore Web option */}
+        <option value="" disabled>Select equipment type</option>
+        {equipmentTypes.map(type => (
+          // @ts-ignore Web option
+          <option key={type} value={type}>{type}</option>
+        ))}
+      </select>
+    ) : <>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Select equipment type" accessibilityState={{expanded, disabled}} disabled={disabled} onPress={() => setExpanded(current => !current)} style={[styles.formInput, {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}]}>
+        <Text style={{fontSize: 13, color: value ? '#272b49' : '#a0a4b3'}}>{value || 'Select equipment type'}</Text><Text style={{color: '#727688'}}>▾</Text>
+      </TouchableOpacity>
+      {expanded && <ScrollView nestedScrollEnabled style={{maxHeight: 220, borderWidth: 1, borderColor: '#d8dbe5', borderRadius: 6}} keyboardShouldPersistTaps="handled">
+        {equipmentTypes.map(type => <TouchableOpacity key={type} accessibilityRole="button" accessibilityLabel={type} accessibilityState={{selected: type === value}} onPress={() => {onChange(type); setExpanded(false);}} style={{paddingHorizontal: 12, paddingVertical: 12, backgroundColor: type === value ? '#eef0ff' : '#fff'}}><Text style={{fontSize: 13, color: '#272b49'}}>{type}</Text></TouchableOpacity>)}
+      </ScrollView>}
+    </>}
+  </View>;
+}
+
+function FormField({label, value, onChangeText, multiline = false, placeholder = 'Enter value'}: {
+  label: string; value: string; onChangeText: (value: string) => void; multiline?: boolean; placeholder?: string;
 }) {
   return (
     <View style={styles.formField}>
@@ -597,7 +638,7 @@ function FormField({label, value, onChangeText, multiline = false}: {
         value={value}
         onChangeText={onChangeText}
         multiline={multiline}
-        placeholder="Enter value"
+        placeholder={placeholder}
         placeholderTextColor="#a0a4b3"
         style={[styles.formInput, multiline && styles.formInputMultiline]}
       />

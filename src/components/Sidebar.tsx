@@ -1,4 +1,5 @@
 import React from 'react';
+import QcPendingBadge from './QcPendingBadge';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 
 type NavItem = {
@@ -11,6 +12,8 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   {key: 'Dashboard', label: 'Dashboard', icon: '⌂'},
   {key: 'Projects', label: 'Projects', icon: '▦'},
+  {key: 'QcPending', label: 'QC Pending', icon: '▤', adminOnly: true},
+  {key: 'ManagerQcReview', label: 'QC Review', icon: '✓', adminOnly: true},
   {key: 'Reports', label: 'Reports', icon: '↗'},
   {key: 'UserManagement', label: 'User Management', icon: '◎', adminOnly: true},
 ];
@@ -21,9 +24,10 @@ type Props = {
   userRole: string;
   onNavigate: (key: string) => void;
   onLogout: () => void;
+  qcPendingCount?: number;
 };
 
-export default function Sidebar({active, userName, userRole, onNavigate, onLogout}: Props) {
+export default function Sidebar({active, userName, userRole, onNavigate, onLogout, qcPendingCount}: Props) {
   const isAdminOrManager = userRole === 'Admin' || userRole === 'Manager';
 
   return (
@@ -41,7 +45,7 @@ export default function Sidebar({active, userName, userRole, onNavigate, onLogou
       <Text style={styles.sectionLabel}>WORKSPACE</Text>
 
       <View style={styles.navList}>
-        {NAV_ITEMS.filter(item => !item.adminOnly || isAdminOrManager).map(item => {
+        {NAV_ITEMS.filter(item => !item.adminOnly || isAdminOrManager || (item.key === 'QcPending' && userRole.toLowerCase() === 'qc')).map(item => {
           const isActive = active === item.key;
           return (
             <TouchableOpacity
@@ -49,9 +53,10 @@ export default function Sidebar({active, userName, userRole, onNavigate, onLogou
               onPress={() => onNavigate(item.key)}
               style={[styles.navItem, isActive && styles.navItemActive]}>
               <Text style={styles.navIcon}>{item.icon}</Text>
-              <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>
+              <Text style={[styles.navLabel, isActive && styles.navLabelActive, item.key === 'QcPending' && {flex: 1}]}>
                 {item.label}
               </Text>
+              {item.key === 'QcPending' && <QcPendingBadge count={qcPendingCount} active={isActive} />}
             </TouchableOpacity>
           );
         })}

@@ -1,8 +1,9 @@
 import React from 'react';
+import QcPendingBadge from './QcPendingBadge';
 import {Platform, Text, TouchableOpacity, View} from 'react-native';
 import {Colors} from '../theme/palette';
 
-export type AppTab = 'Home' | 'Surveys' | 'Equipment' | 'User';
+export type AppTab = 'Home' | 'Surveys' | 'Equipment' | 'User' | 'QCReview' | 'QCPending';
 
 const TABS: {key: AppTab; label: string; glyph: string}[] = [
   {key: 'Home', label: 'Home', glyph: '⌂'},
@@ -17,10 +18,13 @@ type Props = {
   c: Colors;
   /** When set, a Logout button is added as the last item of the bar. */
   onLogout?: () => void;
+  showQcReview?: boolean;
+  showQcPending?: boolean;
+  qcPendingCount?: number;
 };
 
 /** Bottom navigation for the mobile layout: Home / Surveys / Equipment / User. */
-export default function BottomTabBar({active, onChange, c, onLogout}: Props) {
+export default function BottomTabBar({active, onChange, c, onLogout, showQcReview, showQcPending, qcPendingCount}: Props) {
   return (
     <View
       style={[
@@ -38,7 +42,7 @@ export default function BottomTabBar({active, onChange, c, onLogout}: Props) {
           default: {},
         }),
       ]}>
-      {TABS.map(tab => {
+      {[...TABS, ...(showQcPending ? [{key: 'QCPending' as AppTab, label: 'QC Pending', glyph: '▤'}] : []), ...(showQcReview ? [{key: 'QCReview' as AppTab, label: 'QC Review', glyph: '✓'}] : [])].map(tab => {
         const on = tab.key === active;
         const color = on ? c.yellow : c.muted;
         return (
@@ -50,7 +54,10 @@ export default function BottomTabBar({active, onChange, c, onLogout}: Props) {
             onPress={() => onChange(tab.key)}
             style={{flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center', gap: 3}}>
             <Text style={{fontSize: 22, lineHeight: 26, color}}>{tab.glyph}</Text>
-            <Text style={{fontSize: 11.5, fontWeight: on ? '800' : '600', color}}>{tab.label}</Text>
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap', justifyContent: 'center'}}>
+              <Text style={{fontSize: 11.5, fontWeight: on ? '800' : '600', color}}>{tab.label}</Text>
+              {tab.key === 'QCPending' && <QcPendingBadge count={qcPendingCount} />}
+            </View>
           </TouchableOpacity>
         );
       })}

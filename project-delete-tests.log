@@ -1,0 +1,21 @@
+
+> ExSurveyApp@0.0.1 test
+> jest --runInBand DeleteProjectButton CreateProjectForm HazardousAreaPlan SurveyorAreaLayout QcPendingNavigation QcDashboardScreen ManagerQcReviewScreen SurveyorInspectionScreen SurveyorProjectDetailsScreen SurveyorDashboardScreen
+
+PASS __tests__/DeleteProjectButton.test.tsx
+PASS __tests__/SurveyorAreaLayout.test.tsx
+PASS __tests__/CreateProjectForm.test.tsx
+PASS __tests__/ManagerQcReviewScreen.test.tsx
+PASS __tests__/SurveyorInspectionScreen.test.tsx
+PASS __tests__/SurveyorProjectDetailsScreen.test.tsx
+PASS __tests__/SurveyorDashboardScreen.test.tsx
+PASS __tests__/QcDashboardScreen.test.tsx
+PASS __tests__/HazardousAreaPlanViewer.test.tsx
+PASS __tests__/HazardousAreaPlan.test.tsx
+PASS __tests__/QcPendingNavigation.test.tsx
+
+Test Suites: 11 passed, 11 total
+Tests:       31 passed, 31 total
+Snapshots:   0 total
+Time:        7.409 s
+Ran all test suites matching /DeleteProjectButton|CreateProjectForm|HazardousAreaPlan|SurveyorAreaLayout|QcPendingNavigation|QcDashboardScreen|ManagerQcReviewScreen|SurveyorInspectionScreen|SurveyorProjectDetailsScreen|SurveyorDashboardScreen/i.

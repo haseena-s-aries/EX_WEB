@@ -1,0 +1,57 @@
+
+> ExSurveyApp@0.0.1 test
+> jest --runInBand
+
+PASS __tests__/SurveyorInspectionScreen.test.tsx (6.243 s)
+PASS __tests__/SurveyorProjectDetailsScreen.test.tsx
+PASS __tests__/SurveyorDashboardScreen.test.tsx
+PASS __tests__/QcDashboardScreen.test.tsx
+FAIL __tests__/App.test.tsx
+  ● Test suite failed to run
+
+    Jest encountered an unexpected token
+
+    Jest failed to parse a file. This happens e.g. when your code or its dependencies use non-standard JavaScript syntax, or when Jest is not configured to support such syntax.
+
+    Out of the box Jest supports Babel, which will be used to transform your files into valid JS based on your Babel configuration.
+
+    By default "node_modules" folder is ignored by transformers.
+
+    Here's what you can do:
+     • If you are trying to use ECMAScript Modules, see https://jestjs.io/docs/ecmascript-modules for how to enable it.
+     • If you are trying to use TypeScript, see https://jestjs.io/docs/getting-started#using-typescript
+     • To have some of your "node_modules" files transformed, you can specify a custom "transformIgnorePatterns" in your config.
+     • If you need a custom transformation specify a "transform" option in your config.
+     • If you simply want to mock your non-JS modules (e.g. binary assets) you can stub them out with the "moduleNameMapper" config option.
+
+    You'll find more details and examples of these config options in the docs:
+    https://jestjs.io/docs/configuration
+    For information about custom transformations, see:
+    https://jestjs.io/docs/code-transformation
+
+    Details:
+
+    C:\Users\AL414\source\repos\ex-survey\node_modules\@react-navigation\native\lib\module\index.js:3
+    export { createStandardNavigationFactories } from "./createStandardNavigationFactories.js";
+    ^^^^^^
+
+    SyntaxError: Unexpected token 'export'
+
+       8 |   View,
+       9 | } from 'react-native';
+    > 10 | import {NavigationContainer} from '@react-navigation/native';
+         | ^
+      11 | import {createNativeStackNavigator} from '@react-navigation/native-stack';
+      12 | import SignupScreen from '../screens/SignupScreen';
+      13 | import OtpScreen from '../screens/OtpScreen';
+
+      at Runtime.createScriptFromCode (node_modules/jest-runtime/build/index.js:1505:14)
+      at Object.require (src/navigation/AppNavigator.tsx:10:1)
+      at Object.require (App.tsx:248:1)
+      at Object.require (__tests__/App.test.tsx:7:1)
+
+Test Suites: 1 failed, 4 passed, 5 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        8.09 s
+Ran all test suites.
