@@ -1,3 +1,7 @@
+import OurCompanySection from './OurCompanySection';
+import ProjectMetadataFields, {ProjectMetadata, emptyProjectMetadata} from './ProjectMetadataFields';
+import ClientDetailsSection from './ClientDetailsSection';
+import {ClientLogoFile} from './clientLogo';
 import DeleteProjectButton from './DeleteProjectButton';
 import {qcAssignmentLabel} from './projectAssignmentLabels';
 import ZoomableImageViewer from './ZoomableImageViewer';
@@ -34,7 +38,10 @@ type Props = {
   visible: boolean;
   project: any | null;
   onClose: () => void;
-  onSave: (data: {
+  onSave: (data: ProjectMetadata & {
+    ourCompanyId?: string | null;
+  clientLogo?: ClientLogoFile | null;
+    removeClientLogo?: boolean;
     hazardousAreaPlan?: HazardousAreaPlanFile | null;
     projectName: string;
     sector: string;
@@ -129,6 +136,10 @@ export default function ProjectDetailModal({
   const [hazardousAreaPlan, setHazardousAreaPlan] = useState<HazardousAreaPlanFile | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  const [ourCompanyId, setOurCompanyId] = useState<string | null>(null);
+  const [metadata, setMetadata] = useState<ProjectMetadata>(emptyProjectMetadata);
+  const [clientLogo, setClientLogo] = useState<ClientLogoFile | null>(null);
+  const [removeClientLogo, setRemoveClientLogo] = useState(false);
   const [projectName, setProjectName] = useState('');
   const [sector, setSector] = useState(SECTOR_OPTIONS[0]);
   const [jobNo, setJobNo] = useState('');
@@ -145,6 +156,9 @@ export default function ProjectDetailModal({
 
   const applyDetail = (detail: any) => {
     setPlanDetails(detail);
+    setOurCompanyId(detail.ourCompanyId || null);
+    setMetadata({uidNumber: detail.uidNumber || '', documentNumber: detail.documentNumber || '', revision: detail.revision || '', description: detail.description || '', clientName: detail.clientName || ''});
+    setClientLogo(null); setRemoveClientLogo(false);
     setHazardousAreaPlan(null);
     setProjectName(pick(detail, 'projectName'));
     setSector(pick(detail, 'sector') || SECTOR_OPTIONS[0]);
@@ -212,6 +226,7 @@ export default function ProjectDetailModal({
     }
 
     onSave({
+      ...metadata, ourCompanyId, clientLogo, removeClientLogo,
       projectName,
       sector,
       jobNo,
@@ -383,6 +398,11 @@ export default function ProjectDetailModal({
               </>
             )}
 
+            <ProjectMetadataFields value={metadata} onChange={editing ? setMetadata : undefined} inputStyle={styles.input} />
+            <SectionHeader color="#8fa7f8" icon="📁" title="OUR COMPANY DETAILS" />
+            <OurCompanySection value={ourCompanyId} onChange={editing ? setOurCompanyId : undefined} existing={planDetails.ourCompany} inputStyle={styles.input} />
+            <SectionHeader color="#8fa7f8" icon="📁" title="CLIENT DETAILS" />
+            <ClientDetailsSection name={metadata.clientName} onNameChange={editing ? clientName => setMetadata({...metadata, clientName}) : undefined} logo={clientLogo} onLogoChange={editing ? setClientLogo : undefined} existingPath={planDetails.clientLogoPath} removeExisting={removeClientLogo} onRemoveExisting={editing ? () => setRemoveClientLogo(value => !value) : undefined} inputStyle={styles.input} disabled={loading} />
             <SectionHeader color="#a75a0b" icon="📌" title="Status" />
             {editing ? (
               <View style={styles.statusRow}>

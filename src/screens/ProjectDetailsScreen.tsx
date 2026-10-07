@@ -1,3 +1,5 @@
+import OurCompanySection from '../components/OurCompanySection';
+import ClientDetailsSection from '../components/ClientDetailsSection';
 import DeleteProjectButton from '../components/DeleteProjectButton';
 import ZoomableImageViewer from '../components/ZoomableImageViewer';
 import HazardousAreaPlanSection from '../components/HazardousAreaPlanSection';
@@ -92,6 +94,7 @@ export default function ProjectDetailsScreen({userRole, projectId, onBack, surve
             <Detail label="Job Number" value={project.jobNo} />
             <Detail label="Location" value={project.location} />
             <Detail label="Vessel / Site Name" value={project.vesselOrSiteName} />
+            <Detail label="UID Number" value={project.uidNumber} /><Detail label="Document Number" value={project.documentNumber} /><Detail label="Revision" value={project.revision} /><Detail label="Description" value={project.description} />
             <Detail label="Created Date" value={dateLabel(project.createdAt)} />
             <Detail label="Last Updated" value={dateLabel(project.updatedAt)} />
           </View>
@@ -103,6 +106,8 @@ export default function ProjectDetailsScreen({userRole, projectId, onBack, surve
           <TeamMember role="Client" name={assignedName(project.assignedClientId, clients)} />
         </View>
       </View>
+      <View style={styles.detailsCard}><Text style={styles.sectionTitle}>OUR COMPANY DETAILS</Text><OurCompanySection value={project.ourCompanyId} existing={project.ourCompany} /></View>
+      <View style={styles.detailsCard}><Text style={styles.sectionTitle}>CLIENT DETAILS</Text><ClientDetailsSection name={project.clientName || ''} existingPath={project.clientLogoPath} /></View>
       <View style={styles.detailsCard}><HazardousAreaPlanSection key={project.hazardousAreaPlanPath || 'no-plan'} project={project} /></View>
       <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>Project Areas</Text><Text style={styles.sectionHint}>Area layouts and equipment totals</Text></View><Text style={styles.areaCount}>{areas.length} areas</Text></View>
       {areas.length === 0 ? <View style={styles.empty}><Text style={styles.sectionTitle}>No areas added</Text><Text style={styles.sectionHint}>Use Edit project to add areas.</Text></View> : <View style={styles.projectAreaList}>{areas.map((area: any, index: number) => {

@@ -16,6 +16,7 @@ type Props = {
   style?: StyleProp<ImageStyle>;
   resizeMode?: 'cover' | 'contain' | 'stretch' | 'repeat' | 'center';
   onLoad?: (event: any) => void;
+  placeholderText?: string;
 };
 
 export default function AuthenticatedImage({
@@ -23,6 +24,7 @@ export default function AuthenticatedImage({
   style,
   resizeMode = 'cover',
   onLoad,
+  placeholderText = 'No image',
 }: Props) {
   const [uri, setUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(path));
@@ -83,7 +85,7 @@ export default function AuthenticatedImage({
   if (!uri) {
     return (
       <View style={[styles.placeholder, style]}>
-        <Text style={styles.placeholderText}>No image</Text>
+        <Text style={styles.placeholderText}>{placeholderText}</Text>
       </View>
     );
   }
@@ -98,6 +100,7 @@ export default function AuthenticatedImage({
           : {headers: {Authorization: `Bearer ${getAuthToken()}`}}),
       }}
       onLoad={onLoad}
+      onError={() => setUri(null)}
       style={style}
     />
   );

@@ -1,3 +1,5 @@
+import {ClientLogoFile, validateClientLogo} from '../components/clientLogo';
+import {Company} from './companies';
 import {HazardousAreaPlanFile, validateHazardousAreaPlan} from '../components/hazardousAreaPlan';
 import apiClient from './client';
 import {Platform} from 'react-native';
@@ -107,6 +109,8 @@ export type ProjectArea = {
 };
 
 export type ProjectDetails = Omit<ProjectSummary, 'areaCount'> & {
+  ourCompanyId?: string | null; ourCompany?: Company | null;
+  uidNumber?: string | null; documentNumber?: string | null; revision?: string | null; description?: string | null; clientName?: string | null; clientLogoPath?: string | null;
   areas: ProjectArea[];
   hazardousAreaPlanPath?: string | null;
   hazardousAreaPlanFileName?: string | null;
@@ -114,6 +118,8 @@ export type ProjectDetails = Omit<ProjectSummary, 'areaCount'> & {
 };
 
 export type ProjectWriteRequest = {
+  ourCompanyId?: string | null;
+  uidNumber?: string | null; documentNumber?: string | null; revision?: string | null; description?: string | null; clientName?: string | null; clientLogo?: ClientLogoFile | null; removeClientLogo?: boolean;
   hazardousAreaPlan?: HazardousAreaPlanFile | null;
   projectName: string;
   sector: string;
@@ -137,17 +143,20 @@ export const getProject = (projectId: string) =>
   apiClient.get<ProjectDetails>(`/projects/${projectId}`);
 
 const projectWriteBody = (data: ProjectWriteRequest) => {
-  const {hazardousAreaPlan, ...fields} = data;
+  const {hazardousAreaPlan, clientLogo, ...fields} = data;
   const payload = {...fields, assignedClientId: fields.assignedClientId || null,
-    projectName: fields.projectName.toUpperCase(), jobNo: fields.jobNo.toUpperCase(),
-    location: fields.location.toUpperCase(), vesselOrSiteName: fields.vesselOrSiteName.toUpperCase(),
+    projectName: fields.projectName.trim().toUpperCase(), jobNo: fields.jobNo.trim().toUpperCase(),
+    location: fields.location.trim().toUpperCase(), vesselOrSiteName: fields.vesselOrSiteName.trim().toUpperCase(),
+    uidNumber: fields.uidNumber?.trim().toUpperCase() || null, documentNumber: fields.documentNumber?.trim().toUpperCase() || null,
+    revision: fields.revision?.trim().toUpperCase() || null, description: fields.description?.trim().toUpperCase() || null, clientName: fields.clientName?.trim().toUpperCase() || null,
     status: normalizeProjectStatus(data.status)};
-  if (!hazardousAreaPlan) return payload;
-  const error = validateHazardousAreaPlan(hazardousAreaPlan);
+  if (!hazardousAreaPlan && !clientLogo) return payload;
+  const error = (hazardousAreaPlan ? validateHazardousAreaPlan(hazardousAreaPlan) : '') || (clientLogo ? validateClientLogo(clientLogo) : '');
   if (error) throw new Error(error);
   const form = new FormData();
   Object.entries(payload).forEach(([key, value]) => {if (value != null) form.append(key, String(value));});
-  form.append('hazardousAreaPlan', (Platform.OS === 'web'
+  if (clientLogo) form.append('clientLogo', (Platform.OS === 'web' ? clientLogo.webFile : {uri: clientLogo.uri, name: clientLogo.name, type: clientLogo.type}) as any);
+  if (hazardousAreaPlan) form.append('hazardousAreaPlan', (Platform.OS === 'web'
     ? hazardousAreaPlan.webFile
     : {uri: hazardousAreaPlan.uri, name: hazardousAreaPlan.name, type: hazardousAreaPlan.type}) as any);
   return form;

@@ -1,3 +1,4 @@
+import {ClientLogoFile} from '../components/clientLogo';
 import DeleteProjectButton from '../components/DeleteProjectButton';
 import DefectsModal from '../components/DefectsModal';
 import {DefectSummary, getDefects} from '../api/defects';
@@ -141,6 +142,9 @@ export default function DashboardScreen({
   surveyorId: string;
   qcId: string;
   clientId: string;
+  ourCompanyId?: string | null;
+  clientLogo?: ClientLogoFile | null;
+  uidNumber?: string; documentNumber?: string; revision?: string; description?: string; clientName?: string;
   hazardousAreaPlan?: HazardousAreaPlanFile | null;
   areas: {name: string; file: any; fileName: string}[];
 }) => {
@@ -156,6 +160,8 @@ export default function DashboardScreen({
       assignedQcId: data.qcId,
       assignedClientId: data.clientId,
       hazardousAreaPlan: data.hazardousAreaPlan,
+      ourCompanyId: data.ourCompanyId,
+      uidNumber: data.uidNumber, documentNumber: data.documentNumber, revision: data.revision, description: data.description, clientName: data.clientName, clientLogo: data.clientLogo,
     });
 
     const projectId = res.data.id;

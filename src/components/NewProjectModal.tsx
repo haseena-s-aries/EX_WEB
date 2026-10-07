@@ -1,3 +1,7 @@
+import OurCompanySection from './OurCompanySection';
+import ProjectMetadataFields, {ProjectMetadata, emptyProjectMetadata} from './ProjectMetadataFields';
+import ClientDetailsSection from './ClientDetailsSection';
+import {ClientLogoFile} from './clientLogo';
 import {qcAssignmentLabel} from './projectAssignmentLabels';
 import HazardousAreaPlanUpload from './HazardousAreaPlanUpload';
 import {HazardousAreaPlanFile} from './hazardousAreaPlan';
@@ -23,7 +27,9 @@ type AreaInput = {
   fileName: string;
 };
 
-type ProjectFormData = {
+type ProjectFormData = ProjectMetadata & {
+  ourCompanyId?: string | null;
+  clientLogo?: ClientLogoFile | null;
   hazardousAreaPlan?: HazardousAreaPlanFile | null;
   projectName: string;
   sector: string;
@@ -66,6 +72,9 @@ export default function NewProjectModal({
   clients,
   loading,
 }: Props) {
+  const [ourCompanyId, setOurCompanyId] = useState<string | null>(null);
+  const [metadata, setMetadata] = useState<ProjectMetadata>(emptyProjectMetadata);
+  const [clientLogo, setClientLogo] = useState<ClientLogoFile | null>(null);
   const [projectName, setProjectName] = useState('');
   const [sector, setSector] = useState(SECTOR_OPTIONS[0]);
   const [jobNumber, setJobNumber] = useState('');
@@ -112,6 +121,8 @@ export default function NewProjectModal({
 
   const reset = () => {
     setHazardousAreaPlan(null);
+    setOurCompanyId(null);
+    setMetadata(emptyProjectMetadata()); setClientLogo(null);
     setProjectName('');
     setJobNumber('');
     setLocation('');
@@ -152,6 +163,7 @@ export default function NewProjectModal({
     }
     setError('');
     onCreate({
+      ...metadata, ourCompanyId, clientLogo,
       projectName,
       sector,
       jobNumber,
@@ -266,7 +278,12 @@ export default function NewProjectModal({
               </View>
             </View>
 
-            <StepHeader index={2} color="#8053a6" icon="👥" title="Team Assignment" />
+            <ProjectMetadataFields value={metadata} onChange={setMetadata} inputStyle={styles.input} />
+            <StepHeader index={2} color="#8fa7f8" icon="📁" title="OUR COMPANY DETAILS" />
+            <OurCompanySection value={ourCompanyId} onChange={setOurCompanyId} inputStyle={styles.input} />
+            <StepHeader index={3} color="#8fa7f8" icon="📁" title="CLIENT DETAILS" />
+            <ClientDetailsSection name={metadata.clientName} onNameChange={clientName => setMetadata({...metadata, clientName})} logo={clientLogo} onLogoChange={setClientLogo} inputStyle={styles.input} disabled={loading} />
+            <StepHeader index={4} color="#8053a6" icon="👥" title="Team Assignment" />
 
             <View style={styles.row}>
               <View style={styles.third}>
@@ -301,9 +318,9 @@ export default function NewProjectModal({
               </View>
             </View>
 
-            <StepHeader index={3} color="#8fa7f8" icon="📄" title="HAZARDOUS AREA PLAN" />
+            <StepHeader index={5} color="#8fa7f8" icon="📄" title="HAZARDOUS AREA PLAN" />
             <HazardousAreaPlanUpload value={hazardousAreaPlan} onChange={setHazardousAreaPlan} disabled={loading} />
-            <StepHeader index={4} color="#8fa7f8" icon="🗺️" title="Area Details" />
+            <StepHeader index={6} color="#8fa7f8" icon="🗺️" title="Area Details" />
 
             {areas.map((area, idx) => (
               <AreaRow
