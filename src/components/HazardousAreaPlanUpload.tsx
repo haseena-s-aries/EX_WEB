@@ -32,7 +32,7 @@ export default function HazardousAreaPlanUpload({
             file.type ||
             (file.name!.toLowerCase().endsWith('.pdf')
               ? 'application/pdf'
-              : 'image/jpeg'),
+              : file.name!.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg'),
           uri: file.uri,
         });
     } catch (requestError) {
@@ -62,7 +62,7 @@ export default function HazardousAreaPlanUpload({
         <Text style={{ color: '#718be8' }}>Choose File / Upload</Text>
       </TouchableOpacity>
       <Text style={{ fontSize: 12, color: '#85899a' }}>
-        Optional — JPG, JPEG or PDF
+        Optional — JPG, JPEG, PNG or PDF
       </Text>
       {!!value && (
         <Text style={{ fontSize: 12, color: '#5b6178' }}>

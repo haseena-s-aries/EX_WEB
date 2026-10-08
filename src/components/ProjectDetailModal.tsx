@@ -21,6 +21,7 @@ import {
   Animated,
   ActivityIndicator,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import {
   getProject,
@@ -131,6 +132,8 @@ export default function ProjectDetailModal({
   clients,
   loading,
 }: Props) {
+  const {width} = useWindowDimensions();
+  const compactInformation = width < 640;
   const [editing, setEditing] = useState(false);
   const [planDetails, setPlanDetails] = useState<any>({});
   const [hazardousAreaPlan, setHazardousAreaPlan] = useState<HazardousAreaPlanFile | null>(null);
@@ -386,19 +389,27 @@ export default function ProjectDetailModal({
                 </View>
               </>
             ) : (
-              <>
-                <View style={styles.row}>
-                  <ReadField label="Sector" value={sector} half />
-                  <ReadField label="Job Number" value={jobNo || '—'} half />
+              <View style={styles.informationPanel}>
+                <View style={[styles.informationRow, compactInformation && styles.informationStack]}>
+                  <ReadField label="Sector" value={sector} half={!compactInformation} information />
+                  <ReadField label="Job Number" value={jobNo || '—'} half={!compactInformation} information />
                 </View>
-                <View style={styles.row}>
-                  <ReadField label="Location" value={location || '—'} half />
-                  <ReadField label="Vessel / Site Name" value={vesselOrSiteName || '—'} half />
+                <View style={[styles.informationRow, compactInformation && styles.informationStack]}>
+                  <ReadField label="Location" value={location || '—'} half={!compactInformation} information />
+                  <ReadField label="Vessel / Site Name" value={vesselOrSiteName || '—'} half={!compactInformation} information />
                 </View>
-              </>
+                <View style={[styles.informationRow, compactInformation && styles.informationStack]}>
+                  <ReadField label="UID Number" value={metadata.uidNumber || '-'} half={!compactInformation} information />
+                  <ReadField label="Document Number" value={metadata.documentNumber || '-'} half={!compactInformation} information />
+                </View>
+                <View style={[styles.informationRow, compactInformation && styles.informationStack]}>
+                  <ReadField label="Revision" value={metadata.revision || '-'} half={!compactInformation} information />
+                  <ReadField label="Description" value={metadata.description || '-'} half={!compactInformation} information />
+                </View>
+              </View>
             )}
 
-            <ProjectMetadataFields value={metadata} onChange={editing ? setMetadata : undefined} inputStyle={styles.input} />
+            {editing && <ProjectMetadataFields value={metadata} onChange={setMetadata} inputStyle={styles.input} />}
             <SectionHeader color="#8fa7f8" icon="📁" title="OUR COMPANY DETAILS" />
             <OurCompanySection value={ourCompanyId} onChange={editing ? setOurCompanyId : undefined} existing={planDetails.ourCompany} inputStyle={styles.input} />
             <SectionHeader color="#8fa7f8" icon="📁" title="CLIENT DETAILS" />
@@ -561,16 +572,18 @@ function ReadField({
   value,
   half,
   third,
+  information,
 }: {
   label: string;
   value: string;
   half?: boolean;
   third?: boolean;
+  information?: boolean;
 }) {
   return (
-    <View style={[half && styles.half, third && styles.third, {marginBottom: 16}]}>
+    <View style={[half && styles.half, third && styles.third, {marginBottom: 16}, information && styles.informationField]}>
       <Text style={styles.label}>{label}</Text>
-      <Text style={styles.readValue}>{value}</Text>
+      <Text style={[styles.readValue, information && styles.informationValue]}>{value}</Text>
     </View>
   );
 }
@@ -813,6 +826,11 @@ const styles = StyleSheet.create({
   selectWrap: {borderWidth: 1.5, borderColor: '#e5e9f6', borderRadius: 10, backgroundColor: '#f8f9fc', position: 'relative', justifyContent: 'center'},
   selectArrow: {position: 'absolute', right: 12, fontSize: 12, color: '#8a8fa3', pointerEvents: 'none' as any},
   row: {flexDirection: 'row', gap: 14},
+  informationPanel: {width: '100%', backgroundColor: '#fbfcff', borderWidth: 1, borderColor: '#e5e9f6', borderRadius: 10, padding: 18},
+  informationRow: {flexDirection: 'row', alignItems: 'flex-start', gap: 28},
+  informationStack: {flexDirection: 'column', gap: 0},
+  informationField: {minWidth: 0, width: '100%', marginBottom: 18},
+  informationValue: {lineHeight: 22, flexShrink: 1, ...Platform.select({web: {overflowWrap: 'anywhere'} as any})},
   half: {flex: 1},
   third: {flex: 1},
   statusRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 6},

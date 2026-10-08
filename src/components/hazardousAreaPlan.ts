@@ -5,7 +5,7 @@ export type HazardousAreaPlanFile = {
   webFile?: any;
 };
 
-export const PLAN_TYPE_ERROR = 'Only JPG, JPEG and PDF files are allowed.';
+export const PLAN_TYPE_ERROR = 'Only JPG, JPEG, PNG and PDF files are allowed.';
 export const validateHazardousAreaPlan = (file: {
   name?: string | null;
   type?: string | null;
@@ -14,8 +14,8 @@ export const validateHazardousAreaPlan = (file: {
     .split('.')
     .pop()
     ?.toLowerCase();
-  if (!['jpg', 'jpeg', 'pdf'].includes(extension || '')) return PLAN_TYPE_ERROR;
-  const expected = extension === 'pdf' ? 'application/pdf' : 'image/jpeg';
+  if (!['jpg', 'jpeg', 'png', 'pdf'].includes(extension || '')) return PLAN_TYPE_ERROR;
+  const expected = extension === 'pdf' ? 'application/pdf' : extension === 'png' ? 'image/png' : 'image/jpeg';
   if (
     file.type &&
     file.type !== 'application/octet-stream' &&

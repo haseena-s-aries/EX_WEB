@@ -1,3 +1,4 @@
+import CreateProjectVisualStyles from './CreateProjectVisualStyles';
 import OurCompanySection from './OurCompanySection';
 import ProjectMetadataFields, {ProjectMetadata, emptyProjectMetadata} from './ProjectMetadataFields';
 import ClientDetailsSection from './ClientDetailsSection';
@@ -17,6 +18,8 @@ import {
   Platform,
   Animated,
   Alert,
+  ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 
 type UserOption = {id: string; displayName: string; managerId?: string | null; managerName?: string | null};
@@ -72,6 +75,8 @@ export default function NewProjectModal({
   clients,
   loading,
 }: Props) {
+  const {width, height} = useWindowDimensions();
+  const compact = width < 700;
   const [ourCompanyId, setOurCompanyId] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<ProjectMetadata>(emptyProjectMetadata);
   const [clientLogo, setClientLogo] = useState<ClientLogoFile | null>(null);
@@ -187,9 +192,10 @@ export default function NewProjectModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <Animated.View style={[styles.modal, {opacity, transform: [{scale}]}]}>
-          <View style={styles.headerBand}>
+      <View style={[styles.overlay, compact && {padding: 10}]}>
+        <Animated.View nativeID="create-project-form" style={[styles.modal, {opacity, transform: [{scale}]}]}>
+          <CreateProjectVisualStyles />
+          <View style={[styles.headerBand, compact && styles.compactPadding]}>
             <View style={styles.headerGlow} />
             <View style={styles.headerIconWrap}>
               <Text style={styles.headerIcon}>📋</Text>
@@ -198,7 +204,7 @@ export default function NewProjectModal({
               <Text style={styles.title}>Create New Project</Text>
               <Text style={styles.subtitle}>Set up a new survey project and assign your team</Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close project form" onPress={onClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -217,8 +223,9 @@ export default function NewProjectModal({
             />
           </View>
 
-          <ScrollView contentContainerStyle={styles.body} style={styles.bodyScroll}>
-            <StepHeader index={1} color="#8fa7f8" icon="📁" title="Project Information" />
+          <ScrollView contentContainerStyle={[styles.body, compact && styles.compactBody]} style={[styles.bodyScroll, {maxHeight: Math.max(180, height * 0.92 - 210)}]}>
+            <View style={styles.sectionCard}>
+            <StepHeader index={1} color="#2563eb" icon="📁" title="Project Information" />
 
             <Field label="Project Name" required>
               <TextInput
@@ -231,7 +238,7 @@ export default function NewProjectModal({
               />
             </Field>
 
-            <View style={styles.row}>
+            <View style={[styles.row, compact && styles.stackedRow]}>
               <View style={styles.half}>
                 <Field label="Sector">
                   <SimpleSelect value={sector} options={SECTOR_OPTIONS} onChange={setSector} />
@@ -251,7 +258,7 @@ export default function NewProjectModal({
               </View>
             </View>
 
-            <View style={styles.row}>
+            <View style={[styles.row, compact && styles.stackedRow]}>
               <View style={styles.half}>
                 <Field label="Location" required>
                   <TextInput
@@ -278,14 +285,20 @@ export default function NewProjectModal({
               </View>
             </View>
 
-            <ProjectMetadataFields value={metadata} onChange={setMetadata} inputStyle={styles.input} />
-            <StepHeader index={2} color="#8fa7f8" icon="📁" title="OUR COMPANY DETAILS" />
+            <ProjectMetadataFields columns={!compact} value={metadata} onChange={setMetadata} inputStyle={styles.input} />
+            </View>
+            <View style={styles.sectionCard}>
+            <StepHeader index={2} color="#2563eb" icon="📁" title="OUR COMPANY DETAILS" />
             <OurCompanySection value={ourCompanyId} onChange={setOurCompanyId} inputStyle={styles.input} />
-            <StepHeader index={3} color="#8fa7f8" icon="📁" title="CLIENT DETAILS" />
+            </View>
+            <View style={styles.sectionCard}>
+            <StepHeader index={3} color="#2563eb" icon="📁" title="CLIENT DETAILS" />
             <ClientDetailsSection name={metadata.clientName} onNameChange={clientName => setMetadata({...metadata, clientName})} logo={clientLogo} onLogoChange={setClientLogo} inputStyle={styles.input} disabled={loading} />
-            <StepHeader index={4} color="#8053a6" icon="👥" title="Team Assignment" />
+            </View>
+            <View style={styles.sectionCard}>
+            <StepHeader index={4} color="#2563eb" icon="👥" title="Team Assignment" />
 
-            <View style={styles.row}>
+            <View style={[styles.row, compact && styles.stackedRow]}>
               <View style={styles.third}>
                 <Field label="Assign Surveyor" required>
                   <SimpleSelect
@@ -318,9 +331,13 @@ export default function NewProjectModal({
               </View>
             </View>
 
-            <StepHeader index={5} color="#8fa7f8" icon="📄" title="HAZARDOUS AREA PLAN" />
+            </View>
+            <View style={styles.sectionCard}>
+            <StepHeader index={5} color="#2563eb" icon="📄" title="HAZARDOUS AREA PLAN" />
             <HazardousAreaPlanUpload value={hazardousAreaPlan} onChange={setHazardousAreaPlan} disabled={loading} />
-            <StepHeader index={6} color="#8fa7f8" icon="🗺️" title="Area Details" />
+            </View>
+            <View style={styles.sectionCard}>
+            <StepHeader index={6} color="#2563eb" icon="🗺️" title="Area Details" />
 
             {areas.map((area, idx) => (
               <AreaRow
@@ -338,6 +355,7 @@ export default function NewProjectModal({
               <Text style={styles.addAreaBtnText}>＋  Add Another Area</Text>
             </TouchableOpacity>
 
+            </View>
             {error ? (
               <View style={styles.errorBox}>
                 <Text style={styles.errorText}>⚠ {error}</Text>
@@ -345,12 +363,14 @@ export default function NewProjectModal({
             ) : null}
           </ScrollView>
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, compact && styles.compactPadding]}>
             <Text style={styles.progressLabel}>
               {filledCount}/{totalRequired} required fields
             </Text>
             <View style={styles.footerBtns}>
               <TouchableOpacity
+                nativeID="create-project-cancel"
+                accessibilityRole="button"
                 style={styles.cancelBtn}
                 onPress={() => {
                   reset();
@@ -384,7 +404,7 @@ function Field({label, required, children}: {label: string; required?: boolean; 
   return (
     <View style={{marginBottom: 16}}>
       <Text style={styles.label}>
-        {label} {required && <Text style={styles.required}>*</Text>}
+        {label} {required ? <Text style={styles.required}>*</Text> : !label.includes("Optional") ? <Text style={styles.optional}> · Optional</Text> : null}
       </Text>
       {children}
     </View>
@@ -481,8 +501,9 @@ function CreateButton({loading, onPress}: {loading?: boolean; onPress: () => voi
   const animateTo = (v: number) =>
     Animated.spring(scale, {toValue: v, useNativeDriver: Platform.OS !== 'web', speed: 30, bounciness: 6}).start();
   return (
-    <TouchableOpacity onPressIn={() => animateTo(0.96)} onPressOut={() => animateTo(1)} onPress={onPress} disabled={loading}>
-      <Animated.View style={[styles.createBtn, {transform: [{scale}]}]}>
+    <TouchableOpacity nativeID="create-project-submit" accessibilityRole="button" accessibilityState={{disabled: !!loading, busy: !!loading}} onPressIn={() => animateTo(0.96)} onPressOut={() => animateTo(1)} onPress={onPress} disabled={loading}>
+      <Animated.View style={[styles.createBtn, loading && styles.createBtnDisabled, {transform: [{scale}]}]}>
+        {loading && <ActivityIndicator size="small" color="#fff" />}
         <Text style={styles.createBtnText}>{loading ? 'Creating…' : '✓  Create Project'}</Text>
       </Animated.View>
     </TouchableOpacity>
@@ -524,7 +545,9 @@ function SimpleSelect({value, options, onChange, placeholder}: {value: string; o
 
 const selectStyleWeb: any = {
   width: '100%',
-  padding: '11px 34px 11px 12px',
+  padding: '12px 34px 12px 12px',
+  minHeight: 46,
+  boxSizing: 'border-box',
   borderRadius: 10,
   border: '1.5px solid transparent',
   fontSize: 14,
@@ -538,28 +561,28 @@ const selectStyleWeb: any = {
 
 const uploadLabelStyleWeb: any = {
   display: 'block',
-  border: '1.5px dashed #c9cce0',
+  border: '1px dashed #93b8ed',
   borderRadius: 10,
   padding: '14px 12px',
   fontSize: 13,
   color: '#5b6178',
-  backgroundColor: '#f8f9fc',
+  backgroundColor: '#f9fbfe',
   textAlign: 'center',
   cursor: 'pointer',
 };
 
 const styles = StyleSheet.create({
-  overlay: {flex: 1, backgroundColor: 'rgba(12, 14, 34, 0.6)', alignItems: 'center', justifyContent: 'center', padding: 20},
+  overlay: {flex: 1, backgroundColor: 'rgba(24, 42, 70, 0.38)', alignItems: 'center', justifyContent: 'center', padding: 20},
   modal: {
     width: '100%',
-    maxWidth: 780,
+    maxWidth: 940,
     maxHeight: '92%' as any,
     backgroundColor: '#fff',
-    borderRadius: 24,
+    borderRadius: 16,
     overflow: 'hidden',
     ...Platform.select({
-      web: {boxShadow: '0px 30px 70px rgba(8, 10, 35, 0.4)'},
-      default: {shadowColor: '#000', shadowOffset: {width: 0, height: 14}, shadowOpacity: 0.32, shadowRadius: 34, elevation: 14},
+      web: {boxShadow: '0px 20px 60px rgba(24, 42, 70, 0.22)'},
+      default: {shadowColor: '#000', shadowOffset: {width: 0, height: 14}, shadowOpacity: 0.16, shadowRadius: 34, elevation: 14},
     }),
   },
   headerBand: {
@@ -570,47 +593,53 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     position: 'relative',
     overflow: 'hidden',
-    backgroundColor: '#242d52',
+    backgroundColor: '#eff6ff',
     ...Platform.select({
-      web: {backgroundImage: 'linear-gradient(120deg, #242d52 0%, #718be8 60%, #8fa7f8 130%)'},
+      web: {backgroundImage: 'linear-gradient(120deg, #ffffff 0%, #eff6ff 65%, #e0f2fe 100%)'},
     }),
   },
   headerGlow: {position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.06)', top: -60, right: -30},
-  headerIconWrap: {width: 46, height: 46, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', zIndex: 1},
+  headerIconWrap: {width: 46, height: 46, borderRadius: 13, backgroundColor: '#dbeafe', alignItems: 'center', justifyContent: 'center', zIndex: 1},
   headerIcon: {fontSize: 20},
-  title: {fontSize: 20, fontWeight: '800', color: '#fff'},
-  subtitle: {fontSize: 12.5, color: '#a9acd6', marginTop: 3},
-  closeBtn: {width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', zIndex: 1},
-  closeBtnText: {color: '#c7caf0', fontSize: 14, fontWeight: '700'},
+  title: {fontSize: 22, fontWeight: '800', color: '#172b4d'},
+  subtitle: {fontSize: 12.5, color: '#60738e', marginTop: 3},
+  closeBtn: {width: 30, height: 30, borderRadius: 15, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', zIndex: 1},
+  closeBtnText: {color: '#41658e', fontSize: 14, fontWeight: '700'},
   progressTrack: {height: 3, backgroundColor: '#eceef4'},
-  progressFill: {height: 3, backgroundColor: '#8fa7f8'},
+  progressFill: {height: 3, backgroundColor: '#2563eb'},
   bodyScroll: {maxHeight: 500},
-  body: {padding: 28, paddingBottom: 10},
-  stepHeader: {flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 24, marginBottom: 18},
+  body: {padding: 24, paddingBottom: 8, backgroundColor: '#f5f8fc'},
+  compactPadding: {paddingHorizontal: 16},
+  compactBody: {padding: 12},
+  sectionCard: {backgroundColor: '#fff', borderWidth: 1, borderColor: '#dce6f2', borderTopWidth: 3, borderTopColor: '#60a5fa', borderRadius: 12, padding: 18, marginBottom: 16, ...Platform.select({web: {boxShadow: '0 2px 8px rgba(24,42,70,.04)'}, default: {elevation: 1}})},
+  stepHeader: {flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 0, marginBottom: 20},
   stepBadge: {width: 25, height: 25, borderRadius: 13, alignItems: 'center', justifyContent: 'center'},
   stepBadgeText: {color: '#fff', fontSize: 11.5, fontWeight: '800'},
   stepIcon: {fontSize: 14},
-  stepTitle: {fontSize: 15.5, fontWeight: '800', color: '#252f50'},
+  stepTitle: {fontSize: 15, fontWeight: '800', color: '#172b4d', flexShrink: 1},
   stepLine: {flex: 1, height: 1, backgroundColor: '#eceef4', marginLeft: 6},
   label: {fontSize: 12.5, fontWeight: '700', color: '#5b6178', marginBottom: 7, letterSpacing: 0.2},
   required: {color: '#d64545'},
+  optional: {fontSize: 11, fontWeight: '400', color: '#7b8aa0'},
   input: {
-    borderWidth: 1.5,
-    borderColor: '#e5e9f6',
+    borderWidth: 1,
+    borderColor: '#ccd9e8',
     borderRadius: 10,
+    minHeight: 46,
     paddingHorizontal: 13,
     paddingVertical: 12,
     fontSize: 14,
-    backgroundColor: '#f8f9fc',
+    backgroundColor: '#f9fbfe',
     color: '#252f50',
   },
-  selectWrap: {borderWidth: 1.5, borderColor: '#e5e9f6', borderRadius: 10, backgroundColor: '#f8f9fc', position: 'relative', justifyContent: 'center'},
+  selectWrap: {borderWidth: 1, borderColor: '#ccd9e8', borderRadius: 10, backgroundColor: '#f9fbfe', position: 'relative', justifyContent: 'center'},
   selectArrow: {position: 'absolute', right: 12, fontSize: 12, color: '#8a8fa3', pointerEvents: 'none' as any},
   row: {flexDirection: 'row', gap: 14},
-  half: {flex: 1},
-  third: {flex: 1},
+  stackedRow: {flexDirection: 'column', gap: 0},
+  half: {flex: 1, minWidth: 0},
+  third: {flex: 1, minWidth: 0},
   areaCard: {
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#eceef4',
     borderRadius: 14,
     padding: 16,
@@ -618,35 +647,37 @@ const styles = StyleSheet.create({
     backgroundColor: '#fbfbfd',
   },
   areaCardHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12},
-  areaCardTitle: {fontSize: 13.5, fontWeight: '800', color: '#8fa7f8'},
+  areaCardTitle: {fontSize: 13.5, fontWeight: '800', color: '#2563eb'},
   areaRemoveText: {fontSize: 12, fontWeight: '700', color: '#d64545'},
   uploadBoxNative: {
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#c9cce0',
     borderStyle: 'dashed',
     borderRadius: 10,
     padding: 14,
     alignItems: 'center',
-    backgroundColor: '#f8f9fc',
+    backgroundColor: '#f9fbfe',
   },
   uploadBoxNativeText: {fontSize: 12.5, color: '#5b6178'},
   addAreaBtn: {
-    borderWidth: 1.5,
-    borderColor: '#8fa7f8',
+    borderWidth: 1,
+    borderColor: '#93b8ed',
     borderStyle: 'dashed',
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
     marginBottom: 10,
   },
-  addAreaBtnText: {fontSize: 13, fontWeight: '700', color: '#8fa7f8'},
+  addAreaBtnText: {fontSize: 13, fontWeight: '700', color: '#2563eb'},
   errorBox: {backgroundColor: '#fdeceb', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, marginTop: 12},
   errorText: {color: '#ba4e3c', fontSize: 12.5, fontWeight: '600'},
   footer: {paddingHorizontal: 28, paddingVertical: 18, borderTopWidth: 1, borderTopColor: '#eceef4'},
   progressLabel: {fontSize: 11.5, color: '#9aa0b4', fontWeight: '600', marginBottom: 10},
   footerBtns: {flexDirection: 'row', justifyContent: 'flex-end', gap: 12},
-  cancelBtn: {borderWidth: 1.5, borderColor: '#e5e9f6', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20, justifyContent: 'center'},
+  cancelBtn: {borderWidth: 1, borderColor: '#ccd9e8', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20, justifyContent: 'center'},
   cancelBtnText: {fontSize: 14, fontWeight: '700', color: '#5b6178'},
-  createBtn: {backgroundColor: '#b8a5f8', borderRadius: 11, paddingVertical: 13, paddingHorizontal: 24},
-  createBtnText: {fontSize: 14, fontWeight: '800', color: '#242d52'},
+  createBtn: {backgroundColor: '#2563eb', borderRadius: 9, minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, paddingHorizontal: 24},
+  createBtnDisabled: {backgroundColor: '#86a9ee', opacity: 0.8},
+  createBtnText: {fontSize: 14, fontWeight: '800', color: '#fff'},
 });
+

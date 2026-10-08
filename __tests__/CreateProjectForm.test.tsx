@@ -7,6 +7,9 @@ import { createProject } from '../src/api/projects';
 import apiClient from '../src/api/client';
 
 jest.mock('../src/components/HazardousAreaPlanUpload', () => 'PlanUpload');
+jest.mock('../src/components/ClientLogoUpload', () => 'ClientLogoUpload');
+jest.mock('../src/components/AuthenticatedImage', () => 'AuthenticatedImage');
+jest.mock('../src/api/companies', () => ({getCompanies: jest.fn().mockResolvedValue({data: []})}));
 jest.mock('../src/api/client', () => ({
   __esModule: true,
   default: { post: jest.fn(), put: jest.fn() },

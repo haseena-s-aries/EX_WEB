@@ -22,15 +22,17 @@ const textOf = (node: Renderer.ReactTestInstance): string =>
     .map(child => (typeof child === 'string' ? child : textOf(child)))
     .join('');
 test('validates extensions and MIME types with the required message', () => {
-  ['plan.jpg', 'plan.JPEG', 'plan.pdf'].forEach(name =>
+  ['plan.jpg', 'plan.JPEG', 'plan.PNG', 'plan.pdf'].forEach(name =>
     expect(validateHazardousAreaPlan({ name })).toBe(''),
   );
-  ['plan.png', 'plan.exe', 'plan.pdf.exe'].forEach(name =>
+  ['plan.gif', 'plan.exe', 'plan.pdf.exe'].forEach(name =>
     expect(validateHazardousAreaPlan({ name })).toBe(PLAN_TYPE_ERROR),
   );
   expect(
     validateHazardousAreaPlan({ name: 'plan.jpg', type: 'application/pdf' }),
   ).toBe(PLAN_TYPE_ERROR);
+  expect(validateHazardousAreaPlan({name: 'plan.PNG', type: 'image/png'})).toBe('');
+  expect(validateHazardousAreaPlan({name: 'plan.png', type: 'image/jpeg'})).toBe(PLAN_TYPE_ERROR);
 });
 test('unsupported file preserves selection and shows inline error', async () => {
   const onChange = jest.fn();
@@ -45,8 +47,8 @@ test('unsupported file preserves selection and shows inline error', async () => 
       .findByType('input')
       .props.onChange({
         target: {
-          files: [{ name: 'plan.png', type: 'image/png' }],
-          value: 'plan.png',
+          files: [{ name: 'plan.gif', type: 'image/gif' }],
+          value: 'plan.gif',
         },
       });
   });
@@ -79,12 +81,14 @@ test('project API keeps JSON without plan and sends multipart only for explicit 
     ...data,
     projectName: 'TEST', location: 'DUBAI', vesselOrSiteName: 'SITE',
     status: 'Pending',
+    uidNumber: null, documentNumber: null, revision: null, description: null, clientName: null,
   });
   updateProject('project', { ...data, status: 'Active' });
   expect(apiClient.put).toHaveBeenLastCalledWith('/projects/project', {
     ...data,
     projectName: 'TEST', location: 'DUBAI', vesselOrSiteName: 'SITE',
     status: 'Active',
+    uidNumber: null, documentNumber: null, revision: null, description: null, clientName: null,
   });
   createProject({
     ...data,
@@ -101,7 +105,7 @@ test('project API keeps JSON without plan and sends multipart only for explicit 
   expect(() =>
     createProject({
       ...data,
-      hazardousAreaPlan: { name: 'bad.png', type: 'image/png' },
+      hazardousAreaPlan: { name: 'bad.gif', type: 'image/gif' },
     }),
   ).toThrow(PLAN_TYPE_ERROR);
 });
