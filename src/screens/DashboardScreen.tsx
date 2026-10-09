@@ -53,6 +53,8 @@ type Props = {
   showBrand?: boolean;
   /** Optional element at the right of the profile row (e.g. the notification bell). */
   accessory?: React.ReactNode;
+  /** Menu (hamburger) button shown at the left of the brand header; opens the navigation drawer. */
+  menuButton?: React.ReactNode;
 };
 
 const VISIBLE_SITES = 6;
@@ -65,6 +67,7 @@ export default function DashboardScreen({
   clients = [],
   showBrand = false,
   accessory,
+  menuButton,
 }: Props) {
   const mode = useThemeMode();
   const c = mode === 'dark' ? DARK : LIGHT;
@@ -228,6 +231,7 @@ export default function DashboardScreen({
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadProjects(true)} />}>
       {showBrand ? (
         <View style={s.brandRow}>
+          {menuButton}
           <View style={s.exBadge}>
             <Text style={s.exBadgeText}>Ex</Text>
           </View>
@@ -426,7 +430,7 @@ export default function DashboardScreen({
 function makeStyles(c: Colors) {
   return StyleSheet.create({
     screen: {flex: 1, backgroundColor: c.bg},
-    content: {padding: 16, paddingBottom: 110, maxWidth: 760, width: '100%', alignSelf: 'center'},
+    content: {padding: 16, paddingBottom: 32, maxWidth: 760, width: '100%', alignSelf: 'center'},
     contentWide: {maxWidth: 1180, padding: 32, paddingBottom: 48},
 
     brandRow: {flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18},

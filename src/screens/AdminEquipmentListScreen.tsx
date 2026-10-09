@@ -149,7 +149,7 @@ export default function AdminEquipmentListScreen({onEquipmentPress, refreshVersi
 function makeStyles(c: Colors) {
   return StyleSheet.create({
     screen: {flex: 1, backgroundColor: c.bg},
-    content: {padding: 16, paddingBottom: 110, maxWidth: 760, width: '100%', alignSelf: 'center'},
+    content: {padding: 16, paddingBottom: 32, maxWidth: 760, width: '100%', alignSelf: 'center'},
     heading: {flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 8, marginBottom: 12},
     title: {color: c.text, fontSize: 22, fontWeight: '800'},
     hint: {color: c.muted, fontSize: 12, fontWeight: '600'},

@@ -184,7 +184,7 @@ export default function ManagerQcReviewScreen({userRole, onBack, onAssignmentsCh
 }
 
 const styles = StyleSheet.create({
-  page: {padding: 20, paddingBottom: 110, gap: 16}, header: {flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12},
+  page: {padding: 20, paddingBottom: 32, gap: 16}, header: {flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12},
   title: {fontSize: 26, fontWeight: '800', flex: 1}, subtitle: {fontSize: 18, fontWeight: '700', marginBottom: 12},
   card: {padding: 18, borderRadius: 12, borderWidth: 1, gap: 12}, stats: {flexDirection: 'row', flexWrap: 'wrap', gap: 12},
   fields: {flexDirection: 'row', flexWrap: 'wrap', gap: 16}, field: {minWidth: 160, flexGrow: 1, flexBasis: 190, gap: 4},

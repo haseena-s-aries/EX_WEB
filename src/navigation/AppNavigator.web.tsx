@@ -29,7 +29,7 @@ import type {AppNotification} from '../notifications/notifications';
 import {sendOtp, verifyOtp, completeRegistration, loginUser} from '../api/auth';
 import {getAssignmentOptions} from '../api/projects';
 import {setAuthToken} from '../api/client';
-import BottomTabBar, {AppTab} from '../components/BottomTabBar';
+import MobileDrawer, {MenuButton, AppTab} from '../components/MobileDrawer';
 import AdminEquipmentListScreen from '../screens/AdminEquipmentListScreen';
 import {useThemeMode} from '../theme/useThemeMode';
 import {DARK, LIGHT} from '../theme/palette';
@@ -73,6 +73,7 @@ export default function AppNavigator() {
   const [projectDetailsReturnScreen, setProjectDetailsReturnScreen] = useState<'Dashboard' | 'Projects'>('Dashboard');
   const [surveyorRefreshVersion, setSurveyorRefreshVersion] = useState(0);
   const themeMode = useThemeMode();
+  const [menuOpen, setMenuOpen] = useState(false);
   const qcPendingCount = useQcPendingCount(currentUser, screen);
   if (screen === 'Otp') {
     return (
@@ -202,6 +203,15 @@ export default function AppNavigator() {
               : 'UserManagement',
       );
     };
+    const SECTION_TITLES: Record<AppTab, string> = {
+      Home: 'Home',
+      Surveys: 'Surveys',
+      Equipment: 'Equipment',
+      Reports: 'Reports',
+      QCPending: 'QC Pending',
+      QCReview: 'QC Review',
+      User: 'User Management',
+    };
     const openNotification = (notification: AppNotification) => {
       const target = notification.target;
       if (!target) return;
@@ -246,6 +256,16 @@ export default function AppNavigator() {
           isMobile && styles.appShellMobile,
           adminMobile && {backgroundColor: tc.bg},
         ]}>
+        {adminMobile && screen !== 'Dashboard' ? (
+          <View style={[styles.adminTopBar, {backgroundColor: tc.bg, borderBottomColor: tc.border}]}>
+            <MenuButton c={tc} onPress={() => setMenuOpen(true)} badge={canManageUsers ? qcPendingCount : 0} />
+            <View style={styles.adminTopTitleWrap}>
+              <Text numberOfLines={1} style={[styles.adminTopTitle, {color: tc.text}]}>{SECTION_TITLES[activeTab]}</Text>
+              <Text numberOfLines={1} style={[styles.adminTopSub, {color: tc.muted}]}>Ex-Survey</Text>
+            </View>
+            {bell(true)}
+          </View>
+        ) : null}
         {adminMobile ? null : isMobile ? (
           <View style={styles.mobileHeader}>
             <View style={styles.mobileBrandRow}>
@@ -414,6 +434,7 @@ export default function AppNavigator() {
               userName={currentUser.name}
               userRole={currentUser.role}
               showBrand={adminMobile}
+              menuButton={adminMobile ? <MenuButton c={tc} onPress={() => setMenuOpen(true)} badge={canManageUsers ? qcPendingCount : 0} /> : undefined}
               accessory={adminMobile ? bell(true) : undefined}
               surveyors={approvedUsers
                 .filter((u: any) => u.role?.toLowerCase() === 'surveyor')
@@ -528,7 +549,20 @@ export default function AppNavigator() {
             <DashboardScreen userName={currentUser.name} />
           )}
         </View>
-        {adminMobile ? <BottomTabBar active={activeTab} onChange={onTabChange} c={tc} onLogout={logout} showQcReview={canManageUsers} showQcPending={canManageUsers} qcPendingCount={qcPendingCount} /> : null}
+        {adminMobile ? (
+          <MobileDrawer
+            visible={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            active={activeTab}
+            onChange={onTabChange}
+            onLogout={logout}
+            c={tc}
+            userName={currentUser.name}
+            userRole={currentUser.role}
+            showQc={canManageUsers}
+            qcPendingCount={qcPendingCount}
+          />
+        ) : null}
       </View>
     );
   }
@@ -565,6 +599,18 @@ const styles = StyleSheet.create({
   appShellMobile: {flexDirection: 'column'},
   mainContent: {flex: 1, minWidth: 0},
   topBar: {height: 56, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', backgroundColor: '#f7f9ff', borderBottomWidth: 1, borderBottomColor: '#e2e6f0', zIndex: 20},
+  adminTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    ...({position: 'sticky', top: 0, zIndex: 30} as object),
+  },
+  adminTopTitleWrap: {flex: 1, minWidth: 0},
+  adminTopTitle: {fontSize: 17, fontWeight: '800'},
+  adminTopSub: {fontSize: 9.5, fontWeight: '700', letterSpacing: 1.2, marginTop: 1, textTransform: 'uppercase'},
   mobileHeader: {
     backgroundColor: '#242d52',
     borderBottomWidth: 1,
