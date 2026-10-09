@@ -672,8 +672,12 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
+  Image,
 } from 'react-native';
 import SignupScreen from '../screens/SignupScreen';
+
+const ARIES_LOGO = require('../assets/aries-logo.png');
+
 import OtpScreen from '../screens/OtpScreen';
 import LoginScreen from '../screens/LoginScreen';
 import DashboardScreen from '../screens/DashboardScreen';
@@ -950,7 +954,7 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
 <View style={styles.mobileHeader}>
 <View style={styles.mobileBrandRow}>
 <View style={styles.mobileLogo}>
-<Text style={styles.mobileLogoText}>EX</Text>
+<Image source={ARIES_LOGO} style={styles.mobileLogoImage} resizeMode="contain" accessibilityLabel="Aries logo" />
 </View>
 <View style={styles.mobileIdentity}>
 <Text style={styles.mobileBrand}>Ex-Survey</Text>
@@ -1304,14 +1308,16 @@ function makeStyles(c: Colors) {
     alignItems: 'center',
   },
   mobileLogo: {
-    width: 34,
+    width: 60,
     height: 34,
-    borderRadius: 8,
-    backgroundColor: '#FBBF24',
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+    padding: 2,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  mobileLogoText: {color: '#000', fontSize: 12, fontWeight: '900', fontStyle: 'italic'},
+  mobileLogoImage: {width: '100%', height: '100%'},
   mobileIdentity: {flex: 1, marginLeft: 9},
   mobileBrand: {color: c.text, fontSize: 15, fontWeight: '800'},
   mobileRole: {color: c.secondary, fontSize: 10.5, marginTop: 1},

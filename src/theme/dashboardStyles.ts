@@ -9,8 +9,8 @@ export function makeDashboardStyles(c: Colors) {
     contentWide: {maxWidth: 1180, padding: 32, paddingBottom: 48},
 
     brandRow: {flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18},
-    exBadge: {width: 42, height: 42, borderRadius: 10, backgroundColor: '#FBBF24', alignItems: 'center', justifyContent: 'center'},
-    exBadgeText: {color: '#000', fontSize: 19, fontWeight: '900', fontStyle: 'italic'},
+    logoBadge: {width: 74, height: 42, borderRadius: 8, backgroundColor: '#FFFFFF', padding: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden'},
+    logoImage: {width: '100%', height: '100%'},
     brandTitle: {color: c.text, fontSize: 21, fontWeight: '800'},
     brandSub: {color: c.secondary, fontSize: 9.5, fontWeight: '700', letterSpacing: 1.2, marginTop: 1},
     motto: {color: c.muted, fontSize: 8.5, fontWeight: '700', letterSpacing: 1, textAlign: 'right', lineHeight: 12},

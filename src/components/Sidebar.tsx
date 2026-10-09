@@ -1,8 +1,10 @@
 import React, {useMemo} from 'react';
-import {View, Text, TouchableOpacity, ScrollView, Platform} from 'react-native';
+import {View, Text, TouchableOpacity, ScrollView, Platform, Image} from 'react-native';
 import QcPendingBadge from './QcPendingBadge';
 import {Colors, DARK, LIGHT, tint} from '../theme/palette';
 import {setThemeMode, useThemeMode} from '../theme/useThemeMode';
+
+const ARIES_LOGO = require('../assets/aries-logo.png');
 
 type NavItem = {
   key: string;
@@ -64,14 +66,14 @@ export default function Sidebar({active, userName, userRole, onNavigate, onLogou
 
       {/* brand */}
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 14}}>
-        <View style={{width: 44, height: 44, borderRadius: 11, backgroundColor: '#FBBF24', alignItems: 'center', justifyContent: 'center'}}>
-          <Text style={{color: '#000', fontSize: 20, fontWeight: '900', fontStyle: 'italic'}}>Ex</Text>
+        <View style={{width: 78, height: 44, borderRadius: 8, backgroundColor: '#FFFFFF', padding: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}}>
+          <Image source={ARIES_LOGO} style={{width: '100%', height: '100%'}} resizeMode="contain" accessibilityLabel="Aries logo" />
         </View>
         <View style={{flex: 1}}>
           <Text style={{color: c.text, fontSize: 20, fontWeight: '800'}}>Ex-Survey</Text>
-          <Text style={{color: c.secondary, fontSize: 9.5, fontWeight: '700', letterSpacing: 1.2, marginTop: 1}}>
+          {/* <Text style={{color: c.secondary, fontSize: 9.5, fontWeight: '700', letterSpacing: 1.2, marginTop: 1}}>
             ATEX & IECEx INSPECTIONS
-          </Text>
+          </Text> */}
         </View>
       </View>
 

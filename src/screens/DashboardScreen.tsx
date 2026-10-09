@@ -14,10 +14,13 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Image,
   RefreshControl,
   useWindowDimensions,
 } from 'react-native';
 import NewProjectModal from '../components/NewProjectModal';
+
+const ARIES_LOGO = require('../assets/aries-logo.png');
 import ProjectDetailModal from '../components/ProjectDetailModal';
 import ThemeToggle from '../components/ThemeToggle';
 import ProgressRing from '../components/ProgressRing';
@@ -49,7 +52,7 @@ type Props = {
   surveyors?: UserOption[];
   qcUsers?: UserOption[];
   clients?: UserOption[];
-  /** Brand header (Ex logo + slogan). Off by default: sidebar / native shell already show one. */
+  /** Brand header (Aries logo + slogan). Off by default: sidebar / native shell already show one. */
   showBrand?: boolean;
   /** Optional element at the right of the profile row (e.g. the notification bell). */
   accessory?: React.ReactNode;
@@ -231,27 +234,20 @@ export default function DashboardScreen({
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadProjects(true)} />}>
       {showBrand ? (
         <View style={s.brandRow}>
-          {menuButton}
-          <View style={s.exBadge}>
-            <Text style={s.exBadgeText}>Ex</Text>
+          {/* left slot (menu) and right spacer share a width so the brand stays centred */}
+          <View style={s.brandSide}>{menuButton}</View>
+          <View style={s.brandCenter}>
+            <View style={s.logoBadge}>
+              <Image source={ARIES_LOGO} style={s.logoImage} resizeMode="contain" accessibilityLabel="Aries logo" />
+            </View>
+            <Text style={s.brandTitle} numberOfLines={1}>Ex-Survey</Text>
           </View>
-          <View style={{flex: 1}}>
-            <Text style={s.brandTitle}>Ex-Survey</Text>
-            <Text style={s.brandSub}>ATEX & IECEx INSPECTIONS</Text>
-          </View>
-          <Text style={s.motto}>{'SAFER ASSETS\nA BRIGHTER TOMORROW'}</Text>
+          <View style={s.brandSide} />
         </View>
       ) : null}
 
       <View style={s.profileRow}>
-        <View style={{flex: 1}}>
-          <Text style={s.userName} numberOfLines={1}>
-            {userName}
-          </Text>
-          <View style={s.roleBadge}>
-            <Text style={s.roleBadgeText}>⚡ {userRole}</Text>
-          </View>
-        </View>
+        <View style={{flex: 1}} />
         {accessory}
         <ThemeToggle floating={false} size={34} />
       </View>
@@ -433,9 +429,11 @@ function makeStyles(c: Colors) {
     content: {padding: 16, paddingBottom: 32, maxWidth: 760, width: '100%', alignSelf: 'center'},
     contentWide: {maxWidth: 1180, padding: 32, paddingBottom: 48},
 
-    brandRow: {flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18},
-    exBadge: {width: 42, height: 42, borderRadius: 10, backgroundColor: '#FBBF24', alignItems: 'center', justifyContent: 'center'},
-    exBadgeText: {color: '#000', fontSize: 19, fontWeight: '900', fontStyle: 'italic'},
+    brandRow: {flexDirection: 'row', alignItems: 'center', marginBottom: 18},
+    brandSide: {width: 44, alignItems: 'flex-start', justifyContent: 'center'},
+    brandCenter: {flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minWidth: 0},
+    logoBadge: {width: 74, height: 42, borderRadius: 8, backgroundColor: '#FFFFFF', padding: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden'},
+    logoImage: {width: '100%', height: '100%'},
     brandTitle: {color: c.text, fontSize: 21, fontWeight: '800'},
     brandSub: {color: c.secondary, fontSize: 9.5, fontWeight: '700', letterSpacing: 1.2, marginTop: 1},
     motto: {color: c.muted, fontSize: 8.5, fontWeight: '700', letterSpacing: 1, textAlign: 'right', lineHeight: 12},

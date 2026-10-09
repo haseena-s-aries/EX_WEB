@@ -1,6 +1,8 @@
 import React from 'react';
-import {ActivityIndicator, Platform, RefreshControl, ScrollView, Text, TouchableOpacity, useWindowDimensions, View} from 'react-native';
+import {ActivityIndicator, Image, Platform, RefreshControl, ScrollView, Text, TouchableOpacity, useWindowDimensions, View} from 'react-native';
 import {makeDashboardStyles} from '../theme/dashboardStyles';
+
+const ARIES_LOGO = require('../assets/aries-logo.png');
 import {projectDetailStyles as detail} from '../theme/projectDetailStyles';
 import {DARK, LIGHT, tint} from '../theme/palette';
 import {useThemeMode} from '../theme/useThemeMode';
@@ -47,7 +49,7 @@ export function DashboardLayout({title, heading, kpis, loading, error, refreshin
 }) {
   const {c, s} = useDashboardPresentation(); const {width} = useWindowDimensions(); const wide = width >= 900;
   return <ScrollView style={s.screen} contentContainerStyle={[s.content, wide && s.contentWide]} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.amber} />}>
-    {showBrand && <View style={s.brandRow}><View style={s.exBadge}><Text style={s.exBadgeText}>Ex</Text></View><View style={{flex: 1}}><Text style={s.brandTitle}>Ex-Survey</Text><Text style={s.brandSub}>ATEX & IECEx INSPECTIONS</Text></View><Text style={s.motto}>{'SAFER ASSETS\nA BRIGHTER TOMORROW'}</Text></View>}
+    {showBrand && <View style={s.brandRow}><View style={s.logoBadge}><Image source={ARIES_LOGO} style={s.logoImage} resizeMode="contain" accessibilityLabel="Aries logo" /></View><View style={{flex: 1}}><Text style={s.brandTitle}>Ex-Survey</Text></View></View>}
     <View style={s.profileRow}><View style={{flex: 1, minWidth: 0}}><Text style={[s.userName, wrap]}>{title}</Text><View style={s.roleBadge}><Text style={s.roleBadgeText}>⚡ Client</Text></View></View>{accessory}<ThemeToggle floating={false} size={34} />{onLogout && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Log out" onPress={onLogout} style={{alignSelf: 'flex-end', paddingVertical: 9, paddingLeft: 14}}><Text style={s.link}>Log out</Text></TouchableOpacity>}</View>
     {!loading && kpis && <View style={s.kpiGrid}>{kpis.map(kpi => <View key={kpi.label} style={[s.kpiCard, wide && s.kpiCardWide, width < 360 && {flexBasis: '100%'}, {minWidth: 0}]}><View style={[s.iconBox, {backgroundColor: tint(kpi.color, '1F')}]}><Text style={[s.iconGlyph, {color: kpi.color}]}>{kpi.icon}</Text></View><View style={s.kpiBody}><Text style={s.kpiLabel}>{kpi.label}</Text><Text style={s.kpiValue}>{kpi.count}</Text><Text style={s.kpiFoot}>{kpi.foot}</Text></View></View>)}</View>}
     {actions}<View style={s.sectionHeading}><Text style={[s.sectionTitle, {flex: 1}, wrap]}>{heading}</Text><TouchableOpacity accessibilityRole="button" onPress={onRefresh} style={{paddingVertical: 12, paddingLeft: 12}}><Text style={s.link}>Refresh ↻</Text></TouchableOpacity></View>
