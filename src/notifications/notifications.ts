@@ -1,3 +1,4 @@
+import {getClientNotifications} from '../api/clientDashboard';
 import {getPendingApprovals} from '../api/auth';
 import {
   getAssignmentOptions,
@@ -23,6 +24,7 @@ export type NotificationTarget =
   | {kind: 'project'; projectId: string}
   | {kind: 'surveyorProject'; projectId: string}
   | {kind: 'surveyorEquipment'; projectId: string; areaId: string; equipmentId: string}
+  | {kind: 'clientProject'; projectId: string}
   | {kind: 'users'};
 
 export type AppNotification = {
@@ -245,6 +247,7 @@ async function buildSurveyorNotifications(): Promise<AppNotification[]> {
 
 export const buildNotifications = (role: string): Promise<AppNotification[]> => {
   const key = role.toLowerCase();
+  if (key === 'client') return getClientNotifications().then(res => newestFirst(res.data.map(n => ({id: n.id, type: /approved/i.test(n.title) ? 'approved' : /report/i.test(n.title) ? 'assigned' : /defect/i.test(n.title) ? 'comments' : 'submitted', title: n.title, message: n.message, time: n.time, target: {kind: 'clientProject', projectId: n.projectId}}))));
   if (key === 'qc') return buildQcNotifications();
   if (key === 'surveyor') return buildSurveyorNotifications();
   if (key === 'admin' || key === 'manager') return buildManagerNotifications();

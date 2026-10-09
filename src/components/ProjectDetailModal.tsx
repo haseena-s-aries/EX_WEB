@@ -1,3 +1,5 @@
+import {DashboardSectionHeader as SectionHeader} from './DashboardPresentation';
+import {projectDetailStyles as styles} from '../theme/projectDetailStyles';
 import OurCompanySection from './OurCompanySection';
 import ProjectMetadataFields, {ProjectMetadata, emptyProjectMetadata} from './ProjectMetadataFields';
 import ClientDetailsSection from './ClientDetailsSection';
@@ -547,17 +549,6 @@ export default function ProjectDetailModal({
   );
 }
 
-function SectionHeader({color, icon, title}: {color: string; icon: string; title: string}) {
-  return (
-    <View style={styles.sectionHeader}>
-      <View style={[styles.sectionDot, {backgroundColor: color}]} />
-      <Text style={styles.sectionIcon}>{icon}</Text>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionLine} />
-    </View>
-  );
-}
-
 function Field({label, children}: {label: string; children: React.ReactNode}) {
   return (
     <View style={{marginBottom: 16}}>
@@ -769,145 +760,3 @@ const uploadLabelStyleWeb: any = {
   textAlign: 'center',
   cursor: 'pointer',
 };
-
-const styles = StyleSheet.create({
-  overlay: {flex: 1, backgroundColor: 'rgba(12, 14, 34, 0.6)', alignItems: 'center', justifyContent: 'center', padding: 20},
-  modal: {
-    width: '100%',
-    maxWidth: 780,
-    maxHeight: '92%' as any,
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    overflow: 'hidden',
-    ...Platform.select({
-      web: {boxShadow: '0px 30px 70px rgba(8, 10, 35, 0.4)'},
-      default: {shadowColor: '#000', shadowOffset: {width: 0, height: 14}, shadowOpacity: 0.32, shadowRadius: 34, elevation: 14},
-    }),
-  },
-  headerBand: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 24,
-    paddingHorizontal: 28,
-    position: 'relative',
-    overflow: 'hidden',
-    backgroundColor: '#242d52',
-    ...Platform.select({
-      web: {backgroundImage: 'linear-gradient(120deg, #242d52 0%, #718be8 60%, #8fa7f8 130%)'},
-    }),
-  },
-  headerGlow: {position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.06)', top: -60, right: -30},
-  headerIconWrap: {width: 46, height: 46, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', zIndex: 1},
-  headerIcon: {fontSize: 20},
-  title: {fontSize: 19, fontWeight: '800', color: '#fff'},
-  subtitle: {fontSize: 12.5, color: '#a9acd6', marginTop: 3},
-  closeBtn: {width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', zIndex: 1},
-  closeBtnText: {color: '#c7caf0', fontSize: 14, fontWeight: '700'},
-  bodyScroll: {maxHeight: 520},
-  body: {padding: 28, paddingBottom: 10},
-  sectionHeader: {flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 22, marginBottom: 16},
-  sectionDot: {width: 8, height: 8, borderRadius: 4},
-  sectionIcon: {fontSize: 14},
-  sectionTitle: {fontSize: 14.5, fontWeight: '800', color: '#252f50'},
-  sectionLine: {flex: 1, height: 1, backgroundColor: '#eceef4', marginLeft: 4},
-  label: {fontSize: 12.5, fontWeight: '700', color: '#5b6178', marginBottom: 7, letterSpacing: 0.2},
-  input: {
-    borderWidth: 1.5,
-    borderColor: '#e5e9f6',
-    borderRadius: 10,
-    paddingHorizontal: 13,
-    paddingVertical: 12,
-    fontSize: 14,
-    backgroundColor: '#f8f9fc',
-    color: '#252f50',
-  },
-  readValue: {fontSize: 14, fontWeight: '600', color: '#252f50'},
-  selectWrap: {borderWidth: 1.5, borderColor: '#e5e9f6', borderRadius: 10, backgroundColor: '#f8f9fc', position: 'relative', justifyContent: 'center'},
-  selectArrow: {position: 'absolute', right: 12, fontSize: 12, color: '#8a8fa3', pointerEvents: 'none' as any},
-  row: {flexDirection: 'row', gap: 14},
-  informationPanel: {width: '100%', backgroundColor: '#fbfcff', borderWidth: 1, borderColor: '#e5e9f6', borderRadius: 10, padding: 18},
-  informationRow: {flexDirection: 'row', alignItems: 'flex-start', gap: 28},
-  informationStack: {flexDirection: 'column', gap: 0},
-  informationField: {minWidth: 0, width: '100%', marginBottom: 18},
-  informationValue: {lineHeight: 22, flexShrink: 1, ...Platform.select({web: {overflowWrap: 'anywhere'} as any})},
-  half: {flex: 1},
-  third: {flex: 1},
-  statusRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 6},
-  statusChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: '#e5e9f6',
-    borderRadius: 10,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    backgroundColor: '#fff',
-  },
-  readStatusChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    borderRadius: 10,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    marginBottom: 6,
-  },
-  statusChipIcon: {fontSize: 13},
-  statusChipText: {fontSize: 12.5, fontWeight: '600', color: '#5b6178'},
-  noAreasText: {fontSize: 13, color: '#9aa0b4', marginBottom: 10},
-  areaReadRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f1f6',
-  },
-  areaReadIconWrap: {width: 34, height: 34, borderRadius: 9, backgroundColor: '#eafafa', alignItems: 'center', justifyContent: 'center'},
-  areaReadIcon: {fontSize: 15},
-  areaReadName: {fontSize: 13.5, fontWeight: '700', color: '#252f50'},
-  areaReadMeta: {fontSize: 12, color: '#8a8fa3', marginTop: 2},
-  areaCard: {
-    borderWidth: 1.5,
-    borderColor: '#eceef4',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 14,
-    backgroundColor: '#fbfbfd',
-  },
-  areaPreview: {width: '100%', height: 150, borderRadius: 8, marginBottom: 10},
-  areaCardHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12},
-  areaCardTitle: {fontSize: 13.5, fontWeight: '800', color: '#8fa7f8'},
-  areaRemoveText: {fontSize: 12, fontWeight: '700', color: '#d64545'},
-  uploadBoxNative: {
-    borderWidth: 1.5,
-    borderColor: '#c9cce0',
-    borderStyle: 'dashed',
-    borderRadius: 10,
-    padding: 14,
-    alignItems: 'center',
-    backgroundColor: '#f8f9fc',
-  },
-  uploadBoxNativeText: {fontSize: 12.5, color: '#5b6178'},
-  addAreaBtn: {
-    borderWidth: 1.5,
-    borderColor: '#8fa7f8',
-    borderStyle: 'dashed',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  addAreaBtnText: {fontSize: 13, fontWeight: '700', color: '#8fa7f8'},
-  footer: {paddingHorizontal: 28, paddingVertical: 18, borderTopWidth: 1, borderTopColor: '#eceef4'},
-  footerBtns: {flexDirection: 'row', justifyContent: 'flex-end', gap: 12},
-  cancelBtn: {borderWidth: 1.5, borderColor: '#e5e9f6', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20, justifyContent: 'center'},
-  cancelBtnText: {fontSize: 14, fontWeight: '700', color: '#5b6178'},
-  editBtn: {backgroundColor: '#718be8', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 22, justifyContent: 'center'},
-  editBtnText: {fontSize: 14, fontWeight: '700', color: '#fff'},
-  saveBtn: {backgroundColor: '#718be8', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 24},
-  saveBtnText: {fontSize: 14, fontWeight: '700', color: '#fff'},
-});

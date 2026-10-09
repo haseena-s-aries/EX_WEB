@@ -28,6 +28,7 @@ jest.mock('../src/screens/QcProjectDetailsScreen', () => 'QcProjectDetailsScreen
 jest.mock('../src/screens/ProjectDetailsScreen', () => 'ProjectDetailsScreen');
 jest.mock('../src/screens/AdminEquipmentListScreen', () => 'AdminEquipmentListScreen');
 jest.mock('../src/screens/ManagerQcReviewScreen', () => 'ManagerQcReviewScreen');
+jest.mock('../src/screens/ClientWorkspace', () => 'ClientWorkspace');
 jest.mock('../src/screens/ReportsScreen', () => 'ReportsScreen');
 jest.mock('../src/components/Sidebar', () => 'Sidebar');
 jest.mock('../src/components/BottomTabBar', () => 'BottomTabBar');
@@ -51,4 +52,20 @@ test.each(['Manager', 'Admin', 'Qc'])('%s QC Pending opens the existing review s
   expect(renderer.root.findByType('QcDashboardScreen' as any).props.pendingWorkspace).toBe(true);
   await ReactTestRenderer.act(async () => renderer.unmount());
   jest.restoreAllMocks();
+});
+
+test('Client uses its own workspace and navigation rather than technical management screens', async () => {
+  (loginUser as jest.Mock).mockResolvedValue({data: {accessToken: 'test', user: {id: 'client-id', displayName: 'Client', role: 'Client'}}});
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {renderer = ReactTestRenderer.create(<AppNavigator />);});
+  await ReactTestRenderer.act(async () => {await renderer.root.findByType('LoginScreen' as any).props.onLogin('client@test.invalid', 'test');});
+  expect(renderer.root.findByType('ClientWorkspace' as any).props.userKey).toBe('Client:client-id');
+  for (const key of ['Projects', 'Defects', 'Reports', 'Notifications']) {
+    await ReactTestRenderer.act(async () => {renderer.root.findByType('Sidebar' as any).props.onNavigate(key);});
+    expect(renderer.root.findByType('ClientWorkspace' as any).props.section).toBe(key);
+  }
+  await ReactTestRenderer.act(async () => {renderer.root.findByType('Sidebar' as any).props.onNavigate('QcPending');});
+  expect(renderer.root.findByType('ClientWorkspace' as any).props.section).toBe('Notifications');
+  expect(renderer.root.findAllByType('DashboardScreen' as any)).toHaveLength(0);
+  await ReactTestRenderer.act(async () => renderer.unmount());
 });
