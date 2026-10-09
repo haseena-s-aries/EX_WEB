@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {AppNotification, buildNotifications, loadDismissedIds, loadReadIds, NotificationType, saveDismissedIds, saveReadIds} from '../notifications/notifications';
 
@@ -10,17 +10,20 @@ type Props = {
   compact?: boolean; // smaller bell for the dark mobile header
 };
 
+import {Colors, DARK, LIGHT, tint} from '../theme/palette';
+import {useThemeMode} from '../theme/useThemeMode';
+
 const POLL_MS = 60000;
-const ICONS: Record<NotificationType, {icon: string; color: string; bg: string}> = {
-  submitted: {icon: '📋', color: '#3f47d6', bg: '#eceeff'},
-  assigned: {icon: '📌', color: '#685bd0', bg: '#f0eeff'},
-  overdue: {icon: '⏰', color: '#c0392b', bg: '#fdeaea'},
-  users: {icon: '👤', color: '#8a5a00', bg: '#fdf1d8'},
-  approved: {icon: '✅', color: '#1f7a4d', bg: '#e3f5ea'},
-  hold: {icon: '⏸', color: '#8a5a00', bg: '#fdf1d8'},
-  notStarted: {icon: '🕓', color: '#5a6078', bg: '#eef0f6'},
-  comments: {icon: '💬', color: '#c0392b', bg: '#fdeaea'},
-};
+const iconStyles = (c: Colors): Record<NotificationType, {icon: string; color: string; bg: string}> => ({
+  submitted: {icon: '📋', color: c.indigo, bg: tint(c.indigo, '1F')},
+  assigned: {icon: '📌', color: c.cyan, bg: tint(c.cyan, '1F')},
+  overdue: {icon: '⏰', color: c.critical, bg: tint(c.critical, '1F')},
+  users: {icon: '👤', color: c.amber, bg: tint(c.amber, '22')},
+  approved: {icon: '✅', color: c.success, bg: tint(c.success, '1F')},
+  hold: {icon: '⏸', color: c.amber, bg: tint(c.amber, '22')},
+  notStarted: {icon: '🕓', color: c.muted, bg: c.elevated},
+  comments: {icon: '💬', color: c.critical, bg: tint(c.critical, '1F')},
+});
 
 const timeAgo = (value?: string | null) => {
   if (!value) return '';
@@ -44,6 +47,9 @@ export default function NotificationBell({role, userKey, refreshKey, onSelect, c
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const alive = useRef(true);
+  const c = useThemeMode() === 'dark' ? DARK : LIGHT;
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const ICONS = useMemo(() => iconStyles(c), [c]);
 
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => { setReadIds(loadReadIds(userKey)); setDismissedIds(loadDismissedIds(userKey)); }, [userKey]);
@@ -91,7 +97,7 @@ export default function NotificationBell({role, userKey, refreshKey, onSelect, c
               <Text style={styles.panelTitle}>Notifications</Text>
               <Text style={styles.panelSub}>{unread > 0 ? `${unread} unread` : 'All caught up'}</Text>
             </View>
-            {loading && <ActivityIndicator size="small" color="#3f47d6" style={{marginRight: 10}} />}
+            {loading && <ActivityIndicator size="small" color={c.amber} style={{marginRight: 10}} />}
             <TouchableOpacity disabled={unread === 0} onPress={markAllRead} style={[styles.headBtn, unread === 0 && {opacity: 0.4}]}><Text style={styles.headBtnText}>Mark all read</Text></TouchableOpacity>
             <TouchableOpacity accessibilityLabel="Close notifications" onPress={() => setOpen(false)} style={styles.closeBtn}><Text style={styles.closeText}>×</Text></TouchableOpacity>
           </View>
@@ -106,7 +112,7 @@ export default function NotificationBell({role, userKey, refreshKey, onSelect, c
                   <View style={[styles.iconBox, {backgroundColor: style.bg}]}><Text style={styles.iconText}>{style.icon}</Text></View>
                   <View style={{flex: 1, minWidth: 0}}>
                     <View style={styles.rowTop}>
-                      <Text numberOfLines={1} style={[styles.rowTitle, {color: isUnread ? '#242d52' : '#5a6078'}]}>{item.title}</Text>
+                      <Text numberOfLines={1} style={[styles.rowTitle, {color: isUnread ? c.text : c.secondary}]}>{item.title}</Text>
                       {!!item.time && <Text style={styles.rowTime}>{timeAgo(item.time)}</Text>}
                     </View>
                     <Text numberOfLines={3} style={styles.rowMessage}>{item.message}</Text>
@@ -123,35 +129,37 @@ export default function NotificationBell({role, userKey, refreshKey, onSelect, c
   </>;
 }
 
-const styles = StyleSheet.create({
-  bell: {width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e6f0', alignItems: 'center', justifyContent: 'center'},
-  bellCompact: {width: 36, height: 36, borderRadius: 18, borderColor: '#3e4974', backgroundColor: '#2f3a66'},
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+  bell: {width: 40, height: 40, borderRadius: 20, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center'},
+  bellCompact: {width: 38, height: 38, borderRadius: 19},
   bellIcon: {fontSize: 17},
-  badge: {position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: '#e5484d', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center'},
-  badgeText: {fontSize: 9, color: '#fff', fontWeight: '800'},
-  backdrop: {flex: 1, alignItems: 'flex-end', paddingTop: 60, paddingHorizontal: 14, backgroundColor: 'rgba(23, 29, 54, 0.18)'},
-  panel: {width: '100%', maxWidth: 400, maxHeight: '80%', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#e2e6f0', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 18, shadowOffset: {width: 0, height: 8}, elevation: 10},
-  panelHead: {flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1, borderColor: '#e2e6f0'},
-  panelTitle: {fontSize: 15, color: '#242d52', fontWeight: '800'},
-  panelSub: {fontSize: 10.5, color: '#82879a', marginTop: 2},
-  headBtn: {paddingVertical: 7, paddingHorizontal: 10, borderRadius: 7, backgroundColor: '#f0eeff'},
-  headBtnText: {fontSize: 10.5, color: '#3f47d6', fontWeight: '800'},
-  closeBtn: {width: 28, height: 28, borderRadius: 14, backgroundColor: '#eef0f6', alignItems: 'center', justifyContent: 'center'},
-  closeText: {fontSize: 17, color: '#424865', fontWeight: '800', marginTop: -2},
-  row: {flexDirection: 'row', alignItems: 'flex-start', paddingLeft: 16, paddingRight: 10, paddingVertical: 12, borderBottomWidth: 1, borderColor: '#f0f2f8'},
+  badge: {position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: c.amber, borderWidth: 2, borderColor: c.bg, alignItems: 'center', justifyContent: 'center'},
+  badgeText: {fontSize: 9, color: c.onAmber, fontWeight: '800'},
+  backdrop: {flex: 1, alignItems: 'flex-end', paddingTop: 60, paddingHorizontal: 14, backgroundColor: 'rgba(15, 23, 42, 0.35)'},
+  panel: {width: '100%', maxWidth: 400, maxHeight: '80%', backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 18, shadowOffset: {width: 0, height: 8}, elevation: 10},
+  panelHead: {flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1, borderColor: c.border},
+  panelTitle: {fontSize: 15, color: c.text, fontWeight: '800'},
+  panelSub: {fontSize: 10.5, color: c.muted, marginTop: 2},
+  headBtn: {paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8, backgroundColor: tint(c.amber, '22')},
+  headBtnText: {fontSize: 10.5, color: c.amber, fontWeight: '800'},
+  closeBtn: {width: 28, height: 28, borderRadius: 14, backgroundColor: c.elevated, alignItems: 'center', justifyContent: 'center'},
+  closeText: {fontSize: 17, color: c.secondary, fontWeight: '800', marginTop: -2},
+  row: {flexDirection: 'row', alignItems: 'flex-start', paddingLeft: 16, paddingRight: 10, paddingVertical: 12, borderBottomWidth: 1, borderColor: c.border},
   rowMain: {flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 11},
-  removeBtn: {width: 24, height: 24, marginLeft: 8, borderRadius: 12, backgroundColor: '#eef0f6', alignItems: 'center', justifyContent: 'center'},
-  removeText: {fontSize: 15, color: '#6b7188', fontWeight: '800', marginTop: -2},
-  rowUnread: {backgroundColor: '#f7f8ff'},
+  removeBtn: {width: 24, height: 24, marginLeft: 8, borderRadius: 12, backgroundColor: c.elevated, alignItems: 'center', justifyContent: 'center'},
+  removeText: {fontSize: 15, color: c.secondary, fontWeight: '800', marginTop: -2},
+  rowUnread: {backgroundColor: tint(c.amber, '12')},
   iconBox: {width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center'},
   iconText: {fontSize: 15},
   rowTop: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8},
   rowTitle: {flex: 1, fontSize: 12.5, fontWeight: '800'},
-  rowTime: {fontSize: 10, color: '#8a8fa3'},
-  rowMessage: {fontSize: 11.5, color: '#5a6078', marginTop: 3, lineHeight: 16},
-  dot: {width: 8, height: 8, borderRadius: 4, backgroundColor: '#3f47d6', marginTop: 6},
+  rowTime: {fontSize: 10, color: c.muted},
+  rowMessage: {fontSize: 11.5, color: c.secondary, marginTop: 3, lineHeight: 16},
+  dot: {width: 8, height: 8, borderRadius: 4, backgroundColor: c.amber, marginTop: 6},
   emptyBox: {alignItems: 'center', paddingVertical: 34},
   emptyIcon: {fontSize: 26, opacity: 0.5},
-  emptyTitle: {fontSize: 13, color: '#242d52', fontWeight: '800', marginTop: 8},
-  empty: {fontSize: 11.5, color: '#82879a', textAlign: 'center', padding: 16},
-});
+  emptyTitle: {fontSize: 13, color: c.text, fontWeight: '800', marginTop: 8},
+  empty: {fontSize: 11.5, color: c.muted, textAlign: 'center', padding: 16},
+  });
+}

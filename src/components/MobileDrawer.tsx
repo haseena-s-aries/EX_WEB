@@ -83,9 +83,11 @@ type Props = {
   userRole: string;
   showQc?: boolean;
   qcPendingCount?: number;
+  /** Limit the menu to these tabs (native build only has some of the screens). */
+  tabs?: AppTab[];
 };
 
-export default function MobileDrawer({visible, onClose, active, onChange, onLogout, c, userName, userRole, showQc, qcPendingCount = 0}: Props) {
+export default function MobileDrawer({visible, onClose, active, onChange, onLogout, c, userName, userRole, showQc, qcPendingCount = 0, tabs}: Props) {
   const {width} = useWindowDimensions();
   const drawerW = Math.min(330, Math.round(width * 0.86));
   const dark = useThemeMode() === 'dark';
@@ -172,12 +174,16 @@ export default function MobileDrawer({visible, onClose, active, onChange, onLogo
     );
   };
 
-  const section = (label: string, items: Item[]) => (
+  const section = (label: string, all: Item[]) => {
+    const items = tabs ? all.filter(i => tabs.includes(i.key)) : all;
+    if (items.length === 0) return null;
+    return (
     <View key={label} style={{marginTop: 18}}>
       <Text style={{fontSize: 10.5, fontWeight: '800', letterSpacing: 1.4, color: c.muted, marginBottom: 8, marginLeft: 10}}>{label}</Text>
       <View style={{gap: 4}}>{items.map(renderItem)}</View>
     </View>
-  );
+    );
+  };
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose}>
