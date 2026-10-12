@@ -34,10 +34,10 @@ export default function QcDashboardScreen({userName, onProjectPress, projectsOnl
   useEffect(() => { load(); }, [load, refreshVersion]);
   const counts = useMemo(() => {
     if (pendingWorkspace) return [
-      ['Awaiting QC Review', Number(summary.awaitingQcReview) || 0, '#fff0d7', '#a75a0b'],
-      ['Changes Requested', Number(summary.changesRequested) || 0, '#fdebed', '#bf3441'],
-      ['Approved', Number(summary.approved) || 0, '#e5f6ec', '#237348'],
-      ['Overdue', Number(summary.overdue) || 0, '#f1eaf3', '#8053a6'],
+      ['Awaiting QC Review', Number(summary.awaitingQcReview) || 0, 'amber'],
+      ['Changes Requested', Number(summary.changesRequested) || 0, 'critical'],
+      ['Approved', Number(summary.approved) || 0, 'success'],
+      ['Overdue', Number(summary.overdue) || 0, 'indigo'],
     ] as const;
     const approved = projects.filter(p => /approved|complete/i.test(statusOf(p))).length;
     const changes = projects.filter(p => /change|revision|rework/i.test(statusOf(p))).length;
@@ -49,17 +49,17 @@ export default function QcDashboardScreen({userName, onProjectPress, projectsOnl
     const count = (keys: string[], fromProjects: number) =>
       Math.max(fromProjects, Number(value(summary, ...keys)) || 0);
     return [
-      ['Total Projects', projects.length, '#eceeff', '#3f47d6'],
-      ['Awaiting QC Review', count(['awaitingQcReview', 'awaitingQCReview', 'awaitingReview'], awaiting), '#fff0d7', '#a75a0b'],
-      ['Changes Required', count(['changesRequested', 'changesRequired', 'changeRequired'], changes), '#fdebed', '#bf3441'],
-      ['Approved', count(['approved'], approved), '#e5f6ec', '#237348'],
-      ['Overdue', count(['overdue'], overdue), '#f1eaf3', '#8053a6'],
+      ['Total Projects', projects.length, 'cyan'],
+      ['Awaiting QC Review', count(['awaitingQcReview', 'awaitingQCReview', 'awaitingReview'], awaiting), 'amber'],
+      ['Changes Required', count(['changesRequested', 'changesRequired', 'changeRequired'], changes), 'critical'],
+      ['Approved', count(['approved'], approved), 'success'],
+      ['Overdue', count(['overdue'], overdue), 'indigo'],
     ] as const;
   }, [projects, summary, pendingWorkspace]);
   return <QcDashboardLayout eyebrow={projectsOnly ? 'QC PROJECTS' : 'QC WORKSPACE'}
     title={pendingWorkspace ? 'QC Pending' : projectsOnly ? 'Assigned Projects' : `Welcome, ${userName.split(' ')[0]}`}
     subtitle={pendingWorkspace ? 'QC assignments and inspection review status' : projectsOnly ? 'Projects assigned to you for quality review' : 'Assigned projects and inspection review status'}
-    kpis={projectsOnly ? undefined : counts.map(([label, count, background, color]) => ({label, count, background, color}))}
+    kpis={projectsOnly ? undefined : counts.map(([label, count, tone]) => ({label, count, tone}))}
     heading={pendingWorkspace ? 'QC Projects' : 'Assigned Projects'} loading={loading} error={error} empty={projects.length === 0}
     refreshing={refreshing} onRefresh={() => load(true)} onReload={() => load()}>
     {projects.map((p, i) => {

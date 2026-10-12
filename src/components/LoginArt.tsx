@@ -1,5 +1,5 @@
 import React from 'react';
-import {View, Text, StyleSheet} from 'react-native';
+import {View, Text, Image, StyleSheet} from 'react-native';
 
 /**
  * Icons and the refinery illustration used by LoginScreen.
@@ -151,6 +151,20 @@ function Hexagon({size, color}: {size: number; color: string}) {
         />
       ))}
     </View>
+  );
+}
+
+const ARIES_LOGO = require('../assets/aries-logo.png');
+
+/** Aries company logo (transparent PNG, no badge behind it). */
+export function AriesLogo({size = 40}: {size?: number}) {
+  return (
+    <Image
+      source={ARIES_LOGO}
+      style={{width: Math.round(size * 1.76), height: size}}
+      resizeMode="contain"
+      accessibilityLabel="Aries logo"
+    />
   );
 }
 

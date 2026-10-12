@@ -31,14 +31,14 @@ export default function QcReportingManagers({onChanged}: {onChanged: () => void}
   };
   return <View style={{padding: 18, gap: 16, backgroundColor: colors.card, borderRadius: 12}}>
     <Text style={{fontSize: 18, fontWeight: '700', color: colors.text}}>QC reporting managers</Text>
-    {error ? <Text accessibilityRole="alert" style={{color: '#ba4e3c'}}>{error}</Text> : null}
+    {error ? <Text accessibilityRole="alert" style={{color: colors.critical}}>{error}</Text> : null}
     {busy ? <ActivityIndicator /> : null}
     {users.map(qc => <View key={qc.id} style={{gap: 8}}>
       <Text style={{color: colors.text}}>{qc.displayName} — Manager: {qc.managerName || 'Not assigned'}</Text>
       <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>{[null, ...managers].map(manager =>
         <TouchableOpacity key={manager?.id || 'none'} accessibilityRole="button" disabled={busy}
-          onPress={() => update(qc, manager)} style={{padding: 10, borderRadius: 6, backgroundColor: '#b8a5f8', opacity: busy ? 0.5 : 1}}>
-          <Text style={{color: '#242d52'}}>{manager?.displayName || 'Not assigned'}{(qc.managerId || null) === (manager?.id || null) ? ' ✓' : ''}</Text>
+          onPress={() => update(qc, manager)} style={{padding: 10, borderRadius: 6, backgroundColor: colors.amber, opacity: busy ? 0.5 : 1}}>
+          <Text style={{color: colors.onAmber}}>{manager?.displayName || 'Not assigned'}{(qc.managerId || null) === (manager?.id || null) ? ' ✓' : ''}</Text>
         </TouchableOpacity>)}</View>
     </View>)}
   </View>;

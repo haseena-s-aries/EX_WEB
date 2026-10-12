@@ -19,7 +19,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import ThemeToggle from '../components/ThemeToggle';
 import {useThemeMode} from '../theme/useThemeMode';
 import {
-  HexLogo,
+  AriesLogo,
   MailIcon,
   LockIcon,
   EyeIcon,
@@ -463,7 +463,7 @@ function Brand({size = 40, nameSize = 26}: {size?: number; nameSize?: number}) {
   const {c, s, dark} = useTheme();
   return (
     <View style={s.brandRow}>
-      <HexLogo size={size} holeColor={dark ? c.heroBg : '#FFFFFF'} />
+      <AriesLogo size={size} />
       <Text style={[s.brandName, {fontSize: nameSize}]}>
         {dark ? (
           <>

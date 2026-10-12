@@ -2,9 +2,12 @@ import React, {useRef, useState} from 'react';
 import {Alert, Platform, Text, TouchableOpacity} from 'react-native';
 import {deleteProject} from '../api/projects';
 import {getApiErrorMessage} from '../api/errors';
+import {useThemeMode} from '../theme/useThemeMode';
+import {DARK, LIGHT, tint} from '../theme/palette';
 
 type Props = {userRole?: string; projectId: string; projectName: string; onDeleted: () => void | Promise<void>};
 export default function DeleteProjectButton({userRole, projectId, projectName, onDeleted}: Props) {
+  const c = useThemeMode() === 'dark' ? DARK : LIGHT;
   const [deleting, setDeleting] = useState(false);
   const busy = useRef(false);
   if (!['admin', 'manager'].includes(String(userRole).toLowerCase())) return null;
@@ -28,7 +31,7 @@ export default function DeleteProjectButton({userRole, projectId, projectName, o
       {text: 'Cancel', style: 'cancel'}, {text: 'Delete', style: 'destructive', onPress: () => {void performDelete();}},
     ]);
   };
-  return <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Delete project ${projectName}`} disabled={deleting} onPress={confirmDelete} style={{paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: '#e5b4ac', alignSelf: 'flex-start', opacity: deleting ? .5 : 1}}>
-    <Text style={{color: '#ba4e3c', fontWeight: '700', fontSize: 12}}>{deleting ? 'Deleting…' : 'Delete Project'}</Text>
+  return <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Delete project ${projectName}`} disabled={deleting} onPress={confirmDelete} style={{paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: tint(c.critical, '66'), alignSelf: 'flex-start', opacity: deleting ? .5 : 1}}>
+    <Text style={{color: c.critical, fontWeight: '700', fontSize: 12}}>{deleting ? 'Deleting…' : 'Delete Project'}</Text>
   </TouchableOpacity>;
 }

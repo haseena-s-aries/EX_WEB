@@ -340,7 +340,7 @@ export default function DashboardScreen({
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={{gap: 12}}>
+            <View style={isWide ? {flexDirection: 'row', flexWrap: 'wrap', gap: 12} : {gap: 12}}>
               {visible.map(project => {
                 const status = statusOf(project);
                 const sc = statusColor(c, status);
@@ -351,7 +351,7 @@ export default function DashboardScreen({
                     accessibilityRole="button"
                     onPress={() => setSelectedProject(project)}
                     activeOpacity={0.75}
-                    style={s.projectCard}>
+                    style={[s.projectCard, isWide && {flexGrow: 1, flexShrink: 1, flexBasis: 460}]}>
                     <View style={{flex: 1, minWidth: 0}}>
                     
                       <Text style={s.projectName} numberOfLines={2}>
@@ -427,7 +427,7 @@ function makeStyles(c: Colors) {
   return StyleSheet.create({
     screen: {flex: 1, backgroundColor: c.bg},
     content: {padding: 16, paddingBottom: 32, maxWidth: 760, width: '100%', alignSelf: 'center'},
-    contentWide: {maxWidth: 1180, padding: 32, paddingBottom: 48},
+    contentWide: {maxWidth: '100%', alignSelf: 'stretch', padding: 32, paddingBottom: 48},
 
     brandRow: {flexDirection: 'row', alignItems: 'center', marginBottom: 18},
     brandSide: {width: 44, alignItems: 'flex-start', justifyContent: 'center'},
@@ -458,7 +458,7 @@ function makeStyles(c: Colors) {
       minHeight: 104,
       ...web({boxShadow: c.shadow}),
     },
-    kpiCardWide: {flexBasis: '22%'},
+    kpiCardWide: {flexGrow: 1, flexShrink: 1, flexBasis: 220},
     iconBox: {width: 50, height: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center'},
     iconGlyph: {fontSize: 24},
     kpiBody: {flex: 1, minWidth: 0},

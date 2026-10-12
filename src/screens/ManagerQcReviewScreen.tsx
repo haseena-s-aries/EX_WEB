@@ -1,4 +1,4 @@
-import {QcDashboardLayout, QcProjectCard, QcProjectMetadata, qcDashboardStyles} from '../components/QcDashboardLayout';
+import {QcDashboardLayout, QcProjectCard, QcProjectMetadata, useQcStyles} from '../components/QcDashboardLayout';
 import React, {useEffect, useState} from 'react';
 import {ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {
@@ -33,6 +33,8 @@ export default function ManagerQcReviewScreen({userRole, onBack, onAssignmentsCh
   const [showManagers, setShowManagers] = useState(false);
   const theme = useThemeMode();
   const colors = theme === 'dark' ? DARK : LIGHT;
+  const {styles: qcDashboardStyles} = useQcStyles();
+  const styles = React.useMemo(() => makeStyles(colors), [colors]);
   const allowed = userRole === 'Manager' || userRole === 'Admin';
   useEffect(() => {
     if (!allowed) return;
@@ -93,11 +95,11 @@ export default function ManagerQcReviewScreen({userRole, onBack, onAssignmentsCh
     heading="QC Projects" loading={loading} error={error} empty={projects.length === 0}
     onRefresh={() => setVersion(v => v + 1)}
     kpis={counts ? [
-      {label: 'Awaiting QC Review', count: counts.awaitingQcReview, background: '#fff0d7', color: '#a75a0b'},
-      {label: 'In Review', count: counts.inReview, background: '#eceeff', color: '#3f47d6'},
-      {label: 'Changes Requested', count: counts.changesRequested, background: '#fdebed', color: '#bf3441'},
-      {label: 'QC Approved', count: counts.approved, background: '#e5f6ec', color: '#237348'},
-      {label: 'Overdue', count: counts.overdue, background: '#f1eaf3', color: '#8053a6'},
+      {label: 'Awaiting QC Review', count: counts.awaitingQcReview, tone: 'amber'},
+      {label: 'In Review', count: counts.inReview, tone: 'cyan'},
+      {label: 'Changes Requested', count: counts.changesRequested, tone: 'critical'},
+      {label: 'QC Approved', count: counts.approved, tone: 'success'},
+      {label: 'Overdue', count: counts.overdue, tone: 'indigo'},
     ] : undefined}
     actions={<>
       {(onBack || userRole === 'Admin') && <View style={qcDashboardStyles.heading}>
@@ -125,7 +127,7 @@ export default function ManagerQcReviewScreen({userRole, onBack, onAssignmentsCh
       {button('Refresh', () => setVersion(v => v + 1))}
     </View>
     <Text style={{color: colors.muted}}>Project → Area → Equipment → Inspection → QC History</Text>
-    {loading ? <ActivityIndicator color="#7165a7" /> : error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : <>
+    {loading ? <ActivityIndicator color={colors.amber} /> : error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : <>
       {route.kind === 'project' && project && <>
         {card(<><Text style={[styles.subtitle, {color: colors.text}]}>{project.project.projectName}</Text>{projectFields(project.project)}</>)}
         {stats(project.project.counts)}
@@ -183,12 +185,12 @@ export default function ManagerQcReviewScreen({userRole, onBack, onAssignmentsCh
   </ScrollView>;
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: typeof DARK) => StyleSheet.create({
   page: {padding: 20, paddingBottom: 32, gap: 16}, header: {flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12},
   title: {fontSize: 26, fontWeight: '800', flex: 1}, subtitle: {fontSize: 18, fontWeight: '700', marginBottom: 12},
   card: {padding: 18, borderRadius: 12, borderWidth: 1, gap: 12}, stats: {flexDirection: 'row', flexWrap: 'wrap', gap: 12},
   fields: {flexDirection: 'row', flexWrap: 'wrap', gap: 16}, field: {minWidth: 160, flexGrow: 1, flexBasis: 190, gap: 4},
-  fieldLabel: {fontSize: 12, fontWeight: '600'}, button: {alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#b8a5f8', borderRadius: 8},
-  buttonText: {color: '#242d52', fontWeight: '700'}, error: {color: '#ba4e3c'}, answer: {paddingVertical: 12, gap: 6},
-  photo: {width: 280, height: 220}, timeline: {borderLeftWidth: 3, borderLeftColor: '#b8a5f8', paddingLeft: 14, paddingVertical: 14},
+  fieldLabel: {fontSize: 12, fontWeight: '600'}, button: {alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: c.amber, borderRadius: 8},
+  buttonText: {color: c.onAmber, fontWeight: '700'}, error: {color: c.critical}, answer: {paddingVertical: 12, gap: 6},
+  photo: {width: 280, height: 220}, timeline: {borderLeftWidth: 3, borderLeftColor: c.amber, paddingLeft: 14, paddingVertical: 14},
 });

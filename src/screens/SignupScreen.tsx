@@ -16,7 +16,7 @@ import {
 import AnimatedCard from '../components/AnimatedCard';
 import ThemeToggle from '../components/ThemeToggle';
 import {
-  HexLogo,
+  AriesLogo,
   UserIcon,
   MailIcon,
   LockIcon,
@@ -237,7 +237,7 @@ function MobileHeroPhoto({
 function Brand({size, c, s, hex = 30}: {size: number; c: Colors; s: Styles; hex?: number}) {
   return (
     <View style={s.brandRow}>
-      <HexLogo size={hex} holeColor={c.canvas} />
+      <AriesLogo size={hex} />
       <Text style={[s.brandName, {fontSize: size}]}>
         <Text style={{color: c.amber}}>Ex-</Text>Survey
       </Text>
@@ -546,7 +546,7 @@ function SignupThemed({
               />
             ) : null}
             <View style={s.mobileHeader}>
-              <HexLogo size={46} holeColor={c.canvas} />
+              <AriesLogo size={46} />
               <Text style={[s.mobileBrand, FONT]}>
                 <Text style={{color: c.amber}}>Ex-</Text>Survey
               </Text>
