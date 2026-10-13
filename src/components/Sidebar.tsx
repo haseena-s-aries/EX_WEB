@@ -32,11 +32,13 @@ type Props = {
   onNavigate: (key: string) => void;
   onLogout: () => void;
   qcPendingCount?: number;
+  /** Notification bell, shown beside the Ex-Survey title in the brand row. */
+  notification?: React.ReactNode;
 };
 
 const web = (style: object) => Platform.select({web: style, default: {}}) as object;
 
-export default function Sidebar({active, userName, userRole, onNavigate, onLogout, qcPendingCount}: Props) {
+export default function Sidebar({active, userName, userRole, onNavigate, onLogout, qcPendingCount, notification}: Props) {
   const isAdminOrManager = userRole === 'Admin' || userRole === 'Manager';
   const dark = useThemeMode() === 'dark';
   const c: Colors = dark ? DARK : LIGHT;
@@ -75,6 +77,7 @@ export default function Sidebar({active, userName, userRole, onNavigate, onLogou
             ATEX & IECEx INSPECTIONS
           </Text> */}
         </View>
+        {notification}
       </View>
 
       {/* nav */}

@@ -8,6 +8,7 @@ type Props = {
   refreshKey?: string; // change this (e.g. the current screen) to refresh right away
   onSelect?: (notification: AppNotification) => void;
   compact?: boolean; // smaller bell for the dark mobile header
+  row?: boolean; // sidebar variant: the panel opens beside the sidebar instead of at the top right
 };
 
 import {Colors, DARK, LIGHT, tint} from '../theme/palette';
@@ -39,7 +40,7 @@ const timeAgo = (value?: string | null) => {
   return new Date(t).toLocaleDateString(undefined, {day: '2-digit', month: 'short'});
 };
 
-export default function NotificationBell({role, userKey, refreshKey, onSelect, compact}: Props) {
+export default function NotificationBell({role, userKey, refreshKey, onSelect, compact, row}: Props) {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(() => loadReadIds(userKey));
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => loadDismissedIds(userKey));
@@ -90,7 +91,7 @@ export default function NotificationBell({role, userKey, refreshKey, onSelect, c
     </TouchableOpacity>
 
     <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-      <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
+      <Pressable style={[styles.backdrop, row && styles.backdropSide]} onPress={() => setOpen(false)}>
         <Pressable style={styles.panel} onPress={() => undefined}>
           <View style={styles.panelHead}>
             <View style={{flex: 1}}>
@@ -134,6 +135,7 @@ function makeStyles(c: Colors) {
   bell: {width: 40, height: 40, borderRadius: 20, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center'},
   bellCompact: {width: 38, height: 38, borderRadius: 19},
   bellIcon: {fontSize: 17},
+  backdropSide: {alignItems: 'flex-start', paddingLeft: 284},
   badge: {position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: c.amber, borderWidth: 2, borderColor: c.bg, alignItems: 'center', justifyContent: 'center'},
   badgeText: {fontSize: 9, color: c.onAmber, fontWeight: '800'},
   backdrop: {flex: 1, alignItems: 'flex-end', paddingTop: 60, paddingHorizontal: 14, backgroundColor: 'rgba(15, 23, 42, 0.35)'},

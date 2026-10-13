@@ -810,10 +810,11 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
   if (currentUser?.role.toLowerCase() === 'client' && screen !== 'Signup') {
     const navigateClient = (key: string) => {if (['Dashboard', 'Projects', 'Defects', 'Reports', 'Notifications', 'Progress', 'QcStatus', 'Profile'].includes(key)) {setClientRequestedProjectId(''); setClientSection(key as ClientSection);}};
     const clientLogout = () => {setAuthToken(null); setCurrentUser(null); setClientRequestedProjectId(''); setClientSection('Dashboard'); setScreen('Login');};
-    const notification = <NotificationBell role="Client" userKey={`Client:${currentUser.id || currentUser.name}`} refreshKey={clientSection} onSelect={n => {if (n.target?.kind === 'clientProject') {setClientRequestedProjectId(n.target.projectId);}}} />;
+    const notificationBell = (compact?: boolean, row?: boolean) => <NotificationBell role="Client" compact={compact} row={row} userKey={`Client:${currentUser.id || currentUser.name}`} refreshKey={clientSection} onSelect={n => {if (n.target?.kind === 'clientProject') {setClientRequestedProjectId(n.target.projectId);}}} />;
+    const notification = notificationBell();
     return <View style={[styles.appShell, isMobile && styles.appShellMobile, isMobile && {height: '100vh' as any}]}>
-      {!isMobile && <Sidebar active={clientSection} userName={currentUser.name} userRole="Client" onNavigate={navigateClient} onLogout={clientLogout} />}
-<View style={styles.mainContent}>{!isMobile && <View style={styles.topBar}>{notification}</View>}
+      {!isMobile && <Sidebar active={clientSection} userName={currentUser.name} userRole="Client" onNavigate={navigateClient} onLogout={clientLogout} notification={notificationBell(true, true)} />}
+<View style={styles.mainContent}>
 <ClientWorkspace userName={currentUser.name} userKey={`Client:${currentUser.id || currentUser.name}`} section={clientSection} onNavigate={next => navigateClient(next)} showNavigation={isMobile} showNotificationBell={false} accessory={isMobile ? notification : undefined} onLogout={clientLogout} profile={currentUser} requestedProjectId={clientRequestedProjectId} />
 </View>
 </View>;
@@ -923,8 +924,9 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
         setScreen('SurveyorEquipmentDetails');
       }
     };
-    const bell = (compact?: boolean) => (
+    const bell = (compact?: boolean, row?: boolean) => (
 <NotificationBell
+        row={row}
         role={currentUser.role}
         userKey={`${currentUser.role}:${currentUser.name}`}
         refreshKey={screen}
@@ -1038,6 +1040,7 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
             userName={currentUser.name}
             userRole={currentUser.role}
             qcPendingCount={qcPendingCount}
+            notification={bell(true, true)}
             onNavigate={key => {
               if (key === 'QcPending') {
                 if (canManageUsers || currentUser.role.toLowerCase() === 'qc') setScreen('QcPending');
@@ -1063,7 +1066,6 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
           />
         )}
 <View style={styles.mainContent}>
-          {!isMobile && <View style={styles.topBar}>{bell()}</View>}
           {screen === 'Reports' ? <ReportsScreen /> : screen === 'QcPending' && (canManageUsers || currentUser.role.toLowerCase() === 'qc') ? (
 <QcDashboardScreen pendingWorkspace userName={currentUser.name}
               onProjectPress={(id, project) => {

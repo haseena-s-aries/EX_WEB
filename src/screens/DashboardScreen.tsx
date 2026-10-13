@@ -22,7 +22,6 @@ import NewProjectModal from '../components/NewProjectModal';
 
 const ARIES_LOGO = require('../assets/aries-logo.png');
 import ProjectDetailModal from '../components/ProjectDetailModal';
-import ThemeToggle from '../components/ThemeToggle';
 import ProgressRing from '../components/ProgressRing';
 import {useThemeMode} from '../theme/useThemeMode';
 import {Colors, DARK, LIGHT, tint} from '../theme/palette';
@@ -242,15 +241,16 @@ export default function DashboardScreen({
             </View>
             <Text style={s.brandTitle} numberOfLines={1}>Ex-Survey</Text>
           </View>
-          <View style={s.brandSide} />
+          <View style={[s.brandSide, {alignItems: 'flex-end'}]}>{accessory}</View>
         </View>
       ) : null}
 
-      <View style={s.profileRow}>
-        <View style={{flex: 1}} />
-        {accessory}
-        <ThemeToggle floating={false} size={34} />
-      </View>
+      {accessory && !showBrand ? (
+        <View style={s.profileRow}>
+          <View style={{flex: 1}} />
+          {accessory}
+        </View>
+      ) : null}
 
       {loadingProjects ? (
         <ActivityIndicator color={c.amber} style={{marginVertical: 40}} />
@@ -430,7 +430,7 @@ function makeStyles(c: Colors) {
     contentWide: {maxWidth: '100%', alignSelf: 'stretch', padding: 32, paddingBottom: 48},
 
     brandRow: {flexDirection: 'row', alignItems: 'center', marginBottom: 18},
-    brandSide: {width: 44, alignItems: 'flex-start', justifyContent: 'center'},
+    brandSide: {minWidth: 44, alignItems: 'flex-start', justifyContent: 'center'},
     brandCenter: {flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minWidth: 0},
     logoBadge: {width: 74, height: 42, borderRadius: 8, backgroundColor: '#FFFFFF', padding: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden'},
     logoImage: {width: '100%', height: '100%'},
