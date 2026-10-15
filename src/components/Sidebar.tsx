@@ -21,7 +21,6 @@ const NAV_ITEMS: NavItem[] = [
   {key: 'Projects', label: 'Surveys', hint: 'Projects and areas', icon: '▤', tone: 'cyan'},
   {key: 'Reports', label: 'Reports', hint: 'Inspection reports', icon: '↗', tone: 'success'},
   {key: 'QcPending', label: 'QC Pending', hint: 'Awaiting review', icon: '▤', tone: 'amber', adminOnly: true},
-  {key: 'ManagerQcReview', label: 'QC Review', hint: 'Assignments & approvals', icon: '✓', tone: 'success', adminOnly: true},
   {key: 'UserManagement', label: 'User Management', hint: 'Approve and assign users', icon: '☻', tone: 'cyan', adminOnly: true},
 ];
 
@@ -59,9 +58,10 @@ export default function Sidebar({active, userName, userRole, onNavigate, onLogou
           backgroundColor: dark ? c.bar : c.card,
           borderRightWidth: 1,
           borderRightColor: c.border,
-          minHeight: '100%' as any,
+          flexShrink: 0,
         },
-        web({boxShadow: c.shadow}),
+        // Fixed to the viewport so the sidebar keeps its size however long the page grows.
+        web({boxShadow: c.shadow, position: 'sticky', top: 0, height: '100vh', alignSelf: 'flex-start'}),
       ]}>
       {/* amber safety stripe */}
       <View style={{height: 4, backgroundColor: c.amber}} />
