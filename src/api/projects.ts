@@ -77,6 +77,7 @@ export type ProjectAreaEquipment = {
   yPercent: number;
   tagNumber: string;
   equipmentCode?: string | null;
+  rfidTagUid?: string | null;
   type: string;
   circuitId?: string | null;
   location?: string | null;
@@ -303,6 +304,7 @@ export type AreaEquipment = {
   manufacturer?: string | null;
   protectionDetails?: string | null;
   certificateNumber?: string | null;
+  rfidTagUid?: string | null;
   status: string;
   createdByUserId: string;
   createdAt: string;
@@ -418,6 +420,7 @@ export type SaveAreaEquipmentRequest = {
   yPercent: number;
   tagNumber: string;
   equipmentId?: string | null;
+  rfidTagUid?: string | null;
   type: string;
   circuitId?: string | null;
   location?: string | null;
@@ -460,6 +463,11 @@ export const deleteSurveyorEquipment = (
 
 export const getSurveyorEquipmentDetails = (equipmentId: string) =>
   apiClient.get<SurveyorEquipmentDetails>(`/surveyor/equipment/${equipmentId}`);
+
+export const getSurveyorEquipmentByRfid = (rfidTagUid: string) =>
+  apiClient.get<SurveyorEquipmentDetails>(
+    `/surveyor/equipment/by-rfid/${encodeURIComponent(rfidTagUid)}`,
+  );
 
 export const getSurveyorEquipmentInspection = (equipmentId: string) =>
   apiClient.get<SurveyorEquipmentInspection>(
@@ -547,6 +555,7 @@ export type QcEquipmentDetails = {
   yPercent: number;
   tagNumber: string;
   equipmentCode?: string | null;
+  rfidTagUid?: string | null;
   type: string;
   circuitId?: string | null;
   location?: string | null;

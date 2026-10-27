@@ -8,7 +8,7 @@ export type ReportData = {
   client: string; preparedBy: string; checkedBy: string; approvedBy: string;
   uidNumber?: string | null; documentNumber?: string | null; revision?: string | null; description?: string | null; clientName?: string | null; clientLogo?: {url: string} | null;
   hazardousAreaPlan?: {url: string} | null;
-  areas: Array<{name: string; layout?: {url: string} | null; equipment: Array<{sequenceNo: number; tagNumber: string; type: string; inspections: Array<{status: string; inspector: string; answers: unknown[]; photos: unknown[]; findings: unknown[]}>}>}>;
+  areas: Array<{name: string; layout?: {url: string} | null; equipment: Array<{sequenceNo: number; tagNumber: string; rfidTagUid?: string | null; type: string; inspections: Array<{status: string; inspector: string; answers: unknown[]; photos: unknown[]; findings: unknown[]}>}>}>;
 };
 export const getReportProjects = () => apiClient.get<ReportProject[]>('/reports/projects');
 export const getProjectReport = (id: string) => apiClient.get<ReportData>(`/reports/projects/${id}`);

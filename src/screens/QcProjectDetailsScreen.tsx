@@ -270,6 +270,7 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
             <Field label="Sequence" value={first(equipmentInfo, 'sequenceNo')} />
             <Field label="Tag Number" value={first(equipmentInfo, 'tagNumber')} />
             <Field label="Equipment ID" value={first(equipmentInfo, 'equipmentCode', 'equipmentId')} />
+            <Field label="RFID Tag UID" value={first(equipmentInfo, 'rfidTagUid')} />
             <Field label="Type" value={first(equipmentInfo, 'type')} />
             <Field label="Circuit ID" value={first(equipmentInfo, 'circuitId')} />
             <Field label="Location" value={first(equipmentInfo, 'location')} />
@@ -387,6 +388,7 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
               <View style={{flex: 1, minWidth: 0}}>
                 <Text numberOfLines={1} style={styles.equipmentName}>{first(fullEquipment, 'tagNumber', 'equipmentId', 'name') || `Equipment ${equipmentIndex + 1}`}</Text>
                 <Text numberOfLines={1} style={styles.muted}>{[first(fullEquipment, 'type'), first(fullEquipment, 'equipmentCode'), first(fullEquipment, 'location')].filter(Boolean).join(' · ') || 'Equipment'}</Text>
+                {first(fullEquipment, 'rfidTagUid') ? <Text numberOfLines={1} style={styles.muted}>RFID: {first(fullEquipment, 'rfidTagUid')}</Text> : null}
                 {!hasSubmittedInspection && <Text style={styles.awaiting}>Waiting for the surveyor to submit the inspection.</Text>}
               </View>
               <Text style={[styles.status, {fontWeight: '900'}, statusColor(statusText) ? {color: statusColor(statusText)} : null]}>{statusText}</Text>

@@ -118,6 +118,7 @@ export default function SurveyorEquipmentDetailsScreen({
           <Detail label="Sequence No" value={String(equipment.sequenceNo)} />
           <Detail label="Tag Number" value={equipment.tagNumber} />
           <Detail label="Equipment ID" value={equipment.equipmentId} />
+          <Detail label="RFID Tag UID" value={equipment.rfidTagUid} />
           <Detail label="Type" value={equipment.type} />
           <Detail label="Circuit ID" value={equipment.circuitId} />
           <Detail label="Location" value={equipment.location} />

@@ -40,6 +40,7 @@ type PinPosition = {xPercent: number; yPercent: number};
 type EquipmentForm = {
   tagNumber: string;
   equipmentId: string;
+  rfidTagUid: string;
   type: string;
   otherType: string;
   circuitId: string;
@@ -52,6 +53,7 @@ type EquipmentForm = {
 const emptyForm = (): EquipmentForm => ({
   tagNumber: '',
   equipmentId: '',
+  rfidTagUid: '',
   type: '',
   otherType: '',
   circuitId: '',
@@ -156,6 +158,7 @@ export default function SurveyorAreaDetailsScreen({
     setForm({
       tagNumber: equipment.tagNumber,
       equipmentId: equipment.equipmentId || '',
+      rfidTagUid: equipment.rfidTagUid || '',
       type: equipmentTypes.includes(equipment.type) ? equipment.type : equipment.type ? 'Other' : '',
       otherType: equipment.type === 'Other' || !equipmentTypes.includes(equipment.type) ? equipment.type || '' : '',
       circuitId: equipment.circuitId || '',
@@ -204,6 +207,7 @@ export default function SurveyorAreaDetailsScreen({
       ...pendingPosition,
       tagNumber: form.tagNumber.trim(),
       equipmentId: form.equipmentId.trim() || null,
+      rfidTagUid: form.rfidTagUid.trim() || null,
       type: form.type === 'Other' ? form.otherType.trim() : form.type,
       circuitId: form.circuitId.trim() || null,
       location: form.location.trim() || null,
@@ -440,6 +444,7 @@ function EquipmentTable({equipment, selectedId, deletingId, onSelect, onView, on
           <TableCell text="SEQ" width={55} header />
           <TableCell text="TAG NUMBER" width={125} header />
           <TableCell text="EQUIPMENT ID" width={130} header />
+          <TableCell text="RFID TAG UID" width={150} header />
           <TableCell text="TYPE" width={110} header />
           <TableCell text="LOCATION" width={170} header />
           <TableCell text="MANUFACTURER" width={135} header />
@@ -462,6 +467,7 @@ function EquipmentTable({equipment, selectedId, deletingId, onSelect, onView, on
             <TableCell text={String(item.sequenceNo)} width={55} strong />
             <TableCell text={item.tagNumber} width={125} strong />
             <TableCell text={item.equipmentId || '--'} width={130} />
+            <TableCell text={item.rfidTagUid || '--'} width={150} />
             <TableCell text={item.type} width={110} />
             <TableCell text={item.location || '--'} width={170} />
             <TableCell text={item.manufacturer || '--'} width={135} />
@@ -576,6 +582,7 @@ function EquipmentModal({visible, editing, form, error, saving, isPhone, onChang
             <View style={styles.formGrid}>
               <FormField label="Tag Number *" value={form.tagNumber} onChangeText={value => onChange('tagNumber', value)} />
               <FormField label="Equipment ID" value={form.equipmentId} onChangeText={value => onChange('equipmentId', value)} />
+              <FormField label="RFID Tag UID" value={form.rfidTagUid} onChangeText={value => onChange('rfidTagUid', value)} placeholder="Scan or enter tag UID" />
               <EquipmentTypeSelect value={form.type} onChange={value => onChange('type', value)} disabled={saving} visible={visible} />
               {form.type === 'Other' && <FormField label="Other Equipment Type *" value={form.otherType} onChangeText={value => onChange('otherType', value)} placeholder="Enter equipment type" />}
               <FormField label="Circuit ID" value={form.circuitId} onChangeText={value => onChange('circuitId', value)} />
