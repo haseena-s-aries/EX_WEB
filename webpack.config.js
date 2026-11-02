@@ -1,5 +1,7 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const fs = require('fs');
+const webpack = require('webpack');
 
 module.exports = {
   target: 'web',
@@ -38,6 +40,26 @@ module.exports = {
   ],
 },
   plugins: [
+    {
+      apply(compiler) {
+        compiler.hooks.thisCompilation.tap('IISHostingFiles', compilation => {
+          compilation.hooks.processAssets.tap(
+            {
+              name: 'IISHostingFiles',
+              stage: webpack.Compilation.PROCESS_ASSETS_STAGE_ADDITIONAL,
+            },
+            () => {
+              for (const filename of ['config.js', 'web.config']) {
+                compilation.fileDependencies.add(path.resolve(__dirname, 'public', filename));
+                compilation.emitAsset(filename, new webpack.sources.RawSource(
+                  fs.readFileSync(path.resolve(__dirname, 'public', filename)),
+                ));
+              }
+            },
+          );
+        });
+      },
+    },
     new HtmlWebpackPlugin({
       template: path.resolve(__dirname, 'public/index.html'),
     }),

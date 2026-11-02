@@ -4,9 +4,11 @@ import Renderer from 'react-test-renderer';
 import {TextInput, TouchableOpacity} from 'react-native';
 import ClientWorkspace, {ClientRemarks} from '../src/screens/ClientWorkspace';
 import * as api from '../src/api/clientDashboard';
+import * as activityApi from '../src/api/projects';
 import {generateReportPdf, downloadReportPdf} from '../src/reports/pdfFile';
 
 jest.mock('../src/api/clientDashboard', () => ({getClientDashboard: jest.fn(), getClientDefects: jest.fn(), getClientReports: jest.fn(), getClientNotifications: jest.fn(), getClientProject: jest.fn(), getClientArea: jest.fn(), getClientEquipment: jest.fn(), getClientRemarks: jest.fn(), addClientRemark: jest.fn()}));
+jest.mock('../src/api/projects', () => ({getInspectionDefects: jest.fn(), decideDefectClosure: jest.fn()}));
 jest.mock('../src/components/OurCompanySection', () => 'OurCompanySection');
 jest.mock('../src/components/ClientDetailsSection', () => 'ClientDetailsSection');
 jest.mock('../src/components/HazardousAreaPlanViewer', () => 'HazardousAreaPlanViewer');
@@ -21,7 +23,7 @@ let renderer: Renderer.ReactTestRenderer;
 const project = {projectId: 'p', projectName: 'Assigned Project', sector: 'Shipping', jobNumber: 'JOB-1', location: 'Dubai', vesselOrSiteName: 'Vessel', projectStatus: 'Active', surveyorName: 'Surveyor', assignedQcName: 'QC', qcStatus: 'PendingReview', progress: {totalAreas: 1, areasCompleted: 0, totalEquipment: 2, equipmentInspected: 1, totalSubmitted: 1, awaitingQc: 1, inReview: 0, changesRequested: 0, qcApproved: 0, openDefects: 1, closedDefects: 0, surveyProgress: 50}};
 const pin = {id: 'e', sequenceNo: 1, tagNumber: 'TAG-1', type: 'Motor', inspectionStatus: 'Completed', inspections: [{id: 's', status: 'PendingReview', answers: [{number: 1, question: 'Enclosure intact?', value: 'False', comment: 'Damaged seal'}], photos: [], inspector: 'Surveyor', comments: 'Inspection remark'}]};
 const area = {id: 'a', name: 'Deck', equipment: [pin]};
-beforeEach(() => {jest.clearAllMocks(); (api.getClientDashboard as jest.Mock).mockResolvedValue({data: {counts: {activeProjects: 7, surveysInProgress: 5, awaitingQc: 11, qcApproved: 19, completedProjects: 2, openDefects: 3, closedDefects: 4, reportsAvailable: 9}, projects: [project], recentActivity: []}}); (api.getClientDefects as jest.Mock).mockResolvedValue({data: []}); (api.getClientReports as jest.Mock).mockResolvedValue({data: [{projectId: 'p', projectName: 'Assigned Project', reportStatus: 'Available on demand'}]}); (api.getClientNotifications as jest.Mock).mockResolvedValue({data: []}); (api.getClientProject as jest.Mock).mockResolvedValue({data: {project, report: {areas: [area]}}}); (api.getClientArea as jest.Mock).mockResolvedValue({data: area}); (api.getClientEquipment as jest.Mock).mockResolvedValue({data: {equipment: pin, history: []}}); (api.getClientRemarks as jest.Mock).mockResolvedValue({data: []});});
+beforeEach(() => {jest.clearAllMocks(); (api.getClientDashboard as jest.Mock).mockResolvedValue({data: {counts: {activeProjects: 7, surveysInProgress: 5, awaitingQc: 11, qcApproved: 19, completedProjects: 2, openDefects: 3, closedDefects: 4, reportsAvailable: 9}, projects: [project], recentActivity: []}}); (api.getClientDefects as jest.Mock).mockResolvedValue({data: []}); (api.getClientReports as jest.Mock).mockResolvedValue({data: [{projectId: 'p', projectName: 'Assigned Project', reportStatus: 'Available on demand'}]}); (api.getClientNotifications as jest.Mock).mockResolvedValue({data: []}); (api.getClientProject as jest.Mock).mockResolvedValue({data: {project, report: {areas: [area]}}}); (api.getClientArea as jest.Mock).mockResolvedValue({data: area}); (api.getClientEquipment as jest.Mock).mockResolvedValue({data: {equipment: pin, history: []}}); (api.getClientRemarks as jest.Mock).mockResolvedValue({data: []}); (activityApi.getInspectionDefects as jest.Mock).mockResolvedValue({data: []}); (activityApi.decideDefectClosure as jest.Mock).mockResolvedValue({data: {}});});
 afterEach(async () => {await Renderer.act(async () => renderer?.unmount());});
 async function press(label: string) {await Renderer.act(async () => {renderer.root.findAllByType(TouchableOpacity).find(n => n.props.accessibilityLabel === label || text(n) === label)!.props.onPress();});}
 test('uses backend KPI counts and existing read-only drill-down without technical edit actions', async () => {
@@ -49,6 +51,14 @@ test('failed assigned-project request shows error without displaying private det
  (api.getClientProject as jest.Mock).mockRejectedValue(new Error('Forbidden'));
  await Renderer.act(async () => {renderer = Renderer.create(<ClientWorkspace userName="Client" userKey="Client:1" />);}); await press('View Project');
  expect(text(renderer.root)).toContain('Could not open this project.'); expect(text(renderer.root)).not.toContain('Enclosure intact?');
+});
+
+test('client sees an assigned activity defect and can accept its verified closure', async () => {
+ (activityApi.getInspectionDefects as jest.Mock).mockResolvedValue({data: [{id: 'f1', actionId: 'ca1', project: 'Assigned Project', equipmentId: 'e1', checkpoint: 'Seal intact', faultCode: 'FC-1', observation: 'Seal damaged', severityCode: 'Proposed', actionStatus: 'Verified', reportedAt: new Date().toISOString()}]});
+ await Renderer.act(async () => {renderer = Renderer.create(<ClientWorkspace userName="Client" userKey="Client:1" section="Defects" />); await Promise.resolve(); await Promise.resolve();});
+ expect(text(renderer.root)).toContain('Seal damaged');
+ await press('Approve Closure');
+ expect(activityApi.decideDefectClosure).toHaveBeenCalledWith('ca1', true, '');
 });
 
  test('Client mobile drawer replaces tabs, navigates all modules, and uses existing logout', async () => {

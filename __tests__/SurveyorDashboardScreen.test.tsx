@@ -10,6 +10,7 @@ import {
 jest.mock('../src/api/projects', () => ({
   getSurveyorDashboard: jest.fn(),
   getSurveyorProjects: jest.fn(),
+  projectStatusLabel: (value: string) => value,
 }));
 
 const textOf = (node: ReactTestRenderer.ReactTestInstance): string =>
@@ -67,10 +68,10 @@ test('shows assigned Surveyor counts and opens QC feedback equipment', async () 
   });
 
   const content = textOf(renderer.root);
-  expect(content).toContain('My Projects');
+  expect(content).toContain('Assigned Projects');
   expect(content).toContain('Action Required');
   expect(content).toContain('Correct certificate details');
-  expect(content).toContain('High');
+  expect(content).toContain('HIGH');
 
   await ReactTestRenderer.act(async () => {
     buttonNamed(renderer.root, 'EQ-003')?.props.onPress();

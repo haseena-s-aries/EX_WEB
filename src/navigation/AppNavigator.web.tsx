@@ -687,6 +687,11 @@ import SurveyorProjectDetailsScreen from '../screens/SurveyorProjectDetailsScree
 import SurveyorAreaDetailsScreen from '../screens/SurveyorAreaDetailsScreen';
 import SurveyorEquipmentDetailsScreen from '../screens/SurveyorEquipmentDetailsScreen';
 import SurveyorInspectionScreen from '../screens/SurveyorInspectionScreen';
+import InspectionActivityScreen from '../screens/InspectionActivityScreen';
+import ScanEquipmentScreen from '../screens/ScanEquipmentScreen.web';
+import DefectRegisterScreen from '../screens/DefectRegisterScreen';
+import ChecklistAdminScreen from '../screens/ChecklistAdminScreen';
+import InspectionPlanningScreen from '../screens/InspectionPlanningScreen';
 import UserManagementScreen from '../screens/UserManagementScreen';
 import QcDashboardScreen from '../screens/QcDashboardScreen';
 import QcProjectDetailsScreen from '../screens/QcProjectDetailsScreen';
@@ -699,6 +704,7 @@ import {getAssignmentOptions} from '../api/projects';
 import {setAuthToken} from '../api/client';
 import MobileDrawer, {MenuButton, AppTab} from '../components/MobileDrawer';
 import AdminEquipmentListScreen from '../screens/AdminEquipmentListScreen';
+import EquipmentReferenceDocumentsPanel from '../components/EquipmentReferenceDocumentsPanel';
 import {useThemeMode} from '../theme/useThemeMode';
 import {Colors, DARK, LIGHT} from '../theme/palette';
  
@@ -716,7 +722,14 @@ type Screen =
   | 'ProjectDetails'
   | 'SurveyorEquipmentDetails'
   | 'SurveyorInspection'
+  | 'InspectionActivities'
+  | 'InspectionActivityDetail'
+  | 'EquipmentIdentification'
+  | 'DefectRegister'
+  | 'ChecklistAdmin'
+  | 'InspectionPlanning'
   | 'AdminEquipmentList'
+  | 'EquipmentDocuments'
   | 'ManagerQcReview'
   | 'Reports'
   | 'QcPending';
@@ -740,6 +753,7 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
     'Dashboard' | 'QcProjects' | 'QcPending'
 >('Dashboard');
   const [selectedEquipmentId, setSelectedEquipmentId] = useState('');
+  const [selectedActivityId, setSelectedActivityId] = useState('');
   const [projectDetailsReturnScreen, setProjectDetailsReturnScreen] = useState<'Dashboard' | 'Projects'>('Dashboard');
   const [surveyorRefreshVersion, setSurveyorRefreshVersion] = useState(0);
   const themeMode = useThemeMode();
@@ -833,7 +847,14 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
     screen === 'SurveyorInspection' ||
     screen === 'QcPending' ||
     screen === 'ManagerQcReview' ||
+    screen === 'InspectionActivities' ||
+    screen === 'InspectionActivityDetail' ||
+    screen === 'EquipmentIdentification' ||
+    screen === 'DefectRegister' ||
+    screen === 'ChecklistAdmin' ||
+    screen === 'InspectionPlanning' ||
     screen === 'AdminEquipmentList' ||
+    screen === 'EquipmentDocuments' ||
     screen === 'ProjectDetails'
   ) {
     if (!currentUser) {
@@ -866,7 +887,7 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
         ? 'Home'
         : screen === 'Projects' || screen === 'ProjectDetails'
           ? 'Surveys'
-          : screen === 'AdminEquipmentList'
+          : screen === 'AdminEquipmentList' || String(screen)==='EquipmentDocuments'
             ? 'Equipment'
             : 'User'; // UserManagement
     const onTabChange = (tab: AppTab) => {
@@ -946,9 +967,10 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
 <View style={[styles.adminTopBar, {backgroundColor: tc.bg, borderBottomColor: tc.border}]}>
 <MenuButton c={tc} onPress={() => setMenuOpen(true)} badge={canManageUsers ? qcPendingCount : 0} />
 <View style={styles.adminTopTitleWrap}>
-<Text numberOfLines={1} style={[styles.adminTopTitle, {color: tc.text}]}>{SECTION_TITLES[activeTab]}</Text>
+<Text numberOfLines={1} style={[styles.adminTopTitle, {color: tc.text}]}>{screen === 'InspectionPlanning' ? 'Inspection Planning' : SECTION_TITLES[activeTab]}</Text>
 <Text numberOfLines={1} style={[styles.adminTopSub, {color: tc.muted}]}>Ex-Survey</Text>
 </View>
+            {canManageUsers ? <TouchableOpacity accessibilityRole="button" onPress={() => setScreen('InspectionPlanning')} style={{paddingHorizontal:9,paddingVertical:7,backgroundColor:screen==='InspectionPlanning'?'#f0c15a':'#fff',borderRadius:7}}><Text style={{fontWeight:'700',color:'#30344a'}}>Planning</Text></TouchableOpacity> : null}
             {bell(true)}
 </View>
         ) : null}
@@ -1021,6 +1043,12 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
 </Text>
 </TouchableOpacity>
               )}
+              {['qc','surveyor'].includes(currentUser.role.toLowerCase()) && (
+<TouchableOpacity onPress={() => setScreen('InspectionPlanning')} style={[styles.mobileNavItem, screen === 'InspectionPlanning' && styles.mobileNavItemActive]}>
+<Text style={[styles.mobileNavText, screen === 'InspectionPlanning' && styles.mobileNavTextActive]}>Planning</Text>
+</TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={() => setScreen('EquipmentIdentification')} style={[styles.mobileNavItem, String(screen)==='EquipmentIdentification'&&styles.mobileNavItemActive]}><Text style={[styles.mobileNavText,String(screen)==='EquipmentIdentification'&&styles.mobileNavTextActive]}>Scan</Text></TouchableOpacity>
 </View>
 </View>
         ) : (
@@ -1050,6 +1078,10 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
                 if (canManageUsers) setScreen('ManagerQcReview');
                 return;
               }
+              if (key === 'DefectRegister') {setScreen('DefectRegister'); return;}
+              if (key === 'EquipmentIdentification') {setScreen('EquipmentIdentification'); return;}
+              if (key === 'InspectionPlanning') {if (['admin','manager','qc','surveyor'].includes(currentUser.role.toLowerCase())) setScreen('InspectionPlanning'); return;}
+              if (key === 'ChecklistAdmin') {if (['admin','manager','qc'].includes(currentUser.role.toLowerCase())) setScreen('ChecklistAdmin'); return;}
               if (key === 'Dashboard' || key === 'Projects' || key === 'UserManagement' || key === 'Reports') {
                 if (key === 'UserManagement' && !canManageUsers) return;
                 if (key === 'Projects' && currentUser.role.toLowerCase() === 'qc') {
@@ -1066,8 +1098,9 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
           />
         )}
 <View style={styles.mainContent}>
-          {screen === 'Reports' ? <ReportsScreen /> : screen === 'QcPending' && (canManageUsers || currentUser.role.toLowerCase() === 'qc') ? (
+            {String(screen)==='EquipmentIdentification'?<ScanEquipmentScreen accountId={currentUser.email||currentUser.id||''} role={currentUser.role} online onBack={()=>setScreen('Dashboard')} onOpenInspection={equipmentId=>{setSelectedEquipmentId(equipmentId);setScreen('InspectionActivities');}} onOpenOffline={()=>setScreen('Dashboard')} /> : String(screen) === 'InspectionPlanning' ? <InspectionPlanningScreen role={currentUser.role} /> : String(screen) === 'ChecklistAdmin' ? <ChecklistAdminScreen role={currentUser.role} /> : String(screen) === 'DefectRegister' ? <DefectRegisterScreen role={currentUser.role} /> : screen === 'Reports' ? <ReportsScreen role={currentUser.role} /> : screen === 'QcPending' && (canManageUsers || currentUser.role.toLowerCase() === 'qc') ? (
 <QcDashboardScreen pendingWorkspace userName={currentUser.name}
+              onActivityPress={id => {setSelectedActivityId(id); setScreen('InspectionActivityDetail');}}
               onProjectPress={(id, project) => {
                 setQcProjectId(id); setQcProjectSummary(project);
                 setQcProjectReturnScreen('QcPending'); setScreen('QcProjectDetails');
@@ -1079,6 +1112,7 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
           ) : screen === 'Dashboard' && currentUser.role.toLowerCase() === 'qc' ? (
 <QcDashboardScreen
               userName={currentUser.name}
+              onActivityPress={id => {setSelectedActivityId(id); setScreen('InspectionActivityDetail');}}
               onProjectPress={(id, project) => {
                 setQcProjectId(id);
                 setQcProjectSummary(project);
@@ -1209,10 +1243,16 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
               projectId={selectedProjectId}
               areaId={selectedAreaId}
               equipmentId={selectedEquipmentId}
+              userRole={currentUser?.role}
               refreshVersion={surveyorRefreshVersion}
               onBack={() => setScreen('SurveyorAreaDetails')}
               onInspect={() => setScreen('SurveyorInspection')}
+              onStartActivity={() => setScreen('InspectionActivities')}
             />
+          ) : String(screen) === 'InspectionActivities' && selectedEquipmentId ? (
+<InspectionActivityScreen equipmentId={selectedEquipmentId} role={currentUser.role} onBack={() => setScreen('SurveyorEquipmentDetails')} />
+          ) : String(screen) === 'InspectionActivityDetail' && selectedActivityId ? (
+<InspectionActivityScreen activityId={selectedActivityId} role={currentUser.role} onBack={() => setScreen('QcPending')} />
           ) : screen === 'SurveyorInspection' && selectedEquipmentId ? (
 <SurveyorInspectionScreen
               equipmentId={selectedEquipmentId}
@@ -1222,13 +1262,16 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
                 setSurveyorRefreshVersion(version => version + 1)
               }
             />
-          ) : screen === 'AdminEquipmentList' ? (
+          ) : String(screen) === 'AdminEquipmentList' ? (
 <AdminEquipmentListScreen
               onEquipmentPress={projectId => {
                 setSelectedProjectId(projectId);
                 setScreen('ProjectDetails');
               }}
+              onDocumentsPress={row=>{setSelectedProjectId(row.projectId);setSelectedAreaId(row.areaId);setSelectedEquipmentId(row.id);setScreen('EquipmentDocuments');}}
             />
+          ) : String(screen) === 'EquipmentDocuments' && selectedProjectId && selectedAreaId && selectedEquipmentId ? (
+<View style={{flex:1,padding:20,backgroundColor:'#fff'}}><TouchableOpacity accessibilityRole="button" onPress={()=>setScreen('AdminEquipmentList')} style={{alignSelf:'flex-start',padding:10}}><Text style={{color:'#334477',fontWeight:'700'}}>‹ Back to equipment register</Text></TouchableOpacity><EquipmentReferenceDocumentsPanel projectId={selectedProjectId} areaId={selectedAreaId} equipmentId={selectedEquipmentId} role={currentUser?.role}/></View>
           ) : screen === 'UserManagement' ? (
 <UserManagementScreen onBack={() => setScreen('Dashboard')} />
           ) : (

@@ -671,6 +671,7 @@ type Props = {
   /** Called when the person taps the toggle, e.g. to persist the choice on native. */
   onThemeChange?: (mode: ThemeMode) => void;
   onLogin: (email: string, password: string, rememberMe?: boolean) => void;
+  onOfflineLogin?: (email: string,password:string) => void;
   onGoToSignup: () => void;
   loading?: boolean;
   /** Overrides the bundled photo. Pass null for no photo (light theme draws an illustration). */
@@ -705,6 +706,7 @@ export default function LoginScreen(props: Props) {
 function LoginBody({
   mode,
   onLogin,
+  onOfflineLogin,
   onGoToSignup,
   loading,
   heroImage,
@@ -863,6 +865,7 @@ function LoginBody({
           Request access
         </Text>
       </View>
+      {onOfflineLogin ? <Pressable accessibilityRole="button" onPress={() => onOfflineLogin(email.trim(),password)} style={{alignSelf:'center',paddingVertical:12}}><Text style={[s.meta,s.link]}>Open downloaded offline inspections</Text><Text style={[s.meta,{textAlign:'center',fontSize:11}]}>Enter the email and password from your last online sign-in</Text></Pressable> : null}
     </>
   );
 

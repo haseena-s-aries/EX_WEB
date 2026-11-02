@@ -19,6 +19,7 @@ import NotificationBell from '../components/NotificationBell';
 import {downloadReportPdf, generateReportPdf} from '../reports/pdfFile';
 import {GeneratedReport} from '../reports/types';
 import {loadDismissedIds, loadReadIds, saveReadIds} from '../notifications/notifications';
+import {decideDefectClosure, getInspectionDefects} from '../api/projects';
 
 export const CLIENT_MENU: Array<[ClientSection, string]> = [['Dashboard', 'Dashboard'], ['Projects', 'My Projects'], ['Defects', 'Defects'], ['Reports', 'Reports'], ['Notifications', 'Notifications']];
 const display = (value: unknown) => value === undefined || value === null || value === '' ? '-' : String(value);
@@ -44,10 +45,12 @@ export default function ClientWorkspace({userName, userKey, section = 'Dashboard
   const activeSection = onNavigate ? section : localSection;
   const [dashboard, setDashboard] = useState<ClientDashboard | null>(null);
   const [defects, setDefects] = useState<any[]>([]); const [reports, setReports] = useState<any[]>([]); const [notices, setNotices] = useState<ClientNotice[]>([]);
+  const [activityDefects, setActivityDefects] = useState<any[]>([]); const [closureComments, setClosureComments] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [error, setError] = useState('');
   const [detail, setDetail] = useState<any>(null); const [area, setArea] = useState<any>(null); const [equipment, setEquipment] = useState<any>(null);
   const [opening, setOpening] = useState(false); const [query, setQuery] = useState('');
   const [areaFilter, setAreaFilter] = useState(''); const [statusFilter, setStatusFilter] = useState(''); const [severityFilter, setSeverityFilter] = useState('');
+  const [overdueOnly, setOverdueOnly] = useState(false);
   const [viewer, setViewer] = useState<{title: string; images: string[]; pins?: ViewerPin[]} | null>(null);
   const [certificate, setCertificate] = useState<any>(null);
   const [remarkContext, setRemarkContext] = useState<ClientRemarkContext | null>(null);
@@ -59,6 +62,7 @@ export default function ClientWorkspace({userName, userKey, section = 'Dashboard
     try {
       const [d, f, r, n] = await Promise.all([getClientDashboard(), getClientDefects(), getClientReports(), getClientNotifications()]);
       if (!alive.current) return; setDashboard(d.data); setDefects(f.data); setReports(r.data); setNotices(n.data);
+      try { const activityFindingRows = (await getInspectionDefects()).data; if (alive.current) setActivityDefects(activityFindingRows); } catch { /* New activity feature may be disabled on older deployments. */ }
     } catch (err) {if (alive.current) setError(getApiErrorMessage(err, 'Could not load your client workspace.'));}
     finally {if (alive.current) {setLoading(false); setRefreshing(false);}}
   }, []);
@@ -121,7 +125,8 @@ export default function ClientWorkspace({userName, userKey, section = 'Dashboard
       {!detail && activeSection === 'Profile' && <Card title={showNavigation ? 'Account Details' : 'Profile'}><QcProjectMetadata fields={[["Client Name", userName], ['Email', profile?.email], ['Company', profile?.companyName], ['Role', 'Client']]} /><ThemeToggle floating={false} size={34} /></Card>}
       {!detail && activeSection === 'Defects' && <>
         <View style={styles.filters}><Filter label="Area" selected={areaFilter} onSelect={setAreaFilter} options={Array.from(new Map(defects.map(f => [f.areaId, f.areaName])).entries())} /><Filter label="Status" selected={statusFilter} onSelect={setStatusFilter} options={Array.from(new Set(defects.map(f => f.status))).map(v => [v, status(v)])} /><Filter label="Severity" selected={severityFilter} onSelect={setSeverityFilter} options={Array.from(new Set(defects.map(f => display(f.severity)))).map(v => [v, v])} /></View>
-        {selectedDefects.map(renderDefect)}{!selectedDefects.length && <DashboardEmptyState title="No defects found" message="No defects match these filters." />}
+        <View style={styles.actions}><Button title={overdueOnly ? 'Show all activity defects' : 'Show overdue activity defects'} onPress={() => setOverdueOnly(value => !value)} /></View>
+        {selectedDefects.map(renderDefect)}{activityDefects.filter(f => (!statusFilter || String(f.actionStatus || f.statusCode).toLowerCase() === statusFilter.toLowerCase()) && (!severityFilter || display(f.severityCode) === severityFilter) && (!overdueOnly || (!!f.dueAt && new Date(f.dueAt).getTime() < Date.now() && f.actionStatus !== 'ClientClosed'))).map(f => <Card key={`activity-${f.id}`} title={`${display(f.faultCode)} · ${display(f.project)}`}><QcProjectMetadata fields={[["Equipment", display(f.equipmentId)], ['Inspection', `${f.grade} · ${f.checkpoint}`], ['Observation', f.observation], ['Proposed Severity', display(f.severityCode)], ['Corrective Action', display(f.proposedAction)], ['Rectification Reported', display(f.rectificationDescription)], ['Work Order', display(f.workOrderReference)], ['Status', display(f.actionStatus || f.statusCode)], ['Reported', date(f.reportedAt)], ['Due', date(f.dueAt)], ['Age', `${Math.max(0, Math.floor((Date.now() - new Date(f.reportedAt).getTime()) / 86400000))} days`]]} />{(f.evidence || []).map((e: any) => <View key={e.id} style={styles.activity}><AuthenticatedImage path={e.url} style={styles.photo} /><Text style={shared.meta}>{e.role} · {e.fileName} · {date(e.addedAt)}</Text></View>)}{(f.history || []).map((h: any, i: number) => <Text key={`${f.id}-${i}`} style={shared.meta}>{status(h.kind)} · {date(h.occurredAt)}{h.rectificationAt ? ` · repair date ${date(h.rectificationAt)}` : ''}{h.rectificationDescription ? ` · ${h.rectificationDescription}` : ''}{h.comment ? ` · ${h.comment}` : ''}</Text>)}{f.actionStatus === 'Verified' && f.actionId && <><TextInput value={closureComments[f.actionId] || ''} onChangeText={value => setClosureComments(old => ({...old, [f.actionId]: value}))} placeholder="Optional client closure comment" style={styles.input} /><View style={styles.actions}><Button title="Approve Closure" onPress={() => {void decideDefectClosure(f.actionId, true, closureComments[f.actionId] || '').then(() => reload(true)).catch(e => setError(getApiErrorMessage(e, 'Could not close defect.')));}} /><Button title="Reject Rectification" onPress={() => {const comment = closureComments[f.actionId]?.trim(); if (!comment) {setError('Add a reason before rejecting rectification.'); return;} void decideDefectClosure(f.actionId, false, comment).then(() => reload(true)).catch(e => setError(getApiErrorMessage(e, 'Could not reject rectification.')));}} /></View></>}{f.actionStatus === 'ClientClosed' && f.actionId && <><TextInput value={closureComments[f.actionId] || ''} onChangeText={value => setClosureComments(old => ({...old, [f.actionId]: value}))} placeholder="Reason to reopen" style={styles.input} /><Button title="Reopen Defect" onPress={() => {const comment = closureComments[f.actionId]?.trim(); if (!comment) {setError('Add a reason before reopening.'); return;} void decideDefectClosure(f.actionId, false, comment).then(() => reload(true)).catch(e => setError(getApiErrorMessage(e, 'Could not reopen defect.')));}} /></>}</Card>)}{!selectedDefects.length && !activityDefects.length && <DashboardEmptyState title="No defects found" message="No defects match these filters." />}
       </>}
       {!detail && activeSection === 'Reports' && <>
         <Text style={shared.meta}>Reports reflect the latest saved project data. Generated Date appears after a PDF has been generated.</Text>

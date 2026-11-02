@@ -1,9 +1,10 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {Text, TouchableOpacity, View} from 'react-native';
 import {QcDashboardLayout, QcProjectCard, QcProjectMetadata} from '../components/QcDashboardLayout';
 import {getApiErrorMessage} from '../api/errors';
-import {getQcDashboard, getQcProjects} from '../api/projects';
+import {getQcActivityQueue, getQcDashboard, getQcProjects} from '../api/projects';
 
-type Props = {userName: string; onProjectPress: (id: string, project?: any) => void; projectsOnly?: boolean; refreshVersion?: number; pendingWorkspace?: boolean};
+type Props = {userName: string; onProjectPress: (id: string, project?: any) => void; onActivityPress?: (id: string) => void; projectsOnly?: boolean; refreshVersion?: number; pendingWorkspace?: boolean};
 const value = (obj: any, ...keys: string[]) => {
   for (const key of keys) if (obj?.[key] != null) return obj[key];
   return undefined;
@@ -14,19 +15,24 @@ const isOverdue = (project: any) => {
   return !!due && new Date(due).getTime() < Date.now() && !/approved|complete/i.test(statusOf(project));
 };
 
-export default function QcDashboardScreen({userName, onProjectPress, projectsOnly = false, refreshVersion, pendingWorkspace = false}: Props) {
+export default function QcDashboardScreen({userName, onProjectPress, onActivityPress, projectsOnly = false, refreshVersion, pendingWorkspace = false}: Props) {
   const [projects, setProjects] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [activities, setActivities] = useState<any[]>([]);
   const load = useCallback(async (refresh = false) => {
     refresh ? setRefreshing(true) : setLoading(true);
     setError('');
     try {
-      const [dash, list] = await Promise.all([getQcDashboard(), getQcProjects(pendingWorkspace)]);
+      const activityRequest = typeof getQcActivityQueue === 'function'
+        ? getQcActivityQueue().catch(() => ({data: []}))
+        : Promise.resolve({data: []});
+      const [dash, list, activityQueue] = await Promise.all([getQcDashboard(), getQcProjects(pendingWorkspace), activityRequest]);
       setSummary(dash.data);
       setProjects(list.data);
+      setActivities(activityQueue.data);
     } catch (err) {
       setError(getApiErrorMessage(err, 'Could not load QC assignments.'));
     } finally { setLoading(false); setRefreshing(false); }
@@ -74,5 +80,6 @@ export default function QcDashboardScreen({userName, onProjectPress, projectsOnl
         ]} />}
       </QcProjectCard>;
     })}
+    {onActivityPress && activities.length > 0 && <View style={{marginTop: 18, gap: 8}}><Text style={{fontSize: 18, fontWeight: '800', color: '#242d52'}}>New inspection activities</Text>{activities.map(item => <TouchableOpacity key={item.id} onPress={() => onActivityPress(item.id)} style={{backgroundColor: '#fff', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#e5e9f6'}}><Text style={{fontWeight: '700', color: '#252f50'}}>{item.grade} · {item.projectName}</Text><Text style={{color: '#707589', marginTop: 4}}>{String(item.reviewStatus).replace(/([A-Z])/g, ' $1').trim()} · {item.inspectorNameSnapshot}</Text></TouchableOpacity>)}</View>}
   </QcDashboardLayout>;
 }

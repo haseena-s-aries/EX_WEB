@@ -12,6 +12,7 @@ import {
   getSurveyorEquipmentDetails,
   SurveyorEquipmentDetails,
 } from '../api/projects';
+import EquipmentReferenceDocumentsPanel from '../components/EquipmentReferenceDocumentsPanel';
 
 type Props = {
   projectId: string;
@@ -19,7 +20,9 @@ type Props = {
   equipmentId: string;
   onBack: () => void;
   onInspect: () => void;
+  onStartActivity?: () => void;
   refreshVersion?: number;
+  userRole?: string;
 };
 
 const statusLabel = (status: string) => status
@@ -32,10 +35,14 @@ const formatDate = (value: string) => {
 };
 
 export default function SurveyorEquipmentDetailsScreen({
+  projectId,
+  areaId,
   equipmentId,
   onBack,
   onInspect,
+  onStartActivity,
   refreshVersion,
+  userRole,
 }: Props) {
   const [equipment, setEquipment] = useState<SurveyorEquipmentDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -143,6 +150,8 @@ export default function SurveyorEquipmentDetailsScreen({
         <TouchableOpacity onPress={onInspect} style={styles.inspectButton}>
           <Text style={styles.inspectButtonText}>{actionLabel}</Text>
         </TouchableOpacity>
+        {onStartActivity ? <TouchableOpacity onPress={onStartActivity} style={[styles.inspectButton, {marginTop: 10, backgroundColor: '#e9edff'}]}><Text style={[styles.inspectButtonText, {color: '#2e3c7a'}]}>Inspection history / new repeat</Text></TouchableOpacity> : null}
+        <EquipmentReferenceDocumentsPanel projectId={projectId} areaId={areaId} equipmentId={equipmentId} role={userRole} />
       </View>
     </ScrollView>
   );

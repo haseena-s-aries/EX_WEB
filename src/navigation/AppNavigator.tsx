@@ -423,6 +423,7 @@ import QcPendingBadge from '../components/QcPendingBadge';
 import React, {useMemo, useState} from 'react';
 import {
   Alert,
+  ScrollView,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -440,6 +441,13 @@ import SurveyorProjectDetailsScreen from '../screens/SurveyorProjectDetailsScree
 import SurveyorAreaDetailsScreen from '../screens/SurveyorAreaDetailsScreen';
 import SurveyorEquipmentDetailsScreen from '../screens/SurveyorEquipmentDetailsScreen';
 import SurveyorInspectionScreen from '../screens/SurveyorInspectionScreen';
+import InspectionActivityScreen from '../screens/InspectionActivityScreen';
+import OfflineInspectionScreen from '../screens/OfflineInspectionScreen';
+import ScanEquipmentScreen from '../screens/ScanEquipmentScreen';
+import AdminEquipmentListScreen from '../screens/AdminEquipmentListScreen';
+import EquipmentReferenceDocumentsPanel from '../components/EquipmentReferenceDocumentsPanel';
+import {offlineStoreAvailable} from '../offline/offlineInspectionStore';
+import {offlineInspectionService} from '../offline/offlineInspectionService';
 import {sendOtp, verifyOtp, completeRegistration, loginUser} from '../api/auth';
 import {getAssignmentOptions} from '../api/projects';
 import {setAuthToken} from '../api/client';
@@ -554,6 +562,7 @@ export default function AppNavigator() {
                   const {accessToken, user} = res.data;
                   setAuthToken(accessToken);
                   setCurrentUser(user);
+                  if (offlineStoreAvailable && user.email) { try { await offlineInspectionService.saveCredential(user.email, user, accessToken,password); } catch { /* offline cache is optional during online sign-in */ } }
  
                   if (user.role === 'Admin' || user.role === 'Manager') {
                     try {
@@ -584,6 +593,11 @@ export default function AppNavigator() {
                 }
               }}
               onGoToSignup={() => navigation.navigate('Signup')}
+              onOfflineLogin={offlineStoreAvailable ? async (email,password) => {
+                if (!email) { Alert.alert('Email needed','Enter the email from your last online sign-in to open its encrypted offline cache.'); return; }
+                try { const session=await offlineInspectionService.loadCredential(email,password); if(!session){Alert.alert('Offline sign-in unavailable','Check your account password, reconnect to refresh your expired session, or ask an administrator to restore access.');return;} setAuthToken(session.token);setCurrentUser(session.user);navigation.reset({index:0,routes:[{name:'Dashboard'}]}); }
+                catch { Alert.alert('Offline access unavailable','The encrypted offline session could not be opened. Sign in online.'); }
+              } : undefined}
             />
           )}
 </Stack.Screen>
@@ -604,6 +618,9 @@ export default function AppNavigator() {
 </TouchableOpacity>
 </View>}
               {currentUser && currentUser.role.toLowerCase() !== 'client' && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('Reports')} style={styles.logoutButton}><Text style={styles.logoutText}>Reports</Text></TouchableOpacity>}
+              {(currentUser?.role === 'Manager' || currentUser?.role === 'Admin') && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('EquipmentRegister')} style={styles.logoutButton}><Text style={styles.logoutText}>Equipment documents</Text></TouchableOpacity>}
+              {currentUser && currentUser.role.toLowerCase() !== 'client' && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('EquipmentIdentification')} style={styles.logoutButton}><Text style={styles.logoutText}>Scan equipment</Text></TouchableOpacity>}
+              {offlineStoreAvailable && currentUser?.role?.toLowerCase()==='surveyor' && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('OfflineInspections')} style={styles.logoutButton}><Text style={styles.logoutText}>Offline inspections</Text></TouchableOpacity>}
               {(currentUser?.role === 'Manager' || currentUser?.role === 'Admin') && (
 <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('ManagerQcReview')} style={styles.logoutButton}>
 <Text style={styles.logoutText}>QC Review</Text>
@@ -618,6 +635,7 @@ export default function AppNavigator() {
 <QcDashboardScreen
                   userName={currentUser.displayName || 'QC'}
                   refreshVersion={qcRefreshVersion}
+                  onActivityPress={activityId => navigation.navigate('InspectionActivityDetail', {activityId})}
                   onProjectPress={(projectId, projectSummary) =>
                     navigation.navigate('QcProjectDetails', {projectId, projectSummary})
                   }
@@ -655,6 +673,16 @@ export default function AppNavigator() {
 </SafeAreaView>
           )}
 </Stack.Screen>
+        {offlineStoreAvailable && currentUser?.role?.toLowerCase()==='surveyor' && <Stack.Screen name="OfflineInspections">{({navigation})=><SafeAreaView style={styles.dashboardShell}><OfflineInspectionScreen accountId={currentUser.email||currentUser.id||''} onBack={()=>navigation.goBack()} /></SafeAreaView>}</Stack.Screen>}
+        <Stack.Screen name="EquipmentIdentification">
+          {({navigation}:any)=><SafeAreaView style={styles.dashboardShell}><ScanEquipmentScreen accountId={currentUser?.email||currentUser?.id||''} role={currentUser?.role||''} online={!!currentUser} onBack={()=>navigation.goBack()} onOpenInspection={equipmentId=>navigation.navigate('InspectionActivities',{equipmentId})} onOpenOffline={()=>navigation.navigate('OfflineInspections')} /></SafeAreaView>}
+        </Stack.Screen>
+        <Stack.Screen name="EquipmentRegister">
+          {({navigation}: any) => <SafeAreaView style={styles.dashboardShell}><AdminEquipmentListScreen onEquipmentPress={projectId => navigation.navigate('ProjectDetails', {projectId})} onDocumentsPress={row=>navigation.navigate('EquipmentDocuments', {projectId:row.projectId,areaId:row.areaId,equipmentId:row.id})}/></SafeAreaView>}
+        </Stack.Screen>
+        <Stack.Screen name="EquipmentDocuments">
+          {({navigation,route}:any) => <SafeAreaView style={styles.dashboardShell}><ScrollView contentContainerStyle={{padding:16}}><TouchableOpacity accessibilityRole="button" onPress={()=>navigation.goBack()} style={{padding:10}}><Text style={{color:'#334477',fontWeight:'700'}}>‹ Back to equipment register</Text></TouchableOpacity><EquipmentReferenceDocumentsPanel projectId={route.params.projectId} areaId={route.params.areaId} equipmentId={route.params.equipmentId} role={currentUser?.role}/></ScrollView></SafeAreaView>}
+        </Stack.Screen>
  
         <Stack.Screen name="Reports">
           {({navigation}) => <SafeAreaView style={styles.dashboardShell}>{currentUser?.role?.toLowerCase() === 'client' ? <ClientWorkspace userName={currentUser.displayName} userKey={`Client:${currentUser.id || currentUser.displayName}`} section="Reports" showNavigation profile={currentUser} onLogout={() => logout(navigation)} /> : <ReportsScreen onBack={() => navigation.goBack()} />}</SafeAreaView>}
@@ -672,10 +700,14 @@ export default function AppNavigator() {
             {({navigation}) => <SafeAreaView style={styles.dashboardShell}>
 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.logoutButton}><Text style={styles.logoutText}>Back</Text></TouchableOpacity>
 <QcDashboardScreen pendingWorkspace userName={currentUser.displayName} refreshVersion={qcRefreshVersion}
+                onActivityPress={activityId => navigation.navigate('InspectionActivityDetail', {activityId})}
                 onProjectPress={(projectId, projectSummary) => navigation.navigate('QcProjectDetails', {projectId, projectSummary})} />
 </SafeAreaView>}
 </Stack.Screen>
         )}
+        <Stack.Screen name="InspectionActivityDetail">
+          {({navigation, route}: any) => <SafeAreaView style={styles.dashboardShell}><InspectionActivityScreen activityId={route.params.activityId} role={currentUser?.role} onBack={() => {setQcRefreshVersion(v => v + 1); navigation.goBack();}} /></SafeAreaView>}
+        </Stack.Screen>
 <Stack.Screen name="QcProjectDetails">
           {({navigation, route}: any) => (
 <SafeAreaView style={styles.dashboardShell}>
@@ -745,6 +777,7 @@ export default function AppNavigator() {
                 projectId={route.params.projectId}
                 areaId={route.params.areaId}
                 equipmentId={route.params.equipmentId}
+                userRole={currentUser?.role}
                 refreshVersion={surveyorRefreshVersion}
                 onBack={() => navigation.goBack()}
                 onInspect={() =>
@@ -754,6 +787,7 @@ export default function AppNavigator() {
                     equipmentId: route.params.equipmentId,
                   })
                 }
+                onStartActivity={() => navigation.navigate('InspectionActivities', {equipmentId: route.params.equipmentId})}
               />
 </SafeAreaView>
           )}
@@ -773,50 +807,30 @@ export default function AppNavigator() {
 </SafeAreaView>
           )}
 </Stack.Screen>
+
+        <Stack.Screen name="InspectionActivities">
+          {({navigation, route}: any) => (
+            <SafeAreaView style={styles.dashboardShell}>
+              <InspectionActivityScreen equipmentId={route.params.equipmentId} role={currentUser?.role} onBack={() => navigation.goBack()} />
+            </SafeAreaView>
+          )}
+        </Stack.Screen>
 </Stack.Navigator>
 </NavigationContainer>
   );
 }
  
 function makeStyles(c: Colors) {
-const styles = StyleSheet.create({
-  dashboardShell: {flex: 1, backgroundColor: '#f7f9ff'},
-  mobileHeader: {
-    minHeight: 58,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    backgroundColor: '#242d52',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#3e4974',    
-    flexDirection: 'row',
- 
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      backgroundColor: c.bg,
-      borderBottomWidth: 1,
-      borderBottomColor: c.border,
-    },
-    brand: {fontSize: 17, fontWeight: '800', color: '#fff'},
-    role: {fontSize: 11, color: '#c9cded', marginTop: 1},
+  return StyleSheet.create({
+    dashboardShell: {flex: 1, backgroundColor: c.bg},
+    mobileHeader: {minHeight: 58, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: c.bg, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12},
+    brand: {fontSize: 17, fontWeight: '800', color: c.text},
+    role: {fontSize: 11, color: c.muted, marginTop: 1},
     exBadge: {width: 38, height: 38, borderRadius: 10, backgroundColor: '#FBBF24', alignItems: 'center', justifyContent: 'center'},
     exBadgeText: {color: '#000', fontSize: 17, fontWeight: '900', fontStyle: 'italic'},
     topTitle: {color: c.text, fontSize: 17, fontWeight: '800'},
     topSub: {color: c.muted, fontSize: 9.5, fontWeight: '700', letterSpacing: 1.2, marginTop: 1, textTransform: 'uppercase'},
-  logoutButton: {
-      alignSelf: 'flex-start',
-      minHeight: 36,
-      justifyContent: 'center',
-      marginHorizontal: 16,
-      marginTop: 10,
-      paddingHorizontal: 14,
-      borderWidth: 1,
-      borderColor: '#485780',
-      borderRadius: 8,
-      backgroundColor: c.card,
-    },
-   logoutText: {fontSize: 13, fontWeight: '800', color: '#b8a5f8'},
+    logoutButton: {alignSelf: 'flex-start', minHeight: 36, justifyContent: 'center', marginHorizontal: 16, marginTop: 10, paddingHorizontal: 14, borderWidth: 1, borderColor: c.border, borderRadius: 8, backgroundColor: c.card},
+    logoutText: {fontSize: 13, fontWeight: '800', color: c.text},
   });
 }

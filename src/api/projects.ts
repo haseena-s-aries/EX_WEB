@@ -477,6 +477,45 @@ export const getSurveyorEquipmentInspection = (equipmentId: string) =>
 export const getSurveyorChecklist = () =>
   apiClient.get<SurveyorChecklistItem[]>('/surveyor/checklist');
 
+// Additive repeat-inspection activity API. Existing SurveySession endpoints remain unchanged.
+export const getInspectionActivityHistory = (equipmentId: string) =>
+  apiClient.get<any[]>(`/v1/inspection-activities/equipment/${equipmentId}`);
+export const startInspectionActivity = (equipmentId: string, grade: InspectionType) =>
+  apiClient.post<any>(`/v1/inspection-activities/equipment/${equipmentId}/start`, {grade});
+export const getInspectionActivity = (activityId: string) =>
+  apiClient.get<any>(`/v1/inspection-activities/${activityId}`);
+export const addInspectionFinding = (activityId: string, data: any) => apiClient.post<any>(`/v1/inspection-activities/${activityId}/findings`, data);
+export const createFindingCorrectiveAction = (findingId: string, data: any) => apiClient.post<any>(`/v1/inspection-activities/findings/${findingId}/corrective-actions`, data);
+export const reportCorrectiveActionRectification = (actionId: string, data: any) => apiClient.post<any>(`/v1/inspection-activities/corrective-actions/${actionId}/rectification`, data);
+export const submitCorrectiveActionVerification = (actionId: string) => apiClient.post<any>(`/v1/inspection-activities/corrective-actions/${actionId}/submit-verification`);
+export const verifyCorrectiveAction = (actionId: string, acceptCorrection: boolean, comments: string) => apiClient.post<any>(`/v1/inspection-activities/corrective-actions/${actionId}/verification`, {acceptCorrection, comments});
+export const getInspectionDefects = (status?: string, overdueOnly = false) => apiClient.get<any[]>('/v1/inspection-activities/defects', {params: {status, overdueOnly}});
+export const decideDefectClosure = (actionId: string, acceptClosure: boolean, comments: string) => apiClient.post<any>(`/v1/inspection-activities/corrective-actions/${actionId}/client-closure`, {acceptClosure, comments});
+export const uploadCorrectiveActionPhoto = (actionId: string, photo: InspectionPhotoFile, role: 'Before' | 'After' | 'Correction') => {
+  const form = new FormData();
+  if (photo.webFile) form.append('photo', photo.webFile);
+  else form.append('photo', {uri: photo.uri, type: photo.type || 'image/jpeg', name: photo.fileName || photo.name || 'rectification.jpg'} as any);
+  form.append('role', role);
+  return apiClient.post<any>(`/v1/inspection-activities/corrective-actions/${actionId}/photos`, form);
+};
+export const saveActivityCheckpoint = (activityId: string, data: any) =>
+  apiClient.post<any>(`/v1/inspection-activities/${activityId}/checkpoints`, data);
+export const submitInspectionActivity = (activityId: string) =>
+  apiClient.post<any>(`/v1/inspection-activities/${activityId}/submit`);
+export const getQcActivityQueue = () =>
+  apiClient.get<any[]>('/v1/inspection-activities/qc/queue');
+export const reviewInspectionActivity = (activityId: string, decision: 'Accepted' | 'ChangesRequested', comments: string) =>
+  apiClient.post<any>(`/v1/inspection-activities/${activityId}/review`, {decision, comments});
+export const uploadActivityPhoto = (activityId: string, photo: InspectionPhotoFile, checkpointResponseRevisionId?: string, idempotencyKey?: string) => {
+  const form = new FormData();
+  if (photo.webFile) form.append('photo', photo.webFile);
+  else form.append('photo', {uri: photo.uri, type: photo.type || 'image/jpeg', name: photo.fileName || photo.name || 'inspection.jpg'} as any);
+  if (checkpointResponseRevisionId) form.append('checkpointResponseRevisionId', checkpointResponseRevisionId);
+  return apiClient.post<any>(`/v1/inspection-activities/${activityId}/photos`, form, idempotencyKey ? {headers: {'Idempotency-Key': idempotencyKey}} : undefined);
+};
+export const reviewActivityCheckpoint = (activityId: string, checkpointResponseRevisionId: string, decision: 'Accepted' | 'ChangesRequested', comments: string) =>
+  apiClient.post<any>(`/v1/inspection-activities/${activityId}/checkpoint-review`, {checkpointResponseRevisionId, decision, comments});
+
 export const createSurveyorInspection = (
   equipmentId: string,
   data: SaveEquipmentInspectionRequest,

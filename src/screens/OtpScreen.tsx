@@ -10,8 +10,7 @@ import {
   Platform,
   Image,
   ImageSourcePropType,
-  NativeSyntheticEvent,
-  TextInputKeyPressEventData,
+  TextInputKeyPressEvent,
   useWindowDimensions,
 } from 'react-native';
 import AnimatedCard from '../components/AnimatedCard';
@@ -40,7 +39,7 @@ function useOtp(onVerify: (otp: string) => void, onResend: () => void) {
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [error, setError] = useState('');
   const [seconds, setSeconds] = useState(RESEND_SECONDS);
-  const inputs = useRef<Array<TextInput | null>>([]);
+  const inputs = useRef<Array<React.ElementRef<typeof TextInput> | null>>([]);
 
   useEffect(() => {
     if (seconds <= 0) return;
@@ -83,7 +82,7 @@ function useOtp(onVerify: (otp: string) => void, onResend: () => void) {
   };
 
   const handleKeyPress = (
-    e: NativeSyntheticEvent<TextInputKeyPressEventData>,
+    e: TextInputKeyPressEvent,
     index: number,
   ) => {
     if (e.nativeEvent.key === 'Backspace' && !digits[index] && index > 0) {

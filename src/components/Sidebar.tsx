@@ -19,7 +19,13 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   {key: 'Dashboard', label: 'Home', hint: 'Dashboard & site operations', icon: '⌂', tone: 'amber'},
   {key: 'Projects', label: 'Surveys', hint: 'Projects and areas', icon: '▤', tone: 'cyan'},
+  {key: 'AdminEquipmentList', label: 'Equipment', hint: 'Equipment register and reference documents', icon: '⬡', tone: 'indigo', adminOnly: true},
+  {key: 'EquipmentIdentification', label: 'Scan equipment', hint: 'RFID, NFC, QR and manual lookup', icon: '⌕', tone: 'indigo', adminOnly: true},
+  {key: 'InspectionPlanning', label: 'Planning', hint: 'Campaigns and work packages', icon: '◷', tone: 'amber', adminOnly: true},
+  {key: 'DefectRegister', label: 'Defects', hint: 'Rectification and verification', icon: '⚠', tone: 'amber', adminOnly: true},
   {key: 'Reports', label: 'Reports', hint: 'Inspection reports', icon: '↗', tone: 'success'},
+  {key: 'ChecklistAdmin', label: 'Checklists', hint: 'Controlled checklist versions', icon: '☷', tone: 'cyan', adminOnly: true},
+  {key: 'ManagerQcReview', label: 'QC Review', hint: 'Monitor and review inspections', icon: '✓', tone: 'amber', adminOnly: true},
   {key: 'QcPending', label: 'QC Pending', hint: 'Awaiting review', icon: '▤', tone: 'amber', adminOnly: true},
   {key: 'UserManagement', label: 'User Management', hint: 'Approve and assign users', icon: '☻', tone: 'cyan', adminOnly: true},
 ];
@@ -45,7 +51,7 @@ export default function Sidebar({active, userName, userRole, onNavigate, onLogou
   const items = useMemo(
     () =>
       NAV_ITEMS.filter(
-        item => !item.adminOnly || isAdminOrManager || (item.key === 'QcPending' && userRole.toLowerCase() === 'qc'),
+        item => !item.adminOnly || isAdminOrManager || (item.key === 'EquipmentIdentification' && ['qc','surveyor'].includes(userRole.toLowerCase())) || (item.key === 'QcPending' && userRole.toLowerCase() === 'qc') || (item.key === 'ChecklistAdmin' && userRole.toLowerCase() === 'qc') || (item.key === 'InspectionPlanning' && ['qc', 'surveyor'].includes(userRole.toLowerCase())) || (item.key === 'DefectRegister' && ['qc', 'surveyor'].includes(userRole.toLowerCase())),
       ),
     [isAdminOrManager, userRole],
   );

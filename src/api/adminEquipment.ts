@@ -3,6 +3,7 @@ import {getProject} from './projects';
 export type EquipmentRow = {
   id: string;
   projectId: string;
+  areaId: string;
   projectName: string;
   areaName: string;
   sequenceNo: number;
@@ -35,6 +36,7 @@ export async function loadAllEquipment(
           (area.equipment || []).map<EquipmentRow>(item => ({
             id: item.id,
             projectId: project.id,
+            areaId: area.id,
             projectName: project.projectName,
             areaName: area.areaName,
             sequenceNo: item.sequenceNo,

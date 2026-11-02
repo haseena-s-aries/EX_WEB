@@ -22,6 +22,8 @@ jest.mock('../src/screens/SurveyorProjectDetailsScreen', () => 'SurveyorProjectD
 jest.mock('../src/screens/SurveyorAreaDetailsScreen', () => 'SurveyorAreaDetailsScreen');
 jest.mock('../src/screens/SurveyorEquipmentDetailsScreen', () => 'SurveyorEquipmentDetailsScreen');
 jest.mock('../src/screens/SurveyorInspectionScreen', () => 'SurveyorInspectionScreen');
+jest.mock('../src/screens/InspectionActivityScreen', () => 'InspectionActivityScreen');
+jest.mock('../src/screens/DefectRegisterScreen', () => 'DefectRegisterScreen');
 jest.mock('../src/screens/UserManagementScreen', () => 'UserManagementScreen');
 jest.mock('../src/screens/QcDashboardScreen', () => 'QcDashboardScreen');
 jest.mock('../src/screens/QcProjectDetailsScreen', () => 'QcProjectDetailsScreen');
@@ -31,7 +33,6 @@ jest.mock('../src/screens/ManagerQcReviewScreen', () => 'ManagerQcReviewScreen')
 jest.mock('../src/screens/ClientWorkspace', () => 'ClientWorkspace');
 jest.mock('../src/screens/ReportsScreen', () => 'ReportsScreen');
 jest.mock('../src/components/Sidebar', () => 'Sidebar');
-jest.mock('../src/components/BottomTabBar', () => 'BottomTabBar');
 jest.mock('../src/components/NotificationBell', () => 'NotificationBell');
 
 test.each(['Manager', 'Admin', 'Qc'])('%s QC Pending opens the existing review screen and returns to pending', async role => {

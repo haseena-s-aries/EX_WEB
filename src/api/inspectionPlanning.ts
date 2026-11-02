@@ -1,0 +1,25 @@
+import apiClient from './client';
+import {getProjects, ProjectSummary} from './projects';
+
+export type InspectionCampaign = {id: string; projectId: string; inspectionLeadUserId?: string; name: string; reference: string; startsOn: string; endsOn: string; status: string; revision: number; allocationApproved: boolean; projectName: string; site: string; client: string};
+export type SamplingMethod = 'Random' | 'RiskBased' | 'EquipmentType' | 'Manual';
+export const getPlanningProjects = () => getProjects();
+export const getCampaigns = () => apiClient.get<InspectionCampaign[]>('/v1/inspection-planning/campaigns');
+export const createCampaign = (data: {projectId: string; name: string; reference: string; startsOn: string; endsOn: string; inspectionLeadUserId?: string}) => apiClient.post('/v1/inspection-planning/campaigns', data);
+export const editCampaign = (id: string, data: {name: string; reference: string; startsOn: string; endsOn: string; changeReason: string; inspectionLeadUserId?: string}) => apiClient.put(`/v1/inspection-planning/campaigns/${id}`, data);
+export const setCampaignStatus = (id: string, status: 'Draft'|'Planned'|'InProgress'|'Completed'|'OnHold'|'Archived', reason: string) => apiClient.put(`/v1/inspection-planning/campaigns/${id}/status`, {status, reason});
+export const getCampaignAllocation = (id: string) => apiClient.get(`/v1/inspection-planning/campaigns/${id}/allocation`);
+export const configureAllocation = (id: string, data: {closePercent: number; detailedPercent: number; minimumDetailedCreditPercent: number; roundingRule: 'Ceiling' | 'Floor' | 'Nearest'}) => apiClient.put(`/v1/inspection-planning/campaigns/${id}/allocation`, data);
+export const saveAnnualList = (id: string, year: number, equipmentIds: string[], riskScores?: Record<string, number>) => apiClient.post(`/v1/inspection-planning/campaigns/${id}/annual-lists`, {year, equipmentIds, riskScores});
+export const approveAllocation = (id: string, comments: string) => apiClient.post(`/v1/inspection-planning/campaigns/${id}/allocation/approve`, {comments});
+export const previewSampling = (campaignId: string, listId: string, data: {method: SamplingMethod; ruleVersion: number; randomSeed?: number; justification?: string; selectedEquipmentIds?: string[]}) => apiClient.post(`/v1/inspection-planning/campaigns/${campaignId}/annual-lists/${listId}/sampling`, data);
+export const approveSampling = (id: string, comments: string) => apiClient.post(`/v1/inspection-planning/sampling/${id}/approve`, {comments});
+export const getSamplingHistory = (id: string) => apiClient.get<any[]>(`/v1/inspection-planning/campaigns/${id}/sampling`);
+export const createWorkPackage = (id: string, data: {reference: string; site: string; area?: string; rotation?: string; plannedStart?: string; plannedEnd?: string; equipment: Array<{equipmentId: string; grade: 'Visual' | 'Close' | 'Detailed'; assignedUserId?: string; routeOrder: number; priorityCode?: string; scheduledAt?: string; dueAt?: string}>}) => apiClient.post(`/v1/inspection-planning/campaigns/${id}/work-packages`, data);
+export const getWorkPackages = (id: string) => apiClient.get(`/v1/inspection-planning/campaigns/${id}/work-packages`);
+export const getCampaignProgress = (id: string) => apiClient.get(`/v1/inspection-planning/campaigns/${id}/progress`);
+export const getPlanningInspectors = () => apiClient.get('/projects/assignment-options');
+export const reassignInspectionTask = (id: string, userId: string, reason: string) => apiClient.post(`/v1/inspection-planning/tasks/${id}/reassign`, {userId, reason});
+export const markInspectionTaskInaccessible = (id: string, reason: string) => apiClient.post(`/v1/inspection-planning/tasks/${id}/inaccessible`, {reason});
+export const getRecurrences = (id: string) => apiClient.get<any[]>(`/v1/inspection-planning/campaigns/${id}/recurrences`);
+export const createRecurrence = (id: string, data: {annualListId: string; grade: 'Visual'|'Close'|'Detailed'; everyMonths: number; nextOccurrenceOn: string}) => apiClient.post(`/v1/inspection-planning/campaigns/${id}/recurrences`, data);

@@ -1,10 +1,15 @@
 import axios from 'axios';
 import {Platform} from 'react-native';
 
+const webConfig = (globalThis as typeof globalThis & {
+  EX_SURVEY_CONFIG?: {apiBaseUrl?: string};
+}).EX_SURVEY_CONFIG;
+
 const BASE_URL = Platform.select({
-  web: 'https://localhost:7288/api',
-  android: 'http://10.0.2.2:5235/api',
-  default: 'https://localhost:7288/api',
+  web: webConfig?.apiBaseUrl || 'https://139.5.189.155:441/api',
+  android: 'https://139.5.189.155:441/api',
+  ios: 'https://139.5.189.155:441/api',
+  default: 'https://139.5.189.155:441/api',
 });
 
 const apiClient = axios.create({

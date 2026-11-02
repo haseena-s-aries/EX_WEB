@@ -18,6 +18,7 @@ import {Colors, DARK, LIGHT, tint} from '../theme/palette';
 
 type Props = {
   onEquipmentPress: (projectId: string) => void;
+  onDocumentsPress?: (row: EquipmentRow) => void;
   refreshVersion?: number;
 };
 
@@ -30,7 +31,7 @@ const statusColor = (c: Colors, status: string) => {
 };
 
 /** Every piece of equipment across all projects. */
-export default function AdminEquipmentListScreen({onEquipmentPress, refreshVersion}: Props) {
+export default function AdminEquipmentListScreen({onEquipmentPress, onDocumentsPress, refreshVersion}: Props) {
   const mode = useThemeMode();
   const c = mode === 'dark' ? DARK : LIGHT;
   const s = useMemo(() => makeStyles(c), [c]);
@@ -116,8 +117,8 @@ export default function AdminEquipmentListScreen({onEquipmentPress, refreshVersi
             const sc = statusColor(c, row.inspectionStatus);
             const label = inspectionLabel(row.inspectionStatus);
             return (
+              <View key={row.id} style={{flexDirection:'row',gap:7,alignItems:'stretch'}}>
               <TouchableOpacity
-                key={row.id}
                 accessibilityRole="button"
                 onPress={() => onEquipmentPress(row.projectId)}
                 activeOpacity={0.75}
@@ -138,6 +139,8 @@ export default function AdminEquipmentListScreen({onEquipmentPress, refreshVersi
                 </View>
                 <Text style={s.chevron}>›</Text>
               </TouchableOpacity>
+              {onDocumentsPress&&<TouchableOpacity accessibilityRole="button" onPress={()=>onDocumentsPress(row)} style={[s.card,{flex:0,justifyContent:'center'}]}><Text style={s.badgeText}>Documents</Text></TouchableOpacity>}
+              </View>
             );
           })}
         </View>
