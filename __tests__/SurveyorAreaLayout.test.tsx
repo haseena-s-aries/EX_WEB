@@ -1,11 +1,12 @@
 import React from 'react';
 import Renderer from 'react-test-renderer';
-import {Pressable, TouchableOpacity} from 'react-native';
+import {Pressable, TextInput, TouchableOpacity} from 'react-native';
 import SurveyorAreaDetailsScreen from '../src/screens/SurveyorAreaDetailsScreen';
-import {getSurveyorArea, getSurveyorEquipment, getProjectAreaPhotos} from '../src/api/projects';
+import {createSurveyorEquipment, getSurveyorArea, getSurveyorEquipment, getProjectAreaPhotos} from '../src/api/projects';
 
-jest.mock('../src/api/projects', () => ({getSurveyorArea: jest.fn(), getSurveyorEquipment: jest.fn(), getProjectAreaPhotos: jest.fn()}));
+jest.mock('../src/api/projects', () => ({createSurveyorEquipment: jest.fn(), getSurveyorArea: jest.fn(), getSurveyorEquipment: jest.fn(), getSurveyorEquipmentPhotos: jest.fn().mockResolvedValue({data: []}), getProjectAreaPhotos: jest.fn()}));
 jest.mock('../src/components/AuthenticatedImage', () => 'AuthenticatedImage');
+jest.mock('../src/components/InspectionPhotoPicker', () => 'InspectionPhotoPicker');
 jest.mock('../src/components/ZoomableImageViewer', () => 'LayoutViewer');
 const textOf = (node: Renderer.ReactTestInstance): string => node.children.map(child => typeof child === 'string' ? child : textOf(child)).join('');
 test('View Layout reuses zoom viewer with original path and equipment pins', async () => {
@@ -26,5 +27,28 @@ test('View Layout reuses zoom viewer with original path and equipment pins', asy
   await Renderer.act(async () => {viewer.props.onClose(); pin.props.onPress();});
   expect(renderer.root.findAllByType('LayoutViewer' as any)).toHaveLength(0);
   expect(renderer.root.findAll(node => node.props.accessibilityLabel === 'Equipment 1: MOTOR-1').length).toBeGreaterThan(0);
+  await Renderer.act(async () => {renderer.unmount();});
+});
+
+test('Save & start inspection registers equipment then opens its activity workflow', async () => {
+  (getSurveyorArea as jest.Mock).mockResolvedValue({data: {areaId: 'area', areaName: 'Deck'}});
+  (getSurveyorEquipment as jest.Mock).mockResolvedValue({data: []});
+  (getProjectAreaPhotos as jest.Mock).mockResolvedValue({data: []});
+  (createSurveyorEquipment as jest.Mock).mockResolvedValue({data: {id: 'new-equipment', sequenceNo: 1}});
+  const onStartInspection = jest.fn();
+  let renderer!: Renderer.ReactTestRenderer;
+  await Renderer.act(async () => {renderer = Renderer.create(<SurveyorAreaDetailsScreen projectId="project" areaId="area" onBack={jest.fn()} onEquipmentPress={jest.fn()} onStartInspection={onStartInspection} />);});
+  const addButton = renderer.root.findAllByType(TouchableOpacity).find(node => textOf(node).includes('+ Register Equipment'))!;
+  await Renderer.act(async () => {addButton.props.onPress();});
+  const tagField = renderer.root.findAllByType(TextInput).find(node => node.props.placeholder === 'Enter value')!;
+  await Renderer.act(async () => {tagField.props.onChangeText('MOTOR-NEW');});
+  const typeSelect = renderer.root.findAllByType(TouchableOpacity).find(node => textOf(node).includes('Select equipment type'))!;
+  await Renderer.act(async () => {typeSelect.props.onPress();});
+  const motor = renderer.root.findAllByType(TouchableOpacity).find(node => textOf(node) === 'Motor')!;
+  await Renderer.act(async () => {motor.props.onPress();});
+  const saveStart = renderer.root.findAllByType(TouchableOpacity).find(node => textOf(node).includes('Save & start inspection'))!;
+  await Renderer.act(async () => {await saveStart.props.onPress();});
+  expect(createSurveyorEquipment).toHaveBeenCalledWith('project', 'area', expect.objectContaining({tagNumber: 'MOTOR-NEW', type: 'Motor'}));
+  expect(onStartInspection).toHaveBeenCalledWith('new-equipment');
   await Renderer.act(async () => {renderer.unmount();});
 });

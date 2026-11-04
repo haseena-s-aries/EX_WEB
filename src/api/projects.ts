@@ -75,6 +75,7 @@ export type ProjectAreaEquipment = {
   sequenceNo: number;
   xPercent: number;
   yPercent: number;
+  isPlacedOnLayout?: boolean;
   tagNumber: string;
   equipmentCode?: string | null;
   rfidTagUid?: string | null;
@@ -296,6 +297,7 @@ export type AreaEquipment = {
   sequenceNo: number;
   xPercent: number;
   yPercent: number;
+  isPlacedOnLayout?: boolean;
   tagNumber: string;
   equipmentId?: string | null;
   type: string;
@@ -313,6 +315,19 @@ export type AreaEquipment = {
   qcReviewStatus?: string | null;
   qcComments?: string | null;
   qcSeverity?: string | null;
+  description?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  exProtectionType?: string | null;
+  gasGroup?: string | null;
+  temperatureClass?: string | null;
+  hazardousAreaZone?: string | null;
+  ambientTemperatureRange?: string | null;
+  ipRating?: string | null;
+  notifiedBody?: string | null;
+  specialConditionsOfUse?: string | null;
+  rfidIdentificationMethod?: string | null;
+  registrationStatus?: string;
 };
 
 export type EquipmentInspectionStatus =
@@ -339,6 +354,12 @@ export type SurveyorChecklistItem = {
   text: string;
   sortOrder: number;
   isRequired: boolean;
+  sectionCode?: string | null;
+  applicableProtectionTypes?: string | null;
+  sourceItemNumber?: number | null;
+  sourceItemReference?: string | null;
+  applicableGrades?: string | null;
+  subChecksJson?: string | null;
 };
 
 export type SurveyorInspectionAnswer = SurveyorChecklistItem & {
@@ -416,8 +437,10 @@ export const getSurveyorArea = (projectId: string, areaId: string) =>
   );
 
 export type SaveAreaEquipmentRequest = {
-  xPercent: number;
-  yPercent: number;
+  clientEquipmentId?: string;
+  xPercent?: number;
+  yPercent?: number;
+  isPlacedOnLayout?: boolean;
   tagNumber: string;
   equipmentId?: string | null;
   rfidTagUid?: string | null;
@@ -427,6 +450,18 @@ export type SaveAreaEquipmentRequest = {
   manufacturer?: string | null;
   protectionDetails?: string | null;
   certificateNumber?: string | null;
+  description?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  exProtectionType?: string | null;
+  gasGroup?: string | null;
+  temperatureClass?: string | null;
+  hazardousAreaZone?: string | null;
+  ambientTemperatureRange?: string | null;
+  ipRating?: string | null;
+  notifiedBody?: string | null;
+  specialConditionsOfUse?: string | null;
+  rfidIdentificationMethod?: string | null;
 };
 
 const surveyorEquipmentUrl = (projectId: string, areaId: string) =>
@@ -435,11 +470,20 @@ const surveyorEquipmentUrl = (projectId: string, areaId: string) =>
 export const getSurveyorEquipment = (projectId: string, areaId: string) =>
   apiClient.get<AreaEquipment[]>(surveyorEquipmentUrl(projectId, areaId));
 
+export const resolveSurveyorAreaEquipment = (
+  projectId: string, areaId: string, identifier: string, technology: 'HF_RFID' | 'NFC' | 'QR' | 'MANUAL',
+) => apiClient.get(`${surveyorEquipmentUrl(projectId, areaId)}/resolve`, {params: {identifier, technology}});
+
+export const recordSurveyorEquipmentScanEvent = (projectId: string, areaId: string, data: {
+  clientEventId: string; identifier: string; technology: string; matchResult: string; equipmentId?: string | null; scannedAt: string;
+}) => apiClient.post(`${surveyorEquipmentUrl(projectId, areaId)}/scan-events`, data);
+
 export const createSurveyorEquipment = (
   projectId: string,
   areaId: string,
   data: SaveAreaEquipmentRequest,
-) => apiClient.post<AreaEquipment>(surveyorEquipmentUrl(projectId, areaId), data);
+  idempotencyKey?: string,
+) => apiClient.post<AreaEquipment>(surveyorEquipmentUrl(projectId, areaId), data, idempotencyKey ? {headers: {'Idempotency-Key': idempotencyKey}} : undefined);
 
 export const updateSurveyorEquipment = (
   projectId: string,
@@ -460,6 +504,26 @@ export const deleteSurveyorEquipment = (
   apiClient.delete(
     `${surveyorEquipmentUrl(projectId, areaId)}/${equipmentId}`,
   );
+
+export const getSurveyorEquipmentPhotos = (projectId: string, areaId: string, equipmentId: string) =>
+  apiClient.get<any[]>(`${surveyorEquipmentUrl(projectId, areaId)}/${equipmentId}/photos`);
+
+export const uploadSurveyorEquipmentPhotos = (
+  projectId: string, areaId: string, equipmentId: string,
+  files: InspectionPhotoFile[], role: 'Overview' | 'Nameplate' | 'ExMarking' | 'Installation' | 'Additional',
+  clientPhotoIds?: string[],
+) => {
+  const formData = new FormData();
+  formData.append('Role', role);
+  files.forEach(file => {
+    const value = Platform.OS === 'web' ? file.webFile : {
+      uri: file.uri, type: file.type || 'image/jpeg', name: file.fileName || file.name || 'equipment-photo.jpg',
+    };
+    formData.append('Files', value as any);
+  });
+  clientPhotoIds?.forEach(id => formData.append('ClientPhotoId', id));
+  return apiClient.post<any[]>(`${surveyorEquipmentUrl(projectId, areaId)}/${equipmentId}/photos`, formData);
+};
 
 export const getSurveyorEquipmentDetails = (equipmentId: string) =>
   apiClient.get<SurveyorEquipmentDetails>(`/surveyor/equipment/${equipmentId}`);
@@ -736,3 +800,11 @@ export const updateQcComments = (inspectionId: string, comments: string) =>
   apiClient.put<QcReview>(`/qc/inspections/${inspectionId}/comments`, {
     comments,
   });
+
+export type SurveyorChecklistPreview = {
+  sourceRevision: string;
+  pointCount: number;
+  isPublished: boolean;
+  items: SurveyorChecklistItem[];
+};
+export const getSurveyorChecklistPreview = () => apiClient.get<SurveyorChecklistPreview>('/surveyor/checklist/sample-preview');

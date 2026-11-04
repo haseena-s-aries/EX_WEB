@@ -4,6 +4,7 @@ import ChecklistAdminScreen from '../src/screens/ChecklistAdminScreen';
 import * as checklistApi from '../src/api/checklistAdmin';
 
 jest.mock('../src/api/checklistAdmin', () => ({
+  importSampleChecklist: jest.fn().mockResolvedValue({}),
   approveChecklistTemplate: jest.fn().mockResolvedValue({}), archiveChecklistTemplate: jest.fn().mockResolvedValue({}),
   cloneChecklistTemplate: jest.fn().mockResolvedValue({}), createChecklistTemplate: jest.fn().mockResolvedValue({}),
   editChecklistTemplate: jest.fn().mockResolvedValue({}), getChecklistTemplates: jest.fn().mockResolvedValue({data: []}),
@@ -53,5 +54,18 @@ test('draft checklist can be previewed by section before publication', async () 
   expect(checklistApi.previewChecklistTemplate).toHaveBeenCalledWith('preview-1');
   expect(textOf(renderer.root)).toContain('Checklist preview');
   expect(textOf(renderer.root)).toContain('Synthetic preview prompt');
+  await Renderer.act(async () => renderer.unmount());
+});
+
+
+test('admin can import sample drafts while QC uses the separate review workflow', async () => {
+  (checklistApi.getChecklistTemplates as jest.Mock).mockResolvedValue({data: []});
+  let renderer!: Renderer.ReactTestRenderer;
+  await Renderer.act(async () => {renderer = Renderer.create(<ChecklistAdminScreen role="Admin"/>);});
+  await Renderer.act(async () => press(renderer.root, 'Import sample checklist drafts'));
+  expect(checklistApi.importSampleChecklist).toHaveBeenCalledTimes(1);
+  expect(textOf(renderer.root)).toContain('independent technical approval');
+  await Renderer.act(async () => renderer.update(<ChecklistAdminScreen role="Qc"/>));
+  expect(renderer.root.findAllByProps({accessibilityRole:'button'}).some(x=>textOf(x).includes('Import sample checklist drafts'))).toBe(false);
   await Renderer.act(async () => renderer.unmount());
 });

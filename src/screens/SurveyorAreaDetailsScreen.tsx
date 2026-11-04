@@ -19,22 +19,31 @@ import {getApiErrorMessage} from '../api/errors';
 import {
   AreaEquipment,
   createSurveyorEquipment,
+  getSurveyorEquipmentPhotos,
   deleteSurveyorEquipment,
   getProjectAreaPhotos,
   getSurveyorArea,
   getSurveyorEquipment,
   SaveAreaEquipmentRequest,
   SurveyorAreaDetails,
+  resolveSurveyorAreaEquipment,
+  recordSurveyorEquipmentScanEvent,
+  InspectionPhotoFile,
+  uploadSurveyorEquipmentPhotos,
   updateSurveyorEquipment,
 } from '../api/projects';
 import AuthenticatedImage from '../components/AuthenticatedImage';
+import InspectionPhotoPicker from '../components/InspectionPhotoPicker';
 
 type Props = {
   projectId: string;
   areaId: string;
   onBack: () => void;
   onEquipmentPress: (equipmentId: string) => void;
+  onStartInspection?: (equipmentId: string) => void;
   onEquipmentAdded?: () => void;
+  onScanNfc?: () => Promise<{identifier: string}>;
+  onScanQr?: () => Promise<{identifier: string}>;
 };
 type PinPosition = {xPercent: number; yPercent: number};
 type EquipmentForm = {
@@ -48,6 +57,18 @@ type EquipmentForm = {
   manufacturer: string;
   protectionDetails: string;
   certificateNumber: string;
+  description: string;
+  model: string;
+  serialNumber: string;
+  exProtectionType: string;
+  gasGroup: string;
+  temperatureClass: string;
+  hazardousAreaZone: string;
+  ambientTemperatureRange: string;
+  ipRating: string;
+  notifiedBody: string;
+  specialConditionsOfUse: string;
+  rfidIdentificationMethod: string;
 };
 
 const emptyForm = (): EquipmentForm => ({
@@ -61,6 +82,9 @@ const emptyForm = (): EquipmentForm => ({
   manufacturer: '',
   protectionDetails: '',
   certificateNumber: '',
+  description: '', model: '', serialNumber: '', exProtectionType: '', gasGroup: '',
+  temperatureClass: '', hazardousAreaZone: '', ambientTemperatureRange: '', ipRating: '',
+  notifiedBody: '', specialConditionsOfUse: '', rfidIdentificationMethod: 'HF_RFID',
 });
 
 const equipmentTypes = ['Transformer', 'Switchgear', 'Circuit Breaker', 'Motor', 'Generator', 'Panel', 'Cable', 'Lighting', 'Outlet', 'Other'];
@@ -70,7 +94,10 @@ export default function SurveyorAreaDetailsScreen({
   areaId,
   onBack,
   onEquipmentPress,
+  onStartInspection,
   onEquipmentAdded,
+  onScanNfc,
+  onScanQr,
 }: Props) {
   const {width} = useWindowDimensions();
   const isPhone = width < 700;
@@ -90,6 +117,13 @@ export default function SurveyorAreaDetailsScreen({
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [identifier, setIdentifier] = useState('');
+  const [identifierTechnology, setIdentifierTechnology] = useState<'HF_RFID' | 'NFC' | 'QR' | 'MANUAL'>('HF_RFID');
+  const [identifying, setIdentifying] = useState(false);
+  const [identification, setIdentification] = useState<any>(null);
+  const [equipmentPhotos, setEquipmentPhotos] = useState<any[]>([]);
+  const [pendingPhotos, setPendingPhotos] = useState<InspectionPhotoFile[]>([]);
+  const [photoRole, setPhotoRole] = useState<'Overview' | 'Nameplate' | 'ExMarking' | 'Installation' | 'Additional'>('Overview');
 
   const refreshEquipment = useCallback(async () => {
     const response = await getSurveyorEquipment(projectId, areaId);
@@ -124,6 +158,15 @@ export default function SurveyorAreaDetailsScreen({
     loadArea();
   }, [loadArea]);
 
+  useEffect(() => {
+    if (!selectedEquipmentId) { setEquipmentPhotos([]); return; }
+    let active = true;
+    getSurveyorEquipmentPhotos(projectId, areaId, selectedEquipmentId)
+      .then(response => {if (active) setEquipmentPhotos(response.data || []);})
+      .catch(() => {if (active) setEquipmentPhotos([]);});
+    return () => {active = false;};
+  }, [areaId, projectId, selectedEquipmentId]);
+
   const handleLayoutPress = (event: any) => {
     if (!placementMode || !layoutSize.width || !layoutSize.height) {
       return;
@@ -147,6 +190,7 @@ export default function SurveyorAreaDetailsScreen({
     setEditingEquipment(null);
     setForm(emptyForm());
     setFormError('');
+    setPendingPhotos([]); setPhotoRole('Overview');
     setPlacementMode(false);
     setFormVisible(true);
   };
@@ -154,7 +198,7 @@ export default function SurveyorAreaDetailsScreen({
   const openEditForm = (equipment: AreaEquipment) => {
     setSelectedEquipmentId(equipment.id);
     setEditingEquipment(equipment);
-    setPendingPosition({xPercent: equipment.xPercent, yPercent: equipment.yPercent});
+    setPendingPosition(equipment.isPlacedOnLayout === false ? null : {xPercent: equipment.xPercent, yPercent: equipment.yPercent});
     setForm({
       tagNumber: equipment.tagNumber,
       equipmentId: equipment.equipmentId || '',
@@ -166,8 +210,14 @@ export default function SurveyorAreaDetailsScreen({
       manufacturer: equipment.manufacturer || '',
       protectionDetails: equipment.protectionDetails || '',
       certificateNumber: equipment.certificateNumber || '',
+      description: equipment.description || '', model: equipment.model || '', serialNumber: equipment.serialNumber || '',
+      exProtectionType: equipment.exProtectionType || '', gasGroup: equipment.gasGroup || '',
+      temperatureClass: equipment.temperatureClass || '', hazardousAreaZone: equipment.hazardousAreaZone || '',
+      ambientTemperatureRange: equipment.ambientTemperatureRange || '', ipRating: equipment.ipRating || '',
+      notifiedBody: equipment.notifiedBody || '', specialConditionsOfUse: equipment.specialConditionsOfUse || '',
+      rfidIdentificationMethod: equipment.rfidIdentificationMethod || 'HF_RFID',
     });
-    setFormError('');
+    setFormError(''); setPendingPhotos([]); setPhotoRole('Overview');
     setFormVisible(true);
   };
 
@@ -179,11 +229,7 @@ export default function SurveyorAreaDetailsScreen({
     setFormError('');
   };
 
-  const saveEquipment = async () => {
-    if (!pendingPosition) {
-      setFormError('Select a position on the area image first.');
-      return;
-    }
+  const saveEquipment = async (startInspection = false) => {
     if (!form.tagNumber.trim() || !form.type.trim()) {
       setFormError('Tag Number and Type are required.');
       return;
@@ -193,18 +239,20 @@ export default function SurveyorAreaDetailsScreen({
       return;
     }
     if (
-      !Number.isFinite(pendingPosition.xPercent) ||
+      (pendingPosition && (!Number.isFinite(pendingPosition.xPercent) ||
       !Number.isFinite(pendingPosition.yPercent) ||
       pendingPosition.xPercent < 0 ||
       pendingPosition.xPercent > 100 ||
       pendingPosition.yPercent < 0 ||
-      pendingPosition.yPercent > 100
+      pendingPosition.yPercent > 100))
     ) {
       setFormError('The selected image position is invalid. Cancel and select the position again.');
       return;
     }
     const payload: SaveAreaEquipmentRequest = {
-      ...pendingPosition,
+      xPercent: pendingPosition?.xPercent ?? editingEquipment?.xPercent ?? 0,
+      yPercent: pendingPosition?.yPercent ?? editingEquipment?.yPercent ?? 0,
+      isPlacedOnLayout: !!pendingPosition,
       tagNumber: form.tagNumber.trim(),
       equipmentId: form.equipmentId.trim() || null,
       rfidTagUid: form.rfidTagUid.trim() || null,
@@ -214,6 +262,18 @@ export default function SurveyorAreaDetailsScreen({
       manufacturer: form.manufacturer.trim() || null,
       protectionDetails: form.protectionDetails.trim() || null,
       certificateNumber: form.certificateNumber.trim() || null,
+      description: form.description.trim() || null,
+      model: form.model.trim() || null,
+      serialNumber: form.serialNumber.trim() || null,
+      exProtectionType: form.exProtectionType.trim() || null,
+      gasGroup: form.gasGroup.trim() || null,
+      temperatureClass: form.temperatureClass.trim() || null,
+      hazardousAreaZone: form.hazardousAreaZone.trim() || null,
+      ambientTemperatureRange: form.ambientTemperatureRange.trim() || null,
+      ipRating: form.ipRating.trim() || null,
+      notifiedBody: form.notifiedBody.trim() || null,
+      specialConditionsOfUse: form.specialConditionsOfUse.trim() || null,
+      rfidIdentificationMethod: form.rfidTagUid.trim() ? (form.rfidIdentificationMethod.trim() || 'HF_RFID') : null,
     };
     setSaving(true);
     setFormError('');
@@ -221,6 +281,18 @@ export default function SurveyorAreaDetailsScreen({
       const response = editingEquipment
         ? await updateSurveyorEquipment(projectId, areaId, editingEquipment.id, payload)
         : await createSurveyorEquipment(projectId, areaId, payload);
+      if (pendingPhotos.length) {
+        try {
+          await uploadSurveyorEquipmentPhotos(projectId, areaId, response.data.id, pendingPhotos, photoRole);
+          setPendingPhotos([]);
+        } catch (photoError) {
+          setEditingEquipment(response.data);
+          setSelectedEquipmentId(response.data.id);
+          setFormError(`Equipment was saved, but its photographs were not uploaded. Retry the upload: ${getApiErrorMessage(photoError, 'upload failed')}`);
+          await refreshEquipment();
+          return;
+        }
+      }
       await refreshEquipment();
       if (!editingEquipment) {
         onEquipmentAdded?.();
@@ -234,11 +306,55 @@ export default function SurveyorAreaDetailsScreen({
       setFormVisible(false);
       setEditingEquipment(null);
       setPendingPosition(null);
+      if (!editingEquipment && startInspection) onStartInspection?.(response.data.id);
     } catch (requestError) {
       setFormError(getApiErrorMessage(requestError, 'Could not save equipment.'));
     } finally {
       setSaving(false);
     }
+  };
+
+  const identifyInArea = async (value = identifier, technology = identifierTechnology) => {
+    if (!value.trim()) { setIdentification({state: 'invalid', message: 'Scan or enter an equipment identifier.'}); return; }
+    setIdentifying(true); setIdentification(null);
+    try {
+      const response = await resolveSurveyorAreaEquipment(projectId, areaId, value.trim(), technology);
+      setIdentification(response.data);
+      try { await recordSurveyorEquipmentScanEvent(projectId, areaId, {clientEventId: newClientEventId(), identifier: value.trim(), technology, matchResult: response.data?.state || 'unknown', equipmentId: response.data?.equipment?.id || null, scannedAt: new Date().toISOString()}); }
+      catch { setIdentification({...response.data, message: `${response.data?.message || 'Lookup complete.'} Scan event could not be synchronized; retry the lookup while connected.`}); }
+    } catch (requestError: any) {
+      const data = requestError?.response?.data;
+      setIdentification({state: data?.state || 'error', message: data?.message || data?.error || getApiErrorMessage(requestError, 'Could not look up this identifier.')});
+      if (requestError?.response?.status === 404 || requestError?.response?.status === 409) {
+        try { await recordSurveyorEquipmentScanEvent(projectId, areaId, {clientEventId: newClientEventId(), identifier: value.trim(), technology, matchResult: data?.state === 'duplicate' ? 'duplicate' : 'unknown', scannedAt: new Date().toISOString()}); }
+        catch { setIdentification((current: any) => ({...current, message: `${current?.message || 'Lookup complete.'} Scan event could not be synchronized; retry the lookup while connected.`})); }
+      }
+    } finally { setIdentifying(false); }
+  };
+
+  const scanNfcInArea = async () => {
+    try {
+      if (!onScanNfc) throw new Error('NFC scan is not available on this device. Enter the UID or use a connected reader.');
+      const result = await onScanNfc();
+      setIdentifier(result.identifier); setIdentifierTechnology('NFC');
+      await identifyInArea(result.identifier, 'NFC');
+    } catch (scanError: any) { setIdentification({state: 'error', message: scanError?.message || 'NFC scanning is not available on this device.'}); }
+  };
+
+  const scanQrInArea = async () => {
+    try {
+      if (!onScanQr) throw new Error('QR camera scanning is not available on this device. Use the QR option and enter the encoded identifier.');
+      const result = await onScanQr();
+      setIdentifier(result.identifier); setIdentifierTechnology('QR');
+      await identifyInArea(result.identifier, 'QR');
+    } catch (scanError: any) { setIdentification({state: 'error', message: scanError?.message || 'QR scanning failed.'}); }
+  };
+
+  const openRegistrationFromUnknown = () => {
+    setEditingEquipment(null); setPendingPosition(null); setForm(emptyForm());
+    if (identifierTechnology === 'HF_RFID' || identifierTechnology === 'NFC')
+      setForm(current => ({...current, rfidTagUid: identifier.trim(), rfidIdentificationMethod: identifierTechnology}));
+    setFormError(''); setFormVisible(true);
   };
 
   const deleteEquipment = (equipment: AreaEquipment) => {
@@ -313,6 +429,24 @@ export default function SurveyorAreaDetailsScreen({
           <Text style={styles.subtitle}>{area.equipment.length} equipment items</Text>
         </View>
 
+        <View style={styles.identifyCard}>
+          <Text style={styles.cardTitle}>Scan / identify equipment in this job</Text>
+          <Text style={styles.cardHint}>A scan only searches this assigned job area. Unknown tags are never registered until you choose Register.</Text>
+          <View style={styles.identifyMethods}>
+            {(['HF_RFID', 'NFC', 'QR', 'MANUAL'] as const).map(method => <TouchableOpacity key={method} onPress={() => setIdentifierTechnology(method)} style={[styles.methodButton, identifierTechnology === method && styles.methodButtonActive]}><Text style={[styles.methodText, identifierTechnology === method && styles.methodTextActive]}>{method === 'MANUAL' ? 'Manual' : method}</Text></TouchableOpacity>)}
+            {Platform.OS !== 'web' && !!onScanNfc && <TouchableOpacity onPress={scanNfcInArea} disabled={identifying} style={styles.scanButton}><Text style={styles.scanButtonText}>Scan NFC</Text></TouchableOpacity>}
+            {Platform.OS === 'android' && !!onScanQr && <TouchableOpacity onPress={scanQrInArea} disabled={identifying} style={styles.scanButton}><Text style={styles.scanButtonText}>Scan QR</Text></TouchableOpacity>}
+          </View>
+          <TextInput value={identifier} onChangeText={setIdentifier} onSubmitEditing={() => void identifyInArea()} placeholder={identifierTechnology === 'MANUAL' ? 'Equipment tag or ID' : 'Scan or enter identifier'} autoCapitalize="characters" style={styles.identifyInput} />
+          <TouchableOpacity disabled={identifying} onPress={() => void identifyInArea()} style={styles.lookupButton}><Text style={styles.lookupButtonText}>{identifying ? 'Looking up…' : 'Look up in this job'}</Text></TouchableOpacity>
+          {!!identification && <View style={[styles.identifyResult, identification.state === 'matched' ? styles.identifyMatched : identification.state === 'unknown' ? styles.identifyUnknown : styles.identifyWarning]}>
+            <Text style={styles.identifyResultTitle}>{identification.state === 'matched' ? `Matched: ${identification.equipment?.tagNumber}` : identification.state === 'unknown' ? 'No match in this job area' : identification.state === 'duplicate' ? 'Multiple matches found' : 'Lookup result'}</Text>
+            <Text style={styles.cardHint}>{identification.message || [identification.equipment?.type, identification.equipment?.manufacturer, identification.equipment?.model].filter(Boolean).join(' · ')}</Text>
+            {identification.state === 'matched' && <TouchableOpacity onPress={() => onEquipmentPress(identification.equipment.id)} style={styles.lookupButton}><Text style={styles.lookupButtonText}>Open equipment and history</Text></TouchableOpacity>}
+            {identification.state === 'unknown' && <TouchableOpacity onPress={openRegistrationFromUnknown} style={styles.lookupButton}><Text style={styles.lookupButtonText}>Register as new equipment</Text></TouchableOpacity>}
+          </View>}
+        </View>
+
         <View style={styles.layoutCard}>
           <View style={[styles.cardHeader, isPhone && styles.cardHeaderPhone]}>
             <View style={styles.cardHeaderCopy}>
@@ -366,7 +500,7 @@ export default function SurveyorAreaDetailsScreen({
               }}
               style={styles.layoutImage}
             />
-            {area.equipment.map(equipment => (
+              {area.equipment.filter(equipment => equipment.isPlacedOnLayout !== false).map(equipment => (
               <Pressable
                 key={equipment.id}
                 accessibilityLabel={`Equipment ${equipment.sequenceNo}: ${equipment.tagNumber}`}
@@ -388,12 +522,17 @@ export default function SurveyorAreaDetailsScreen({
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Equipment</Text>
-          <Text style={styles.sectionCount}>{area.equipment.length} total</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
+            <Text style={styles.sectionCount}>{area.equipment.length} total</Text>
+            <TouchableOpacity style={styles.addButton} onPress={() => {setSelectedEquipmentId(null); setEditingEquipment(null); setPendingPosition(null); setForm(emptyForm()); setFormError(''); setPendingPhotos([]); setPhotoRole('Overview'); setFormVisible(true);}}>
+              <Text style={styles.addButtonText}>+ Register Equipment</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         {area.equipment.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.stateTitle}>No equipment added</Text>
-            <Text style={styles.stateMessage}>Select Add Equipment, then choose a position on the layout.</Text>
+            <Text style={styles.stateMessage}>Register equipment directly, or place it on the layout when a plan is available.</Text>
           </View>
         ) : (
           <EquipmentTable
@@ -406,6 +545,7 @@ export default function SurveyorAreaDetailsScreen({
             onDelete={deleteEquipment}
           />
         )}
+        {!!selectedEquipmentId && !!equipmentPhotos.length && <View style={styles.photoPanel}><Text style={styles.cardTitle}>Equipment photographs</Text><View style={styles.photoRow}>{equipmentPhotos.map(photo => <View key={photo.id} style={styles.equipmentPhoto}><AuthenticatedImage path={photo.url} style={styles.photoImage} placeholderText="Photo unavailable"/><Text style={styles.cardHint}>{photo.equipmentPhotoRole} · {photo.fileName}</Text></View>)}</View></View>}
       </ScrollView>
 
       <EquipmentModal
@@ -416,11 +556,25 @@ export default function SurveyorAreaDetailsScreen({
         saving={saving}
         isPhone={isPhone}
         onChange={(key, value) => setForm(current => ({...current, [key]: value}))}
+        photoRole={photoRole}
+        pendingPhotos={pendingPhotos}
+        onPhotoRoleChange={setPhotoRole}
+        onPhotosSelected={files => setPendingPhotos(current => [...current, ...files])}
         onCancel={closeForm}
         onSave={saveEquipment}
+        onSaveAndStart={() => saveEquipment(true)}
+        canStartInspection={!editingEquipment && !!onStartInspection}
       />
     </>
   );
+}
+
+function newClientEventId() {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  return uuid || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
 }
 
 function EquipmentTable({equipment, selectedId, deletingId, onSelect, onView, onEdit, onDelete}: {
@@ -448,6 +602,7 @@ function EquipmentTable({equipment, selectedId, deletingId, onSelect, onView, on
           <TableCell text="TYPE" width={110} header />
           <TableCell text="LOCATION" width={170} header />
           <TableCell text="MANUFACTURER" width={135} header />
+          <TableCell text="REGISTRATION" width={125} header />
           <TableCell text="STATUS" width={135} header />
           <TableCell text="ACTIONS" width={225} header />
         </View>
@@ -471,6 +626,7 @@ function EquipmentTable({equipment, selectedId, deletingId, onSelect, onView, on
             <TableCell text={item.type} width={110} />
             <TableCell text={item.location || '--'} width={170} />
             <TableCell text={item.manufacturer || '--'} width={135} />
+            <TableCell text={item.registrationStatus || 'Unreviewed'} width={125} />
             <View style={[styles.tableCell, styles.statusCell]}>
               <StatusBadge status={item.status} />
             </View>
@@ -554,16 +710,22 @@ function TableCell({text, width, header = false, strong = false}: {
   );
 }
 
-function EquipmentModal({visible, editing, form, error, saving, isPhone, onChange, onCancel, onSave}: {
+function EquipmentModal({visible, editing, form, error, saving, isPhone, photoRole, pendingPhotos, onPhotoRoleChange, onPhotosSelected, onChange, onCancel, onSave, onSaveAndStart, canStartInspection}: {
   visible: boolean;
   editing: boolean;
   form: EquipmentForm;
   error: string;
   saving: boolean;
   isPhone: boolean;
+  photoRole: 'Overview' | 'Nameplate' | 'ExMarking' | 'Installation' | 'Additional';
+  pendingPhotos: InspectionPhotoFile[];
+  onPhotoRoleChange: (role: 'Overview' | 'Nameplate' | 'ExMarking' | 'Installation' | 'Additional') => void;
+  onPhotosSelected: (files: InspectionPhotoFile[]) => void;
   onChange: (key: keyof EquipmentForm, value: string) => void;
   onCancel: () => void;
   onSave: () => void;
+  onSaveAndStart: () => void;
+  canStartInspection: boolean;
 }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
@@ -583,6 +745,7 @@ function EquipmentModal({visible, editing, form, error, saving, isPhone, onChang
               <FormField label="Tag Number *" value={form.tagNumber} onChangeText={value => onChange('tagNumber', value)} />
               <FormField label="Equipment ID" value={form.equipmentId} onChangeText={value => onChange('equipmentId', value)} />
               <FormField label="RFID Tag UID" value={form.rfidTagUid} onChangeText={value => onChange('rfidTagUid', value)} placeholder="Scan or enter tag UID" />
+              <IdentifierTechnologySelect value={form.rfidIdentificationMethod} onChange={value => onChange('rfidIdentificationMethod', value)} disabled={saving} />
               <EquipmentTypeSelect value={form.type} onChange={value => onChange('type', value)} disabled={saving} visible={visible} />
               {form.type === 'Other' && <FormField label="Other Equipment Type *" value={form.otherType} onChangeText={value => onChange('otherType', value)} placeholder="Enter equipment type" />}
               <FormField label="Circuit ID" value={form.circuitId} onChangeText={value => onChange('circuitId', value)} />
@@ -590,6 +753,24 @@ function EquipmentModal({visible, editing, form, error, saving, isPhone, onChang
               <FormField label="Manufacturer" value={form.manufacturer} onChangeText={value => onChange('manufacturer', value)} />
               <FormField label="Protection Details" value={form.protectionDetails} onChangeText={value => onChange('protectionDetails', value)} multiline />
               <FormField label="Certificate Number" value={form.certificateNumber} onChangeText={value => onChange('certificateNumber', value)} />
+              <FormField label="Description" value={form.description} onChangeText={value => onChange('description', value)} />
+              <FormField label="Model" value={form.model} onChangeText={value => onChange('model', value)} />
+              <FormField label="Serial Number" value={form.serialNumber} onChangeText={value => onChange('serialNumber', value)} />
+              <FormField label="Ex Protection Type" value={form.exProtectionType} onChangeText={value => onChange('exProtectionType', value)} placeholder="Enter as verified" />
+              <FormField label="Hazardous Area Zone" value={form.hazardousAreaZone} onChangeText={value => onChange('hazardousAreaZone', value)} placeholder="Enter as verified" />
+              <FormField label="Gas / Dust Group" value={form.gasGroup} onChangeText={value => onChange('gasGroup', value)} />
+              <FormField label="Temperature Class" value={form.temperatureClass} onChangeText={value => onChange('temperatureClass', value)} />
+              <FormField label="Ambient Temperature Range" value={form.ambientTemperatureRange} onChangeText={value => onChange('ambientTemperatureRange', value)} />
+              <FormField label="IP Rating" value={form.ipRating} onChangeText={value => onChange('ipRating', value)} />
+              <FormField label="Certificate Issuing Organization" value={form.notifiedBody} onChangeText={value => onChange('notifiedBody', value)} />
+              <FormField label="Special Conditions of Use" value={form.specialConditionsOfUse} onChangeText={value => onChange('specialConditionsOfUse', value)} multiline />
+              <View style={{width: '100%', gap: 8}}>
+                <Text style={styles.formLabel}>Equipment evidence photographs</Text>
+                <View style={styles.identifyMethods}>{(['Overview', 'Nameplate', 'ExMarking', 'Installation', 'Additional'] as const).map(role => <TouchableOpacity key={role} onPress={() => onPhotoRoleChange(role)} style={[styles.methodButton, photoRole === role && styles.methodButtonActive]}><Text style={[styles.methodText, photoRole === role && styles.methodTextActive]}>{role === 'ExMarking' ? 'Ex marking' : role}</Text></TouchableOpacity>)}</View>
+                <InspectionPhotoPicker disabled={saving} onSelected={onPhotosSelected} />
+                {!!pendingPhotos.length && <Text style={styles.cardHint}>{pendingPhotos.length} photo(s) selected for {photoRole}. They upload after the equipment record is saved.</Text>}
+              </View>
+              <Text style={{fontSize: 11, color: '#73788c', width: '100%'}}>Leave unavailable details blank. Only enter Ex information that has been verified from the nameplate or controlled documents.</Text>
             </View>
             {!!error && <Text style={styles.formError}>{error}</Text>}
           </ScrollView>
@@ -600,6 +781,9 @@ function EquipmentModal({visible, editing, form, error, saving, isPhone, onChang
             <TouchableOpacity disabled={saving} onPress={onSave} style={[styles.modalSaveButton, saving && styles.buttonDisabled]}>
               {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSaveText}>{editing ? 'Save Changes' : 'Add Equipment'}</Text>}
             </TouchableOpacity>
+            {canStartInspection && <TouchableOpacity disabled={saving} onPress={onSaveAndStart} style={[styles.modalSaveButton, saving && styles.buttonDisabled]}>
+              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSaveText}>Save &amp; start inspection</Text>}
+            </TouchableOpacity>}
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -632,6 +816,13 @@ function EquipmentTypeSelect({value, onChange, disabled, visible}: {
         {equipmentTypes.map(type => <TouchableOpacity key={type} accessibilityRole="button" accessibilityLabel={type} accessibilityState={{selected: type === value}} onPress={() => {onChange(type); setExpanded(false);}} style={{paddingHorizontal: 12, paddingVertical: 12, backgroundColor: type === value ? '#eef0ff' : '#fff'}}><Text style={{fontSize: 13, color: '#272b49'}}>{type}</Text></TouchableOpacity>)}
       </ScrollView>}
     </>}
+  </View>;
+}
+
+function IdentifierTechnologySelect({value, onChange, disabled}: {value: string; onChange: (value: string) => void; disabled: boolean}) {
+  return <View style={styles.formField}>
+    <Text style={styles.formLabel}>Tag technology</Text>
+    <View style={{flexDirection: 'row', gap: 8}}>{(['HF_RFID', 'NFC'] as const).map(method => <TouchableOpacity key={method} disabled={disabled} onPress={() => onChange(method)} style={[styles.methodButton, value === method && styles.methodButtonActive]}><Text style={[styles.methodText, value === method && styles.methodTextActive]}>{method === 'HF_RFID' ? 'HF RFID' : method}</Text></TouchableOpacity>)}</View>
   </View>;
 }
 
@@ -668,6 +859,26 @@ const styles = StyleSheet.create({
   backButton: {alignSelf: 'flex-start', paddingVertical: 8, marginBottom: 8},
   backText: {fontSize: 13, color: '#8fa7f8', fontWeight: '800'},
   header: {minHeight: 125, backgroundColor: '#242d52', borderRadius: 16, padding: 23, justifyContent: 'center'},
+  identifyCard: {marginTop: 16, padding: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e3e6ee', borderRadius: 8},
+  identifyMethods: {flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 12, marginBottom: 10},
+  methodButton: {paddingHorizontal: 12, paddingVertical: 9, borderRadius: 6, backgroundColor: '#eef0f5'},
+  methodButtonActive: {backgroundColor: '#dfe4ff'},
+  methodText: {fontSize: 11, color: '#50556d', fontWeight: '700'},
+  methodTextActive: {color: '#343ba7'},
+  identifyInput: {minHeight: 44, paddingHorizontal: 12, borderWidth: 1, borderColor: '#d8dbe5', borderRadius: 6, color: '#272b49'},
+  scanButton: {paddingHorizontal: 12, paddingVertical: 9, borderRadius: 6, backgroundColor: '#242d52'},
+  scanButtonText: {fontSize: 11, color: '#fff', fontWeight: '800'},
+  lookupButton: {alignSelf: 'flex-start', marginTop: 10, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 6, backgroundColor: '#3f47d6'},
+  lookupButtonText: {fontSize: 11, color: '#fff', fontWeight: '800'},
+  identifyResult: {marginTop: 12, padding: 12, borderWidth: 1, borderRadius: 6},
+  identifyMatched: {backgroundColor: '#eff8f2', borderColor: '#b9dfc8'},
+  identifyUnknown: {backgroundColor: '#fff8e8', borderColor: '#ecd79c'},
+  identifyWarning: {backgroundColor: '#fff0f0', borderColor: '#ebc0c4'},
+  identifyResultTitle: {fontSize: 13, color: '#25294f', fontWeight: '800'},
+  photoPanel: {marginTop: 14, padding: 16, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e3e6ee', borderRadius: 8},
+  photoRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10},
+  equipmentPhoto: {width: 145, gap: 4},
+  photoImage: {width: 145, height: 115, borderRadius: 6, backgroundColor: '#eef0f6'},
   eyebrow: {fontSize: 10, color: '#b8a5f8', fontWeight: '800', letterSpacing: 1.1},
   title: {fontSize: 24, color: '#fff', fontWeight: '800', marginTop: 7},
   subtitle: {fontSize: 12, color: '#d0d4e9', marginTop: 7},
@@ -696,7 +907,7 @@ const styles = StyleSheet.create({
   sectionTitle: {fontSize: 18, color: '#242d52', fontWeight: '800'},
   sectionCount: {fontSize: 12, color: '#73788c', fontWeight: '700'},
   tableScrollContent: {minWidth: '100%', paddingBottom: 4},
-  table: {minWidth: 1085, flexGrow: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: '#dfe3ee', borderRadius: 8, overflow: 'hidden'},
+  table: {minWidth: 1210, flexGrow: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: '#dfe3ee', borderRadius: 8, overflow: 'hidden'},
   tableHeader: {flexDirection: 'row', minHeight: 46, backgroundColor: '#eef1f8'},
   tableRow: {flexDirection: 'row', minHeight: 64, borderTopWidth: 1, borderTopColor: '#e9ecf3'},
   tableRowAlternate: {backgroundColor: '#fafbfe'},

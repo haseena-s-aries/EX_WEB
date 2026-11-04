@@ -4,9 +4,10 @@ import {Platform, TextInput, TouchableOpacity} from 'react-native';
 import SurveyorAreaDetailsScreen from '../src/screens/SurveyorAreaDetailsScreen';
 import {createSurveyorEquipment, getProjectAreaPhotos, getSurveyorArea, getSurveyorEquipment, updateSurveyorEquipment} from '../src/api/projects';
 
-jest.mock('../src/api/projects', () => ({getSurveyorArea: jest.fn(), getSurveyorEquipment: jest.fn(), getProjectAreaPhotos: jest.fn(), createSurveyorEquipment: jest.fn(), updateSurveyorEquipment: jest.fn(), deleteSurveyorEquipment: jest.fn()}));
+jest.mock('../src/api/projects', () => ({getSurveyorArea: jest.fn(), getSurveyorEquipment: jest.fn(), getSurveyorEquipmentPhotos: jest.fn().mockResolvedValue({data: []}), getProjectAreaPhotos: jest.fn(), createSurveyorEquipment: jest.fn(), updateSurveyorEquipment: jest.fn(), deleteSurveyorEquipment: jest.fn()}));
 jest.mock('../src/components/AuthenticatedImage', () => 'AuthenticatedImage');
 jest.mock('../src/components/ZoomableImageViewer', () => 'LayoutViewer');
+jest.mock('../src/components/InspectionPhotoPicker', () => 'InspectionPhotoPicker');
 const textOf = (node: Renderer.ReactTestInstance): string => node.children.map(child => typeof child === 'string' ? child : textOf(child)).join('');
 let renderer: Renderer.ReactTestRenderer;
 const originalPlatform = Platform.OS;
@@ -38,7 +39,7 @@ async function add() {
   const canvas = renderer.root.find(node => typeof node.props.onLayout === 'function' && Array.isArray(node.props.style) && node.props.style.some((style: any) => style?.aspectRatio));
   await Renderer.act(async () => {canvas.props.onLayout({nativeEvent: {layout: {width: 200, height: 100}}});});
   await Renderer.act(async () => {canvas.props.onPress({nativeEvent: {locationX: 50, locationY: 50}});});
-  await Renderer.act(async () => {renderer.root.findAllByType(TextInput)[0].props.onChangeText('D3232');});
+  await Renderer.act(async () => {renderer.root.findAllByType(TextInput).find(node => node.props.placeholder === 'Enter value')!.props.onChangeText('D3232');});
 }
 test('Add requires Type, offers the exact options, and preserves pin coordinates when saving', async () => {
   await open(); await add();
@@ -73,4 +74,14 @@ test('Native dropdown selects a type and saves through the same edit API', async
   await Renderer.act(async () => {renderer.root.findAllByType(TouchableOpacity).find(node => node.props.accessibilityLabel === 'Generator')!.props.onPress();});
   await press('Save Changes');
   expect(updateSurveyorEquipment).toHaveBeenCalledWith('project', 'area', 'equipment', expect.objectContaining({type: 'Generator'}));
+});
+
+test('Registers equipment in an assigned area without a layout pin', async () => {
+  (getSurveyorArea as jest.Mock).mockResolvedValue({data: {areaId: 'area', areaName: 'Deck', layoutImagePath: null}});
+  await open();
+  await press('+ Register Equipment');
+  await Renderer.act(async () => {renderer.root.findAllByType(TextInput).find(node => node.props.placeholder === 'Enter value')!.props.onChangeText('NEW-100');});
+  await select('Transformer');
+  await press('Add Equipment');
+  expect(createSurveyorEquipment).toHaveBeenCalledWith('project', 'area', expect.objectContaining({tagNumber: 'NEW-100', type: 'Transformer', isPlacedOnLayout: false, xPercent: 0, yPercent: 0}));
 });

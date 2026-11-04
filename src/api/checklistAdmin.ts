@@ -2,7 +2,8 @@ import apiClient from './client';
 
 export type ChecklistQuestionDraft = {
   text: string; sortOrder: number; sectionCode: 'Apparatus' | 'Installation' | 'Environment' | null; isRequired: boolean;
-  responseScaleCode: 'PassFailNA' | null; applicableProtectionTypes?: string | null; requireRemarkOnFail: boolean;
+  responseScaleCode: 'PassFailNA' | 'BooleanChecked' | null; applicableProtectionTypes?: string | null; requireRemarkOnFail: boolean;
+  sourceItemReference?: string | null; sourceItemNumber?: number | null; applicableGrades?: string | null; subChecksJson?: string | null;
   numericReadingEnabled: boolean; measurementUnit?: string | null; minimumReading?: number | null; maximumReading?: number | null; numericReadingRequired: boolean;
 };
 export type ChecklistTemplate = {
@@ -19,3 +20,5 @@ export const cloneChecklistTemplate = (id: string) => apiClient.post(`/v1/checkl
 export const submitChecklistTemplate = (id: string) => apiClient.post(`/v1/checklist-admin/templates/${id}/submit`);
 export const approveChecklistTemplate = (id: string, comments: string) => apiClient.post(`/v1/checklist-admin/templates/${id}/approve`, {comments});
 export const archiveChecklistTemplate = (id: string) => apiClient.post(`/v1/checklist-admin/templates/${id}/archive`);
+
+export const importSampleChecklist = () => apiClient.post("/v1/checklist-admin/imports/sample-pdf");

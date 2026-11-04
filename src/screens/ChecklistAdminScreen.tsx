@@ -1,7 +1,7 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {getApiErrorMessage} from '../api/errors';
-import {approveChecklistTemplate, archiveChecklistTemplate, ChecklistQuestionDraft, ChecklistTemplate, cloneChecklistTemplate, createChecklistTemplate, editChecklistTemplate, getChecklistTemplates, previewChecklistTemplate, submitChecklistTemplate} from '../api/checklistAdmin';
+import {importSampleChecklist, approveChecklistTemplate, archiveChecklistTemplate, ChecklistQuestionDraft, ChecklistTemplate, cloneChecklistTemplate, createChecklistTemplate, editChecklistTemplate, getChecklistTemplates, previewChecklistTemplate, submitChecklistTemplate} from '../api/checklistAdmin';
 
 const sections: ChecklistQuestionDraft['sectionCode'][] = ['Apparatus', 'Installation', 'Environment'];
 const blankQuestion = (sortOrder: number): ChecklistQuestionDraft => ({text: '', sortOrder, sectionCode: 'Apparatus', isRequired: true, responseScaleCode: 'PassFailNA', applicableProtectionTypes: null, requireRemarkOnFail: false, numericReadingEnabled: false, measurementUnit: null, minimumReading: null, maximumReading: null, numericReadingRequired: false});
@@ -56,9 +56,10 @@ export default function ChecklistAdminScreen({role}: {role: string}) {
     catch (e) {setError(getApiErrorMessage(e, 'Could not load checklist preview.'));}
   };
   const questionView = (q: ChecklistQuestionDraft, index: number) => <View key={`${q.sortOrder}-${index}`} style={{padding: 10, backgroundColor: '#fff', borderRadius: 7, gap: 5}}>
-    <Text style={{fontWeight: '700'}}>{q.sortOrder}. {q.text}</Text>
-    <Text style={{color: '#707589'}}>{q.sectionCode || 'Section not recorded (legacy)'} · {q.responseScaleCode || 'Response scale not recorded (legacy)'}{q.requireRemarkOnFail ? ' · Remark required on Fail' : ''}{q.numericReadingEnabled ? ` · ${q.measurementUnit || 'unit missing'} ${q.minimumReading ?? '—'}–${q.maximumReading ?? '—'}` : ''}</Text>
+    <Text style={{fontWeight: '700'}}>{q.sourceItemNumber ?? q.sortOrder}. {q.text}</Text>
+    <Text style={{color: '#707589'}}>{q.sectionCode || 'Section not recorded (legacy)'} · {q.responseScaleCode === 'BooleanChecked' ? 'Checked / unchecked' : q.responseScaleCode || 'Response scale not recorded (legacy)'}{q.requireRemarkOnFail ? ' · Remark required on Fail' : ''}{q.numericReadingEnabled ? ` · ${q.measurementUnit || 'unit missing'} ${q.minimumReading ?? '—'}–${q.maximumReading ?? '—'}` : ''}</Text>
     <Text style={{color: '#707589'}}>Applies to {q.applicableProtectionTypes || 'all configured Ex types'}</Text>
+    {!!q.applicableGrades && <Text style={{color: '#707589'}}>Source grades: {q.applicableGrades.split(',').join(', ')}</Text>}
   </View>;
 
   return <ScrollView contentContainerStyle={{padding: 22, gap: 12, maxWidth: 1100, width: '100%', alignSelf: 'center'}}>
@@ -78,6 +79,11 @@ export default function ChecklistAdminScreen({role}: {role: string}) {
       {field('Controlled source reference', form.controlledSourceReference, value => setForm(x => ({...x, controlledSourceReference: value})))}
       {field('Applicable Ex protection types, comma separated', form.applicableProtectionTypes, value => setForm(x => ({...x, applicableProtectionTypes: value})))}
       {button('Create draft', () => {void create();}, busy)}
+    </View>}
+    {!creating && !selected && ['Admin', 'Manager'].includes(role) && <View style={{padding: 14, gap: 8, borderWidth: 1, borderColor: '#d8ddea', backgroundColor: '#fff'}}>
+      <Text style={{fontWeight: '800'}}>Sample PDF checklist · 59 numbered points</Text>
+      <Text>23 Apparatus · 33 Installation · 3 Environment. Import creates grade-specific drafts and preserves existing inspections. Review and publish through technical approval.</Text>
+      {button('Import sample checklist drafts', () => {void run(importSampleChecklist, 'Sample drafts ready. Open each grade, review the mapping, and submit for independent technical approval.');}, busy)}
     </View>}
     {!creating && !selected && items.map(template => <TouchableOpacity key={template.id} accessibilityRole="button" onPress={() => open(template)} style={{padding: 14, borderWidth: 1, borderColor: '#e0e4ee', borderRadius: 9, backgroundColor: '#fff'}}>
       <Text style={{fontWeight: '800', color: '#252f50'}}>{template.name} · {template.inspectionType} · v{template.version}</Text>
@@ -105,11 +111,11 @@ export default function ChecklistAdminScreen({role}: {role: string}) {
             <Text style={{fontWeight: '700'}}>Checkpoint {i + 1}</Text>
             {field('Checkpoint text', q.text, value => patchQ(i, {text: value}))}
             <View style={{flexDirection: 'row', gap: 6, flexWrap: 'wrap'}}>{sections.map(section => <TouchableOpacity key={section} onPress={() => patchQ(i, {sectionCode: section})} style={{padding: 7, backgroundColor: q.sectionCode === section ? '#dce4ff' : '#f0f2f7', borderRadius: 6}}><Text>{section}</Text></TouchableOpacity>)}</View>
-            <Text style={{color:'#707589'}}>{q.responseScaleCode ? 'Responses: Pass / Fail / NA' : 'Legacy response scale is not recorded; explicitly select the supported scale for this draft.'}</Text>
+            <Text style={{color:'#707589'}}>{q.responseScaleCode === 'BooleanChecked' ? 'Responses: checked / unchecked' : q.responseScaleCode ? 'Responses: Pass / Fail / NA' : 'Legacy response scale is not recorded; explicitly select the supported scale for this draft.'}</Text>
             {!q.responseScaleCode && <TouchableOpacity onPress={()=>patchQ(i,{responseScaleCode:'PassFailNA'})}><Text style={{color:'#4053a0'}}>Select Pass / Fail / NA</Text></TouchableOpacity>}
             {field('Question Ex applicability (optional)', q.applicableProtectionTypes || '', value => patchQ(i, {applicableProtectionTypes: value || null}))}
             <TouchableOpacity onPress={() => patchQ(i, {isRequired: !q.isRequired})}><Text>{q.isRequired ? '☑ Required' : '☐ Optional'}</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => patchQ(i, {requireRemarkOnFail: !q.requireRemarkOnFail})}><Text>{q.requireRemarkOnFail ? '☑ Remark required on Fail' : '☐ Require remark on Fail'}</Text></TouchableOpacity>
+            {q.responseScaleCode === 'PassFailNA' && <TouchableOpacity onPress={() => patchQ(i, {requireRemarkOnFail: !q.requireRemarkOnFail})}><Text>{q.requireRemarkOnFail ? '☑ Remark required on Fail' : '☐ Require remark on Fail'}</Text></TouchableOpacity>}
             <TouchableOpacity onPress={() => patchQ(i, {numericReadingEnabled: !q.numericReadingEnabled, numericReadingRequired: false})}><Text>{q.numericReadingEnabled ? '☑ Numeric reading' : '☐ Add numeric reading'}</Text></TouchableOpacity>
             {q.numericReadingEnabled && <>
               {field('Measurement unit', q.measurementUnit || '', value => patchQ(i, {measurementUnit: value}))}

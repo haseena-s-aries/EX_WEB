@@ -439,6 +439,9 @@ import DashboardScreen from '../screens/DashboardScreen';
 import SurveyorDashboardScreen from '../screens/SurveyorDashboardScreen';
 import SurveyorProjectDetailsScreen from '../screens/SurveyorProjectDetailsScreen';
 import SurveyorAreaDetailsScreen from '../screens/SurveyorAreaDetailsScreen';
+import {NativeNfcScanner} from '../identification/equipmentScanner';
+import {decodeQrCodeImage} from '../identification/equipmentScanner';
+import {launchCamera} from 'react-native-image-picker';
 import SurveyorEquipmentDetailsScreen from '../screens/SurveyorEquipmentDetailsScreen';
 import SurveyorInspectionScreen from '../screens/SurveyorInspectionScreen';
 import InspectionActivityScreen from '../screens/InspectionActivityScreen';
@@ -754,6 +757,15 @@ export default function AppNavigator() {
 <SurveyorAreaDetailsScreen
                 projectId={route.params.projectId}
                 areaId={route.params.areaId}
+                onScanNfc={async () => ({identifier: (await new NativeNfcScanner().scan()).identifier})}
+                onScanQr={async () => {
+                  const capture = await launchCamera({mediaType: 'photo', cameraType: 'back', saveToPhotos: false});
+                  if (capture.didCancel) throw new Error('QR capture was cancelled.');
+                  if (capture.errorMessage) throw new Error(capture.errorMessage);
+                  const uri = capture.assets?.[0]?.uri;
+                  if (!uri) throw new Error('Camera did not return an image.');
+                  return {identifier: (await decodeQrCodeImage(uri)).identifier};
+                }}
                 onBack={() => navigation.goBack()}
                 onEquipmentPress={equipmentId =>
                   navigation.navigate('SurveyorEquipmentDetails', {
@@ -762,6 +774,7 @@ export default function AppNavigator() {
                     equipmentId,
                   })
                 }
+                onStartInspection={equipmentId => navigation.navigate('InspectionActivities', {equipmentId})}
                 onEquipmentAdded={() =>
                   setSurveyorRefreshVersion(version => version + 1)
                 }

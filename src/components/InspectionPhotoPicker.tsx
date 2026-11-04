@@ -16,6 +16,7 @@ const toPhotoFile = (asset: Asset): InspectionPhotoFile => ({
   uri: asset.uri,
   type: asset.type,
   fileName: asset.fileName,
+  webFile: (asset as any).file,
 });
 
 export default function InspectionPhotoPicker({disabled, onSelected}: Props) {

@@ -17,7 +17,7 @@ class MemoryStore implements OfflineStoreDriver {
   async setOfflinePassword(account:string,password:string){this.passwords.set(account,password);return true;}
   async verifyOfflinePassword(account:string,password:string){return this.passwords.get(account)===password;}
   async stats(){return {bytesUsed:0,recordCount:this.rows.size,maxBytes:1000000};}
-  async storePhoto(_account:string,id:string,uri:string){this.photos.set(id,uri);return true;}
+  async storePhoto(account:string,id:string,uri:string,mimeType='image/jpeg',fileName='photo.jpg',activityId='',checkpointResponseId?:string){this.photos.set(id,uri);this.rows.set(`${account}:${id}`,{id,type:'offline-photo',payload:JSON.stringify({id,mimeType,fileName,activityId,checkpointResponseId}),updatedAt:Date.now()});return true;}
   async exportPhoto(_account:string,id:string){const value=this.photos.get(id);if(!value)throw new Error('missing photo');return value;}
   async deleteExportedPhoto(){return true;}
   async storeDocument(account:string,id:string,base64:string,expectedSha256:string,_mimeType='application/pdf',_fileName='doc.pdf'){if(this.storageFull)throw new Error('OFFLINE_STORAGE_FULL');if(expectedSha256.toLowerCase()==='ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'&&base64!=='YWJj')throw new Error('Document integrity verification failed.');if(base64==='YWJj'&&expectedSha256.toLowerCase()!=='ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')throw new Error('Document integrity verification failed.');this.documents.set(id,{account,sha:expectedSha256,data:base64});return true;}
@@ -27,6 +27,7 @@ class MemoryStore implements OfflineStoreDriver {
 }
 
 const packageData={id:'pkg-1',ready:true,tasks:[{taskId:'task-1',ready:true,grade:'Visual',equipment:{equipmentId:'equipment-1'},checklist:{id:'checklist-1',version:3,questions:[{questionId:'question-1'}]}}]};
+const assignedPackage={...packageData,projectId:'project-1',downloadStatus:'Ready',tasks:[{...packageData.tasks[0],project:{id:'project-1'},area:{id:'area-1',name:'Area 1'},grade:'Visual',checklist:{...packageData.tasks[0].checklist,questions:[{questionId:'question-1'}]}}]};
 
 describe('offline inspection persistence and outbox',()=>{
   let store:MemoryStore;let service:OfflineInspectionService;let now:number;
@@ -92,6 +93,42 @@ describe('offline inspection persistence and outbox',()=>{
     expect(await store.list('second@example.test','outbox')).toHaveLength(0);
     expect(await service.drafts('first@example.test')).toHaveLength(1);
     expect(await store.list('first@example.test','outbox')).toHaveLength(1);
+  });
+
+  it('creates and restores an equipment registration draft without an RFID tag',async()=>{
+    const [pkg]=await service.downloadPackages('surveyor@example.test',[assignedPackage]);
+    const equipment=await service.createEquipmentDraft('surveyor@example.test',pkg,'area-1',{tagNumber:'NEW-001',type:'Junction Box',location:'Area 1'});
+    expect(equipment.rfidTagUid).toBeNull();expect(equipment.registrationStatus).toBe('Provisional');
+    const restarted=new OfflineInspectionService(store,()=>now);const restored=await restarted.equipmentDrafts('surveyor@example.test');
+    expect(restored).toHaveLength(1);expect(restored[0].clientEquipmentId).toBe(equipment.clientEquipmentId);expect(restored[0].tagNumber).toBe('NEW-001');
+  });
+
+  it('keeps a discovered-equipment inspection local until an authorized assigned task is downloaded, then syncs registration, evidence, and inspection in dependency order',async()=>{
+    const [pkg]=await service.downloadPackages('surveyor@example.test',[assignedPackage]);
+    const equipment=await service.createEquipmentDraft('surveyor@example.test',pkg,'area-1',{tagNumber:'NEW-002',type:'Motor',rfidTagUid:'04:ab:12:34',rfidIdentificationMethod:'NFC'});
+    const inspection=await service.createProvisionalInspection('surveyor@example.test',pkg,equipment,pkg.tasks[0]);
+    inspection.checkpoints=[{clientResponseId:'response-new',questionId:'question-1',responseCode:'Fail',observation:'Crack'}];
+    await service.saveDraft(inspection);await service.saveEquipmentPhoto(equipment,{uri:'file://nameplate.jpg',type:'image/jpeg',fileName:'nameplate.jpg'},'Nameplate');
+    await service.queue(inspection);
+    expect((await service.drafts('surveyor@example.test'))[0].localStatus).toBe('NeedsPlanningApproval');
+    expect(await store.list('surveyor@example.test','outbox')).toHaveLength(0);
+    const approvedAssignment={...pkg,tasks:[{...pkg.tasks[0],taskId:'approved-task',equipment:{...pkg.tasks[0].equipment,equipmentId:equipment.clientEquipmentId}}]};
+    await service.downloadPackages('surveyor@example.test',[approvedAssignment]);
+    const order:string[]=[];
+    const transport={registerEquipment:async(_p:string,_a:string,p:any,key:string)=>{order.push('equipment');expect(p.clientEquipmentId).toBe(equipment.clientEquipmentId);expect(key).toBe(equipment.clientEquipmentId);return {id:equipment.clientEquipmentId};},uploadEquipmentPhoto:async(_p:string,_a:string,_e:string,_photo:any,role:string)=>{order.push(`photo:${role}`);return {};},submit:async(payload:any)=>{order.push('activity');expect(payload.taskId).toBe('approved-task');return {accepted:true,serverActivityId:'server-activity',responseMap:{'response-new':'server-response'}};},uploadPhoto:async()=>({}),isAuthFailure:()=>false};
+    const result=await service.sync('surveyor@example.test',true,transport);
+    expect(result.sent).toBe(1);expect(order).toEqual(['equipment','photo:Nameplate','activity']);
+    expect((await service.equipmentDrafts('surveyor@example.test'))[0].registrationStatus).toBe('Synced');
+  });
+
+  it('retains equipment and activity data on a conflicting registration response',async()=>{
+    const [pkg]=await service.downloadPackages('surveyor@example.test',[assignedPackage]);
+    const equipment=await service.createEquipmentDraft('surveyor@example.test',pkg,'area-1',{tagNumber:'CONFLICT-1',type:'Motor'});
+    const activity=await service.createProvisionalInspection('surveyor@example.test',pkg,equipment,pkg.tasks[0]);activity.checkpoints=[{clientResponseId:'response-conflict',questionId:'question-1',responseCode:'Pass'}];await service.queue(activity);
+    const transport={registerEquipment:async()=>{throw {response:{status:409,data:{error:'Duplicate tag'}}};},submit:async()=>({accepted:true}),uploadPhoto:async()=>({}),isAuthFailure:()=>false};
+    const result=await service.sync('surveyor@example.test',true,transport);expect(result.pending).toBe(1);
+    expect((await service.equipmentDrafts('surveyor@example.test'))[0].registrationStatus).toBe('Conflict');
+    expect((await service.drafts('surveyor@example.test'))[0].checkpoints[0].responseCode).toBe('Pass');
   });
 
   it('requires all designated documents, verifies downloads, and keeps optional failures as warnings',async()=>{
