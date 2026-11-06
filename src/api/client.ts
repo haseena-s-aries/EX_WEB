@@ -6,10 +6,10 @@ const webConfig = (globalThis as typeof globalThis & {
 }).EX_SURVEY_CONFIG;
 
 const BASE_URL = Platform.select({
-  web: webConfig?.apiBaseUrl || 'https://139.5.189.155:441/api',
-  android: 'https://139.5.189.155:441/api',
-  ios: 'https://139.5.189.155:441/api',
-  default: 'https://139.5.189.155:441/api',
+  web: webConfig?.apiBaseUrl || 'https://139.5.189.155:338/api',
+  android: 'https://139.5.189.155:338/api',
+  ios: 'https://139.5.189.155:338/api',
+  default: 'https://139.5.189.155:338/api',
 });
 
 const apiClient = axios.create({

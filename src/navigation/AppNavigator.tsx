@@ -1,3 +1,4 @@
+import DefectRegisterScreen from '../screens/DefectRegisterScreen';
 // import ManagerQcReviewScreen from '../screens/ManagerQcReviewScreen';
 // import ReportsScreen from '../screens/ReportsScreen';
 // import useQcPendingCount from '../hooks/useQcPendingCount';
@@ -447,6 +448,7 @@ import SurveyorInspectionScreen from '../screens/SurveyorInspectionScreen';
 import InspectionActivityScreen from '../screens/InspectionActivityScreen';
 import OfflineInspectionScreen from '../screens/OfflineInspectionScreen';
 import ScanEquipmentScreen from '../screens/ScanEquipmentScreen';
+import EquipmentCategoryChecklistScreen from '../screens/EquipmentCategoryChecklistScreen';
 import AdminEquipmentListScreen from '../screens/AdminEquipmentListScreen';
 import EquipmentReferenceDocumentsPanel from '../components/EquipmentReferenceDocumentsPanel';
 import {offlineStoreAvailable} from '../offline/offlineInspectionStore';
@@ -620,8 +622,10 @@ export default function AppNavigator() {
 <Text style={styles.logoutText}>Log out</Text>
 </TouchableOpacity>
 </View>}
+              {currentUser && ['admin', 'manager', 'surveyor', 'qc'].includes(currentUser.role.toLowerCase()) && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('DefectRegister')} style={styles.logoutButton}><Text style={styles.logoutText}>Defects</Text></TouchableOpacity>}
               {currentUser && currentUser.role.toLowerCase() !== 'client' && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('Reports')} style={styles.logoutButton}><Text style={styles.logoutText}>Reports</Text></TouchableOpacity>}
-              {(currentUser?.role === 'Manager' || currentUser?.role === 'Admin') && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('EquipmentRegister')} style={styles.logoutButton}><Text style={styles.logoutText}>Equipment documents</Text></TouchableOpacity>}
+              {['Admin','Surveyor'].includes(currentUser?.role ?? '') && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('ChecklistAdmin')} style={styles.logoutButton}><Text style={styles.logoutText}>Checklists</Text></TouchableOpacity>}
+              {['Manager', 'Admin', 'Surveyor'].includes(currentUser?.role ?? '') && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('EquipmentRegister')} style={styles.logoutButton}><Text style={styles.logoutText}>HAER</Text></TouchableOpacity>}
               {currentUser && currentUser.role.toLowerCase() !== 'client' && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('EquipmentIdentification')} style={styles.logoutButton}><Text style={styles.logoutText}>Scan equipment</Text></TouchableOpacity>}
               {offlineStoreAvailable && currentUser?.role?.toLowerCase()==='surveyor' && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('OfflineInspections')} style={styles.logoutButton}><Text style={styles.logoutText}>Offline inspections</Text></TouchableOpacity>}
               {(currentUser?.role === 'Manager' || currentUser?.role === 'Admin') && (
@@ -677,14 +681,20 @@ export default function AppNavigator() {
           )}
 </Stack.Screen>
         {offlineStoreAvailable && currentUser?.role?.toLowerCase()==='surveyor' && <Stack.Screen name="OfflineInspections">{({navigation})=><SafeAreaView style={styles.dashboardShell}><OfflineInspectionScreen accountId={currentUser.email||currentUser.id||''} onBack={()=>navigation.goBack()} /></SafeAreaView>}</Stack.Screen>}
+        <Stack.Screen name="DefectRegister">
+          {({navigation}) => <DefectRegisterScreen role={currentUser?.role} onBack={() => navigation.goBack()}/>}
+        </Stack.Screen>
         <Stack.Screen name="EquipmentIdentification">
           {({navigation}:any)=><SafeAreaView style={styles.dashboardShell}><ScanEquipmentScreen accountId={currentUser?.email||currentUser?.id||''} role={currentUser?.role||''} online={!!currentUser} onBack={()=>navigation.goBack()} onOpenInspection={equipmentId=>navigation.navigate('InspectionActivities',{equipmentId})} onOpenOffline={()=>navigation.navigate('OfflineInspections')} /></SafeAreaView>}
         </Stack.Screen>
+        <Stack.Screen name="ChecklistAdmin">
+          {({navigation}) => <EquipmentCategoryChecklistScreen canManageCatalog={currentUser?.role === 'Admin'} onBack={() => navigation.goBack()}/>}
+        </Stack.Screen>
         <Stack.Screen name="EquipmentRegister">
-          {({navigation}: any) => <SafeAreaView style={styles.dashboardShell}><AdminEquipmentListScreen onEquipmentPress={projectId => navigation.navigate('ProjectDetails', {projectId})} onDocumentsPress={row=>navigation.navigate('EquipmentDocuments', {projectId:row.projectId,areaId:row.areaId,equipmentId:row.id})}/></SafeAreaView>}
+          {({navigation}: any) => <SafeAreaView style={styles.dashboardShell}><AdminEquipmentListScreen creationOnly={currentUser?.role === 'Surveyor'} onEquipmentPress={projectId => navigation.navigate(currentUser?.role === 'Surveyor' ? 'SurveyorProjectDetails' : 'ProjectDetails', {projectId})} onDocumentsPress={row=>navigation.navigate('EquipmentDocuments', {projectId:row.projectId,areaId:row.areaId,equipmentId:row.id})}/></SafeAreaView>}
         </Stack.Screen>
         <Stack.Screen name="EquipmentDocuments">
-          {({navigation,route}:any) => <SafeAreaView style={styles.dashboardShell}><ScrollView contentContainerStyle={{padding:16}}><TouchableOpacity accessibilityRole="button" onPress={()=>navigation.goBack()} style={{padding:10}}><Text style={{color:'#334477',fontWeight:'700'}}>‹ Back to equipment register</Text></TouchableOpacity><EquipmentReferenceDocumentsPanel projectId={route.params.projectId} areaId={route.params.areaId} equipmentId={route.params.equipmentId} role={currentUser?.role}/></ScrollView></SafeAreaView>}
+          {({navigation,route}:any) => <SafeAreaView style={styles.dashboardShell}><ScrollView contentContainerStyle={{padding:16}}><TouchableOpacity accessibilityRole="button" onPress={()=>navigation.goBack()} style={{padding:10}}><Text style={{color:'#334477',fontWeight:'700'}}>‹ Back to HAER</Text></TouchableOpacity><EquipmentReferenceDocumentsPanel projectId={route.params.projectId} areaId={route.params.areaId} equipmentId={route.params.equipmentId} role={currentUser?.role}/></ScrollView></SafeAreaView>}
         </Stack.Screen>
  
         <Stack.Screen name="Reports">
@@ -810,6 +820,7 @@ export default function AppNavigator() {
           {({navigation, route}: any) => (
 <SafeAreaView style={styles.dashboardShell}>
 <SurveyorInspectionScreen
+              projectId={route.params.projectId}
                 equipmentId={route.params.equipmentId}
                 inspectorName={currentUser?.displayName || 'Surveyor'}
                 onBack={() => navigation.goBack()}

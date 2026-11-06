@@ -70,7 +70,7 @@
 //     'Dashboard' | 'QcProjects' | 'QcPending'
 //   >('Dashboard');
 //   const [selectedEquipmentId, setSelectedEquipmentId] = useState('');
-//   const [projectDetailsReturnScreen, setProjectDetailsReturnScreen] = useState<'Dashboard' | 'Projects'>('Dashboard');
+//   const [projectDetailsReturnScreen, setProjectDetailsReturnScreen] = useState<'Dashboard' | 'Projects' | 'AdminEquipmentList'>('Dashboard');
 //   const [surveyorRefreshVersion, setSurveyorRefreshVersion] = useState(0);
 //   const themeMode = useThemeMode();
 //   const styles = useMemo(() => makeStyles(themeMode === 'dark' ? DARK : LIGHT), [themeMode]);
@@ -207,7 +207,7 @@
 //     const SECTION_TITLES: Record<AppTab, string> = {
 //       Home: 'Home',
 //       Surveys: 'Surveys',
-//       Equipment: 'Equipment',
+//       Equipment: 'HAER',
 //       Reports: 'Reports',
 //       QCPending: 'QC Pending',
 //       QCReview: 'QC Review',
@@ -690,6 +690,7 @@ import SurveyorInspectionScreen from '../screens/SurveyorInspectionScreen';
 import InspectionActivityScreen from '../screens/InspectionActivityScreen';
 import ScanEquipmentScreen from '../screens/ScanEquipmentScreen.web';
 import DefectRegisterScreen from '../screens/DefectRegisterScreen';
+import EquipmentCategoryChecklistScreen from '../screens/EquipmentCategoryChecklistScreen';
 import ChecklistAdminScreen from '../screens/ChecklistAdminScreen';
 import InspectionPlanningScreen from '../screens/InspectionPlanningScreen';
 import UserManagementScreen from '../screens/UserManagementScreen';
@@ -697,6 +698,7 @@ import QcDashboardScreen from '../screens/QcDashboardScreen';
 import QcProjectDetailsScreen from '../screens/QcProjectDetailsScreen';
 import ProjectDetailsScreen from '../screens/ProjectDetailsScreen';
 import Sidebar from '../components/Sidebar';
+import AdminWorkspaceHeader from '../components/AdminWorkspaceHeader';
 import NotificationBell from '../components/NotificationBell';
 import type {AppNotification} from '../notifications/notifications';
 import {sendOtp, verifyOtp, completeRegistration, loginUser} from '../api/auth';
@@ -754,11 +756,12 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
 >('Dashboard');
   const [selectedEquipmentId, setSelectedEquipmentId] = useState('');
   const [selectedActivityId, setSelectedActivityId] = useState('');
-  const [projectDetailsReturnScreen, setProjectDetailsReturnScreen] = useState<'Dashboard' | 'Projects'>('Dashboard');
+  const [projectDetailsReturnScreen, setProjectDetailsReturnScreen] = useState<'Dashboard' | 'Projects' | 'AdminEquipmentList'>('Dashboard');
   const [surveyorRefreshVersion, setSurveyorRefreshVersion] = useState(0);
   const themeMode = useThemeMode();
   const styles = useMemo(() => makeStyles(themeMode === 'dark' ? DARK : LIGHT), [themeMode]);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [workspaceTone, setWorkspaceTone] = useState<'Navy' | 'Blue'>('Navy');
   const qcPendingCount = useQcPendingCount(currentUser, screen);
   if (screen === 'Otp') {
     return (
@@ -880,6 +883,7 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
     const activeTab: AppTab =
       screen === 'QcPending' || (screen === 'QcProjectDetails' && qcProjectReturnScreen === 'QcPending')
         ? 'QCPending'
+        : screen === 'ChecklistAdmin' ? 'Checklists'
         : screen === 'Reports' ? 'Reports'
         : screen === 'ManagerQcReview'
         ? 'QCReview'
@@ -895,7 +899,8 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
       setSelectedAreaId('');
       setSelectedEquipmentId('');
       setScreen(
-        tab === 'Reports' ? 'Reports'
+        tab === 'Checklists' ? 'ChecklistAdmin'
+          : tab === 'Reports' ? 'Reports'
           : tab === 'QCPending'
           ? 'QcPending'
           : tab === 'QCReview'
@@ -912,8 +917,9 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
     const SECTION_TITLES: Record<AppTab, string> = {
       Home: 'Home',
       Surveys: 'Surveys',
-      Equipment: 'Equipment',
+      Equipment: 'HAER',
       Reports: 'Reports',
+      Checklists: 'Checklists',
       QCPending: 'QC Pending',
       QCReview: 'QC Review',
       User: 'User Management',
@@ -1048,6 +1054,12 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
 <Text style={[styles.mobileNavText, screen === 'InspectionPlanning' && styles.mobileNavTextActive]}>Planning</Text>
 </TouchableOpacity>
               )}
+              {currentUser.role.toLowerCase() === 'surveyor' && <TouchableOpacity onPress={() => setScreen('AdminEquipmentList')} style={[styles.mobileNavItem, screen === 'AdminEquipmentList' && styles.mobileNavItemActive]}>
+                <Text style={[styles.mobileNavText, screen === 'AdminEquipmentList' && styles.mobileNavTextActive]}>HAER</Text>
+              </TouchableOpacity>}
+              {['admin','manager','qc','surveyor'].includes(currentUser.role.toLowerCase()) && <TouchableOpacity onPress={() => setScreen('ChecklistAdmin')} style={[styles.mobileNavItem, screen === 'ChecklistAdmin' && styles.mobileNavItemActive]}>
+                <Text style={styles.mobileNavText}>Checklist</Text>
+              </TouchableOpacity>}
               <TouchableOpacity onPress={() => setScreen('EquipmentIdentification')} style={[styles.mobileNavItem, String(screen)==='EquipmentIdentification'&&styles.mobileNavItemActive]}><Text style={[styles.mobileNavText,String(screen)==='EquipmentIdentification'&&styles.mobileNavTextActive]}>Scan</Text></TouchableOpacity>
 </View>
 </View>
@@ -1068,7 +1080,8 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
             userName={currentUser.name}
             userRole={currentUser.role}
             qcPendingCount={qcPendingCount}
-            notification={bell(true, true)}
+            workspaceColor={canManageUsers ? (workspaceTone === 'Navy' ? '#0d1928' : '#16375a') : undefined}
+            notification={canManageUsers ? undefined : bell(true, true)}
             onNavigate={key => {
               if (key === 'QcPending') {
                 if (canManageUsers || currentUser.role.toLowerCase() === 'qc') setScreen('QcPending');
@@ -1078,10 +1091,11 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
                 if (canManageUsers) setScreen('ManagerQcReview');
                 return;
               }
+              if (key === 'AdminEquipmentList' && (canManageUsers || currentUser.role.toLowerCase() === 'surveyor')) {setScreen('AdminEquipmentList'); return;}
               if (key === 'DefectRegister') {setScreen('DefectRegister'); return;}
               if (key === 'EquipmentIdentification') {setScreen('EquipmentIdentification'); return;}
               if (key === 'InspectionPlanning') {if (['admin','manager','qc','surveyor'].includes(currentUser.role.toLowerCase())) setScreen('InspectionPlanning'); return;}
-              if (key === 'ChecklistAdmin') {if (['admin','manager','qc'].includes(currentUser.role.toLowerCase())) setScreen('ChecklistAdmin'); return;}
+              if (key === 'ChecklistAdmin') {if (['admin','manager','qc','surveyor'].includes(currentUser.role.toLowerCase())) setScreen('ChecklistAdmin'); return;}
               if (key === 'Dashboard' || key === 'Projects' || key === 'UserManagement' || key === 'Reports') {
                 if (key === 'UserManagement' && !canManageUsers) return;
                 if (key === 'Projects' && currentUser.role.toLowerCase() === 'qc') {
@@ -1098,7 +1112,15 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
           />
         )}
 <View style={styles.mainContent}>
-            {String(screen)==='EquipmentIdentification'?<ScanEquipmentScreen accountId={currentUser.email||currentUser.id||''} role={currentUser.role} online onBack={()=>setScreen('Dashboard')} onOpenInspection={equipmentId=>{setSelectedEquipmentId(equipmentId);setScreen('InspectionActivities');}} onOpenOffline={()=>setScreen('Dashboard')} /> : String(screen) === 'InspectionPlanning' ? <InspectionPlanningScreen role={currentUser.role} /> : String(screen) === 'ChecklistAdmin' ? <ChecklistAdminScreen role={currentUser.role} /> : String(screen) === 'DefectRegister' ? <DefectRegisterScreen role={currentUser.role} /> : screen === 'Reports' ? <ReportsScreen role={currentUser.role} /> : screen === 'QcPending' && (canManageUsers || currentUser.role.toLowerCase() === 'qc') ? (
+          {canManageUsers && !isMobile && <AdminWorkspaceHeader
+            title={screen === 'Dashboard' ? 'Dashboard' : screen === 'InspectionPlanning' ? 'Planning' : screen === 'EquipmentIdentification' ? 'Scan equipment' : screen === 'DefectRegister' ? 'Defects' : screen === 'ChecklistAdmin' ? 'Checklists' : screen === 'UserManagement' ? 'User Management' : SECTION_TITLES[activeTab]}
+            tone={workspaceTone}
+            onTone={setWorkspaceTone}
+            colors={tc}
+            notification={bell(true)}
+            onProject={id => {setSelectedProjectId(id); setSelectedAreaId(''); setSelectedEquipmentId(''); setScreen('ProjectDetails');}}
+          />}
+            {String(screen)==='EquipmentIdentification'?<ScanEquipmentScreen accountId={currentUser.email||currentUser.id||''} role={currentUser.role} online onBack={()=>setScreen('Dashboard')} onOpenInspection={equipmentId=>{setSelectedEquipmentId(equipmentId);setScreen('InspectionActivities');}} onOpenOffline={()=>setScreen('Dashboard')} /> : String(screen) === 'InspectionPlanning' ? <InspectionPlanningScreen role={currentUser.role} /> : String(screen) === 'ChecklistAdmin' ? (['admin','surveyor'].includes(currentUser.role.toLowerCase()) ? <EquipmentCategoryChecklistScreen canManageCatalog={currentUser.role.toLowerCase() === 'admin'} /> : <ChecklistAdminScreen role={currentUser.role} />) : String(screen) === 'DefectRegister' ? <DefectRegisterScreen role={currentUser.role} /> : screen === 'Reports' ? <ReportsScreen role={currentUser.role} /> : screen === 'QcPending' && (canManageUsers || currentUser.role.toLowerCase() === 'qc') ? (
 <QcDashboardScreen pendingWorkspace userName={currentUser.name}
               onActivityPress={id => {setSelectedActivityId(id); setScreen('InspectionActivityDetail');}}
               onProjectPress={(id, project) => {
@@ -1153,6 +1175,8 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
 <DashboardScreen
               userName={currentUser.name}
               userRole={currentUser.role}
+              workspace={canManageUsers}
+              onViewProjects={() => setScreen('Projects')}
               showBrand={adminMobile}
               menuButton={adminMobile ? <MenuButton c={tc} onPress={() => setMenuOpen(true)} badge={canManageUsers ? qcPendingCount : 0} /> : undefined}
               accessory={adminMobile ? bell(true) : undefined}
@@ -1255,6 +1279,7 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
 <InspectionActivityScreen activityId={selectedActivityId} role={currentUser.role} onBack={() => setScreen('QcPending')} />
           ) : screen === 'SurveyorInspection' && selectedEquipmentId ? (
 <SurveyorInspectionScreen
+              projectId={selectedProjectId}
               equipmentId={selectedEquipmentId}
               inspectorName={currentUser.name || 'Surveyor'}
               onBack={() => setScreen('SurveyorEquipmentDetails')}
@@ -1264,14 +1289,16 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
             />
           ) : String(screen) === 'AdminEquipmentList' ? (
 <AdminEquipmentListScreen
+              creationOnly={!canManageUsers}
               onEquipmentPress={projectId => {
                 setSelectedProjectId(projectId);
-                setScreen('ProjectDetails');
+                setProjectDetailsReturnScreen('AdminEquipmentList');
+                setScreen(canManageUsers ? 'ProjectDetails' : 'SurveyorProjectDetails');
               }}
               onDocumentsPress={row=>{setSelectedProjectId(row.projectId);setSelectedAreaId(row.areaId);setSelectedEquipmentId(row.id);setScreen('EquipmentDocuments');}}
             />
           ) : String(screen) === 'EquipmentDocuments' && selectedProjectId && selectedAreaId && selectedEquipmentId ? (
-<View style={{flex:1,padding:20,backgroundColor:'#fff'}}><TouchableOpacity accessibilityRole="button" onPress={()=>setScreen('AdminEquipmentList')} style={{alignSelf:'flex-start',padding:10}}><Text style={{color:'#334477',fontWeight:'700'}}>‹ Back to equipment register</Text></TouchableOpacity><EquipmentReferenceDocumentsPanel projectId={selectedProjectId} areaId={selectedAreaId} equipmentId={selectedEquipmentId} role={currentUser?.role}/></View>
+<View style={{flex:1,padding:20,backgroundColor:'#fff'}}><TouchableOpacity accessibilityRole="button" onPress={()=>setScreen('AdminEquipmentList')} style={{alignSelf:'flex-start',padding:10}}><Text style={{color:'#334477',fontWeight:'700'}}>‹ Back to HAER</Text></TouchableOpacity><EquipmentReferenceDocumentsPanel projectId={selectedProjectId} areaId={selectedAreaId} equipmentId={selectedEquipmentId} role={currentUser?.role}/></View>
           ) : screen === 'UserManagement' ? (
 <UserManagementScreen onBack={() => setScreen('Dashboard')} />
           ) : (

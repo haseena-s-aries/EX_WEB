@@ -5,14 +5,15 @@ import {setThemeMode, useThemeMode} from '../theme/useThemeMode';
 
 const ARIES_LOGO = require('../assets/aries-logo.png');
 
-export type AppTab = 'Home' | 'Surveys' | 'Equipment' | 'User' | 'QCReview' | 'QCPending' | 'Reports';
+export type AppTab = 'Home' | 'Surveys' | 'Equipment' | 'User' | 'QCReview' | 'QCPending' | 'Reports' | 'Checklists';
 
 type Item = {key: AppTab; label: string; hint: string; glyph: string; tone: keyof Colors};
 
 const WORKSPACE: Item[] = [
   {key: 'Home', label: 'Home', hint: 'Dashboard & site operations', glyph: '⌂', tone: 'amber'},
   {key: 'Surveys', label: 'Surveys', hint: 'Projects and areas', glyph: '▤', tone: 'cyan'},
-  {key: 'Equipment', label: 'Equipment', hint: 'Verified items & status', glyph: '⬡', tone: 'indigo'},
+  {key: 'Equipment', label: 'HAER', hint: 'Verified items & status', glyph: '⬡', tone: 'indigo'},
+  {key: 'Checklists', label: 'Checklists', hint: 'Equipment checkpoint categories', glyph: '☑', tone: 'cyan'},
   {key: 'Reports', label: 'Reports', hint: 'Inspection reports', glyph: '↗', tone: 'success'},
 ];
 const QUALITY: Item[] = [

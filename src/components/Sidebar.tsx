@@ -19,7 +19,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   {key: 'Dashboard', label: 'Home', hint: 'Dashboard & site operations', icon: '⌂', tone: 'amber'},
   {key: 'Projects', label: 'Surveys', hint: 'Projects and areas', icon: '▤', tone: 'cyan'},
-  {key: 'AdminEquipmentList', label: 'Equipment', hint: 'Equipment register and reference documents', icon: '⬡', tone: 'indigo', adminOnly: true},
+  {key: 'AdminEquipmentList', label: 'HAER', hint: 'Equipment register and reference documents', icon: '⬡', tone: 'indigo', adminOnly: true},
   {key: 'EquipmentIdentification', label: 'Scan equipment', hint: 'RFID, NFC, QR and manual lookup', icon: '⌕', tone: 'indigo', adminOnly: true},
   {key: 'InspectionPlanning', label: 'Planning', hint: 'Campaigns and work packages', icon: '◷', tone: 'amber', adminOnly: true},
   {key: 'DefectRegister', label: 'Defects', hint: 'Rectification and verification', icon: '⚠', tone: 'amber', adminOnly: true},
@@ -32,6 +32,7 @@ const NAV_ITEMS: NavItem[] = [
 
 type Props = {
   active: string;
+  workspaceColor?: string;
   userName: string;
   userRole: string;
   onNavigate: (key: string) => void;
@@ -43,7 +44,7 @@ type Props = {
 
 const web = (style: object) => Platform.select({web: style, default: {}}) as object;
 
-export default function Sidebar({active, userName, userRole, onNavigate, onLogout, qcPendingCount, notification}: Props) {
+export default function Sidebar({active, userName, userRole, onNavigate, onLogout, qcPendingCount, notification, workspaceColor}: Props) {
   const isAdminOrManager = userRole === 'Admin' || userRole === 'Manager';
   const dark = useThemeMode() === 'dark';
   const c: Colors = dark ? DARK : LIGHT;
@@ -51,7 +52,7 @@ export default function Sidebar({active, userName, userRole, onNavigate, onLogou
   const items = useMemo(
     () =>
       NAV_ITEMS.filter(
-        item => !item.adminOnly || isAdminOrManager || (item.key === 'EquipmentIdentification' && ['qc','surveyor'].includes(userRole.toLowerCase())) || (item.key === 'QcPending' && userRole.toLowerCase() === 'qc') || (item.key === 'ChecklistAdmin' && userRole.toLowerCase() === 'qc') || (item.key === 'InspectionPlanning' && ['qc', 'surveyor'].includes(userRole.toLowerCase())) || (item.key === 'DefectRegister' && ['qc', 'surveyor'].includes(userRole.toLowerCase())),
+        item => !item.adminOnly || isAdminOrManager || (['AdminEquipmentList','ChecklistAdmin'].includes(item.key) && userRole.toLowerCase() === 'surveyor') || (item.key === 'EquipmentIdentification' && ['qc','surveyor'].includes(userRole.toLowerCase())) || (item.key === 'QcPending' && userRole.toLowerCase() === 'qc') || (item.key === 'ChecklistAdmin' && userRole.toLowerCase() === 'qc') || (item.key === 'InspectionPlanning' && ['qc', 'surveyor'].includes(userRole.toLowerCase())) || (item.key === 'DefectRegister' && ['qc', 'surveyor'].includes(userRole.toLowerCase())),
       ),
     [isAdminOrManager, userRole],
   );
@@ -60,25 +61,25 @@ export default function Sidebar({active, userName, userRole, onNavigate, onLogou
     <View
       style={[
         {
-          width: 272,
-          backgroundColor: dark ? c.bar : c.card,
+          width: workspaceColor ? 280 : 272,
+          backgroundColor: workspaceColor || (dark ? c.bar : c.card),
           borderRightWidth: 1,
-          borderRightColor: c.border,
+          borderRightColor: workspaceColor ? '#263648' : c.border,
           flexShrink: 0,
         },
         // Fixed to the viewport so the sidebar keeps its size however long the page grows.
         web({boxShadow: c.shadow, position: 'sticky', top: 0, height: '100vh', alignSelf: 'flex-start'}),
       ]}>
       {/* amber safety stripe */}
-      <View style={{height: 4, backgroundColor: c.amber}} />
+      {!workspaceColor && <View style={{height: 4, backgroundColor: c.amber}} />}
 
       {/* brand */}
-      <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 14}}>
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingTop: 24, paddingBottom: 22, borderBottomWidth: workspaceColor ? 1 : 0, borderBottomColor: '#263648'}}>
         <View style={{width: 78, height: 44, borderRadius: 8, backgroundColor: '#FFFFFF', padding: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}}>
           <Image source={ARIES_LOGO} style={{width: '100%', height: '100%'}} resizeMode="contain" accessibilityLabel="Aries logo" />
         </View>
         <View style={{flex: 1}}>
-          <Text style={{color: c.text, fontSize: 20, fontWeight: '800'}}>Ex-Survey</Text>
+          <Text style={{color: workspaceColor ? '#ffffff' : c.text, fontSize: 20, fontWeight: '800'}}>Ex-Survey</Text>
           {/* <Text style={{color: c.secondary, fontSize: 9.5, fontWeight: '700', letterSpacing: 1.2, marginTop: 1}}>
             ATEX & IECEx INSPECTIONS
           </Text> */}
@@ -108,41 +109,41 @@ export default function Sidebar({active, userName, userRole, onNavigate, onLogou
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 12,
-                    paddingVertical: 10,
+                    paddingVertical: workspaceColor ? 6 : 10,
                     paddingHorizontal: 10,
-                    borderRadius: 14,
+                    borderRadius: workspaceColor ? 8 : 14,
                     borderWidth: 1,
-                    borderColor: on ? tint(c.amber, '55') : 'transparent',
-                    backgroundColor: on ? tint(c.amber, dark ? '1F' : '17') : 'transparent',
+                    borderColor: on && !workspaceColor ? tint(c.amber, '55') : 'transparent',
+                    backgroundColor: on ? (workspaceColor ? '#ffffff17' : tint(c.amber, dark ? '1F' : '17')) : 'transparent',
                   },
                   web({cursor: 'pointer'}),
                 ]}>
-                {on ? (
+                {on && !workspaceColor ? (
                   <View style={{position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: 2, backgroundColor: c.amber}} />
                 ) : null}
                 <View
                   style={{
-                    width: 40,
-                    height: 40,
+                    width: workspaceColor ? 24 : 40,
+                    height: workspaceColor ? 32 : 40,
                     borderRadius: 12,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: tint(toneColor, dark ? '26' : '1A'),
+                    backgroundColor: workspaceColor ? 'transparent' : tint(toneColor, dark ? '26' : '1A'),
                   }}>
-                  <Text style={{fontSize: 19, color: toneColor}}>{item.icon}</Text>
+                  <Text style={{fontSize: 19, color: workspaceColor ? (on ? '#f59e0b' : '#b9c7d8') : toneColor}}>{item.icon}</Text>
                 </View>
                 <View style={{flex: 1, minWidth: 0}}>
-                  <Text numberOfLines={1} style={{fontSize: 15, fontWeight: on ? '800' : '700', color: on ? accentText : c.text}}>
+                  <Text numberOfLines={1} style={{fontSize: 15, fontWeight: on ? '800' : '700', color: workspaceColor ? (on ? '#ffffff' : '#c6d3e2') : on ? accentText : c.text}}>
                     {item.label}
                   </Text>
-                  <Text numberOfLines={1} style={{fontSize: 11.5, color: c.muted, marginTop: 1}}>
+                  {!workspaceColor && <Text numberOfLines={1} style={{fontSize: 11.5, color: c.muted, marginTop: 1}}>
                     {item.hint}
-                  </Text>
+                  </Text>}
                 </View>
                 {isQc ? (
                   <QcPendingBadge count={qcPendingCount} active={on} />
                 ) : (
-                  <Text style={{fontSize: 18, color: on ? c.amber : c.border}}>›</Text>
+                  workspaceColor ? (on ? <View style={{width: 7, height: 7, borderRadius: 4, backgroundColor: '#f59e0b'}} /> : null) : <Text style={{fontSize: 18, color: on ? c.amber : c.border}}>›</Text>
                 )}
               </TouchableOpacity>
             );
@@ -151,7 +152,8 @@ export default function Sidebar({active, userName, userRole, onNavigate, onLogou
       </ScrollView>
 
       {/* footer: theme + logout */}
-      <View style={{borderTopWidth: 1, borderTopColor: c.border, padding: 14, gap: 10}}>
+      <View style={{borderTopWidth: 1, borderTopColor: workspaceColor ? '#263648' : c.border, padding: 14, gap: 10}}>
+        {workspaceColor && <Text style={{color: '#c6d3e2', fontWeight: '700', paddingHorizontal: 8}}>{userName} · {userRole}</Text>}
         <TouchableOpacity
           activeOpacity={0.8}
           accessibilityRole="switch"

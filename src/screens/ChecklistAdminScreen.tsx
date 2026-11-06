@@ -8,7 +8,7 @@ const blankQuestion = (sortOrder: number): ChecklistQuestionDraft => ({text: '',
 type TemplateForm = {name: string; grade: 'Visual' | 'Close' | 'Detailed'; standardReference: string; standardEdition: string; controlledSourceReference: string; applicableProtectionTypes: string};
 const blank: TemplateForm = {name: '', grade: 'Visual', standardReference: '', standardEdition: '', controlledSourceReference: '', applicableProtectionTypes: ''};
 
-export default function ChecklistAdminScreen({role}: {role: string}) {
+export default function ChecklistAdminScreen({role, onBack}: {role: string; onBack?: () => void}) {
   const [items, setItems] = useState<ChecklistTemplate[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [creating, setCreating] = useState(false);
@@ -62,9 +62,11 @@ export default function ChecklistAdminScreen({role}: {role: string}) {
     {!!q.applicableGrades && <Text style={{color: '#707589'}}>Source grades: {q.applicableGrades.split(',').join(', ')}</Text>}
   </View>;
 
+
   return <ScrollView contentContainerStyle={{padding: 22, gap: 12, maxWidth: 1100, width: '100%', alignSelf: 'center'}}>
     <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap'}}>
       <View><Text style={{fontSize: 24, fontWeight: '800', color: '#242d52'}}>Checklist administration</Text><Text style={{color: '#707589'}}>Draft → technical approval → publish. Use approved controlled checklist content.</Text></View>
+      {onBack && button('Back', onBack)}
       {button(creating ? 'Cancel' : 'New checklist', () => {setCreating(!creating); setSelectedId(''); setForm(blank); setQuestions([]);})}
     </View>
     {!!error && <Text accessibilityRole="alert" style={{color: '#a32929'}}>{error}</Text>}

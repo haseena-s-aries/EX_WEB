@@ -1,3 +1,4 @@
+import CategoryInspectionEntryScreen from './CategoryInspectionEntryScreen';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
@@ -35,6 +36,7 @@ import InspectionPhotoPicker from '../components/InspectionPhotoPicker';
 
 type Props = {
   equipmentId: string;
+  projectId?: string;
   inspectorName: string;
   onBack: () => void;
   onSaved: () => void;
@@ -61,12 +63,22 @@ const TABS: InspectionType[] = ['Visual', 'Close', 'Detailed'];
 const today = () => new Date().toISOString().slice(0, 10);
 const toApiDate = (date: string) => `${date}T00:00:00Z`;
 
-export default function SurveyorInspectionScreen({
+export default function SurveyorInspectionScreen(props: Props) {
+  const {projectId, equipmentId} = props;
+  const [showHistory, setShowHistory] = useState(false);
+  if (projectId && !showHistory) return <CategoryInspectionEntryScreen project={projectId} item={equipmentId}
+    onBack={props.onBack} onSaved={props.onSaved} onLegacy={() => setShowHistory(true)}/>;
+  return <GradeBasedInspectionScreen {...props} historyOnly={showHistory}
+    onBack={showHistory ? () => setShowHistory(false) : props.onBack}/>;
+}
+
+function GradeBasedInspectionScreen({
   equipmentId,
   inspectorName,
   onBack,
   onSaved,
-}: Props) {
+  historyOnly = false,
+}: Props & {historyOnly?: boolean}) {
   const {width} = useWindowDimensions();
   const compact = width < 700;
   const [projectName, setProjectName] = useState('');
@@ -170,7 +182,7 @@ export default function SurveyorInspectionScreen({
     : Math.round((checkedCount / totalChecklistCount) * 100);
   const allVisibleChecked = visibleAnswers.length > 0 &&
     visibleAnswers.every(answer => answer.isChecked);
-  const editable = inspection?.isEditable !== false && !showSourcePreview;
+  const editable = !historyOnly && inspection?.isEditable !== false && !showSourcePreview;
 
   const toggleAnswer = (checklistItemId: string) => {
     if (!editable) return;
@@ -546,7 +558,7 @@ export default function SurveyorInspectionScreen({
           </TouchableOpacity>
         ) : (
           <View style={styles.lockedNotice}>
-            <Text style={styles.lockedText}>{showSourcePreview ? 'Reference preview only. Select Saved inspection to return to your recorded answers.' : 'This inspection is QC approved and locked.'}</Text>
+            <Text style={styles.lockedText}>{showSourcePreview ? 'Reference preview only. Select Saved inspection to return to your recorded answers.' : historyOnly ? 'Viewing the grade-based inspection history.' : 'This inspection is QC approved and locked.'}</Text>
           </View>
         )}
       </View>

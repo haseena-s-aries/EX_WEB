@@ -10,17 +10,17 @@ The browser loads `config.js` before the application and chooses the API automat
 | --- | --- |
 | localhost or loopback on port 440 (IIS) | https://localhost:338/api |
 | localhost or loopback on other ports, including npm run web on 3000 | https://localhost:7288/api | 
-| Server IP or live DNS hostname | https://139.5.189.155:441/api |
+| Server IP or live DNS hostname | https://139.5.189.155:338/api |
 
-For local development start the API with `dotnet run --project Ex-SurveyApp_api --launch-profile https` from the backend repository, and run `npm run web` from the frontend repository. Localhost requires an API running on that same computer. For IIS localhost access the API needs its existing wildcard port 441 binding. Edit this public file to change the API addresses without rebuilding; include `/api`. Never add secrets to it. Keep all generated bundle and asset files together.
-
+For local development start the API with `dotnet run --project Ex-SurveyApp_api --launch-profile https` from the backend repository, and run `npm run web` from the frontend repository. Localhost requires an API running on that same computer. For IIS localhost access the API needs its existing wildcard port 338 binding. Edit this public file to change the API addresses without rebuilding; include `/api`. Never add secrets to it. Keep all generated bundle and asset files together.
+npm
 For this deployment the frontend uses HTTPS port 440. In the API server's appsettings.Production.json, set Cors:AllowedOrigins to these exact frontend origins, without a trailing slash or path:
 
 ```json
 "Cors": {
   "AllowedOrigins": [
     "https://localhost:440",
-    "https://139.5.189.155:440",
+    "https://139.5.189.155:338",
     "https://127.0.0.1:440"
   ]
 }

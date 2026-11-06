@@ -46,6 +46,8 @@ type UserOption = {id: string; displayName: string; managerId?: string | null; m
 
 type Props = {
   userName: string;
+  workspace?: boolean;
+  onViewProjects?: () => void;
   /** Role shown in the badge under the name (e.g. Admin / Manager). */
   userRole?: string;
   surveyors?: UserOption[];
@@ -63,6 +65,8 @@ const VISIBLE_SITES = 6;
 
 export default function DashboardScreen({
   userName,
+  workspace = false,
+  onViewProjects,
   userRole = 'Admin',
   surveyors = [],
   qcUsers = [],
@@ -77,6 +81,7 @@ export default function DashboardScreen({
 
   const {width} = useWindowDimensions();
   const isWide = width >= 900;
+  const tableLayout = workspace && width >= 1100;
   const [showNewProject, setShowNewProject] = useState(false);
   const [creating, setCreating] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(true);
@@ -252,13 +257,22 @@ export default function DashboardScreen({
         </View>
       ) : null}
 
+      {workspace && <View style={s.workspaceHeading}>
+        <View style={{flex: 1, minWidth: 200}}>
+          <Text accessibilityRole="header" style={s.workspaceTitle}>Site operations</Text>
+          <Text style={s.workspaceSubtitle}>Overview of surveys, inspections and quality control.</Text>
+        </View>
+        <TouchableOpacity accessibilityRole="button" onPress={() => setShowNewProject(true)} style={[s.newBtn, s.workspaceNew]}>
+          <Text style={[s.newBtnText, {color: '#fff'}]}>+ New project</Text>
+        </TouchableOpacity>
+      </View>}
       {loadingProjects ? (
         <ActivityIndicator color={c.amber} style={{marginVertical: 40}} />
       ) : (
         <>
           <View style={s.kpiGrid}>
-            <View style={[s.kpiCard, isWide && s.kpiCardWide]}>
-              <View style={[s.iconBox, {backgroundColor: tint(c.cyan, '1F')}]}>
+            <View style={[s.kpiCard, isWide && s.kpiCardWide, workspace && s.workspaceKpi]}>
+              <View style={[s.iconBox, workspace && {position: 'absolute', right: 17, top: 17, width: 36, height: 36, borderRadius: 8}, {backgroundColor: tint(c.cyan, '1F')}]}>
                 <Text style={[s.iconGlyph, {color: c.cyan}]}>▤</Text>
               </View>
               <View style={s.kpiBody}>
@@ -274,10 +288,10 @@ export default function DashboardScreen({
               onPress={() => setShowDefects(true)}
               style={[
                 s.kpiCard,
-                isWide && s.kpiCardWide,
-                {backgroundColor: tint(c.critical, '14'), borderColor: tint(c.critical, '44')},
+                isWide && s.kpiCardWide, workspace && s.workspaceKpi,
+                !workspace && {backgroundColor: tint(c.critical, '14'), borderColor: tint(c.critical, '44')},
               ]}>
-              <View style={[s.iconBox, {backgroundColor: tint(c.critical, '24')}]}>
+              <View style={[s.iconBox, workspace && {position: 'absolute', right: 17, top: 17, width: 36, height: 36, borderRadius: 8}, {backgroundColor: tint(c.critical, '24')}]}>
                 <Text style={[s.iconGlyph, {color: c.critical}]}>⚠</Text>
               </View>
               <View style={s.kpiBody}>
@@ -287,26 +301,27 @@ export default function DashboardScreen({
               </View>
             </TouchableOpacity>
 
-            <View style={[s.kpiCard, isWide && s.kpiCardWide]}>
-              <ProgressRing
+            <View style={[s.kpiCard, isWide && s.kpiCardWide, workspace && s.workspaceKpi]}>
+              {workspace ? <View style={[s.iconBox, workspace && {position: 'absolute', right: 17, top: 17, width: 36, height: 36, borderRadius: 8}, {backgroundColor: tint(c.success, '1F')}]}><Text style={[s.iconGlyph, {color: c.success}]}>◇</Text></View> : <ProgressRing
                 pct={verifiedPct}
                 color={c.success}
                 track={c.elevated}
                 textColor={c.text}
                 label={equipment ? undefined : '…'}
-              />
+              />}
               <View style={s.kpiBody}>
                 <Text style={s.kpiLabel}>Equipment Verified</Text>
                 <Text style={s.kpiValue}>
                   {equipment ? verified : '–'}
                   <Text style={s.kpiValueSub}> / {equipment ? equipmentTotal : '–'}</Text>
                 </Text>
-                <Text style={s.kpiFoot}>Items checked</Text>
+                {workspace && <View style={s.progressTrack}><View style={[s.progressFill, {width: `${verifiedPct}%`, backgroundColor: c.success}]} /></View>}
+                <Text style={s.kpiFoot}>{workspace && equipment ? `${verifiedPct}% checked` : 'Items checked'}</Text>
               </View>
             </View>
 
-            <View style={[s.kpiCard, isWide && s.kpiCardWide]}>
-              <View style={[s.iconBox, {backgroundColor: tint(c.amber, '22')}]}>
+            <View style={[s.kpiCard, isWide && s.kpiCardWide, workspace && s.workspaceKpi]}>
+              <View style={[s.iconBox, workspace && {position: 'absolute', right: 17, top: 17, width: 36, height: 36, borderRadius: 8}, {backgroundColor: tint(c.amber, '22')}]}>
                 <Text style={[s.iconGlyph, {color: c.amber}]}>◷</Text>
               </View>
               <View style={s.kpiBody}>
@@ -317,19 +332,24 @@ export default function DashboardScreen({
             </View>
           </View>
 
-          <TouchableOpacity
+          {!workspace && <TouchableOpacity
             accessibilityRole="button"
             onPress={() => setShowNewProject(true)}
             style={[s.newBtn, isWide && {alignSelf: 'flex-start'}]}>
             <Text style={s.newBtnText}>+ New project</Text>
-          </TouchableOpacity>
+          </TouchableOpacity>}
 
-          <View style={s.sectionHeading}>
+          <View style={tableLayout && s.tablePanel}>
+          <View style={[s.sectionHeading, tableLayout && s.tableHeading]}>
             <View>
-              <Text style={s.sectionTitle}>Active Site Operations</Text>
-              <Text style={s.sectionHint}>{projects.length} total</Text>
+              <Text style={s.sectionTitle}>Active site operations</Text>
+              <Text style={s.sectionHint}>{projects.length} projects</Text>
             </View>
+            {workspace && onViewProjects && <TouchableOpacity accessibilityRole="button" onPress={onViewProjects}><Text style={[s.link, {color: c.cyan}]}>View all</Text></TouchableOpacity>}
           </View>
+          {tableLayout && projects.length > 0 && <View style={s.tableHeader}>
+            {['Project', 'Status', 'Type / ref', 'Progress', 'Areas'].map((label, index) => <Text key={label} style={[s.columnLabel, {flex: [3, 1.5, 1.5, 2, .65][index]}]}>{label}</Text>)}
+          </View>}
 
           {projects.length === 0 ? (
             <View style={s.stateBox}>
@@ -340,11 +360,23 @@ export default function DashboardScreen({
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={isWide ? {flexDirection: 'row', flexWrap: 'wrap', gap: 12} : {gap: 12}}>
+            <View style={tableLayout ? undefined : isWide ? {flexDirection: 'row', flexWrap: 'wrap', gap: 12} : {gap: 12}}>
               {visible.map(project => {
                 const status = statusOf(project);
                 const sc = statusColor(c, status);
                 const lead = surveyorName(project.assignedSurveyorId);
+                if (tableLayout) {
+                  const rows = equipment?.filter(item => item.projectId === project.id) ?? [];
+                  const checked = rows.filter(item => ['completed', 'qcapproved'].includes(inspectionKey(item.inspectionStatus))).length;
+                  const progress = rows.length ? Math.round(checked / rows.length * 100) : 0;
+                  return <TouchableOpacity key={project.id} accessibilityRole="button" onPress={() => setSelectedProject(project)} style={s.tableRow}>
+                    <View style={{flex: 3, minWidth: 0}}><Text style={s.projectName}>{project.projectName}</Text><Text style={s.projectLoc}>{[project.location, lead].filter(Boolean).join(' · ') || 'Location not set'}</Text></View>
+                    <View style={{flex: 1.5}}><View style={[s.badge, {alignSelf: 'flex-start', backgroundColor: tint(sc, '19')}]}><Text style={[s.badgeText, {color: sc}]}>• {status}</Text></View></View>
+                    <Text style={[s.projectLoc, {flex: 1.5, marginTop: 0}]}>{[project.sector, project.jobNo].filter(Boolean).join(' · ') || '—'}</Text>
+                    <View style={{flex: 2, flexDirection: 'row', alignItems: 'center', gap: 10}}><View style={[s.progressTrack, {flex: 1, marginTop: 0}]}><View style={[s.progressFill, {width: `${progress}%`}]} /></View><Text style={s.sectionHint}>{equipment ? `${progress}%` : '—'}</Text></View>
+                    <Text style={[s.projectName, {flex: .65, textAlign: 'right'}]}>{Number(project.areaCount) || 0}  ›</Text>
+                  </TouchableOpacity>;
+                }
                 return (
                   <TouchableOpacity
                     key={project.id}
@@ -392,6 +424,7 @@ export default function DashboardScreen({
               ) : null}
             </View>
           )}
+          </View>
         </>
       )}
 
@@ -443,6 +476,18 @@ function makeStyles(c: Colors) {
     roleBadge: {alignSelf: 'flex-start', marginTop: 6, backgroundColor: tint(c.yellow, '26'), borderWidth: 1, borderColor: tint(c.yellow, '66'), borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4},
     roleBadgeText: {color: c.yellow, fontSize: 12, fontWeight: '800'},
 
+    workspaceHeading: {flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 28},
+    workspaceTitle: {fontSize: 30, fontWeight: '800', color: c.text},
+    workspaceSubtitle: {fontSize: 15, color: c.secondary, marginTop: 6},
+    workspaceNew: {backgroundColor: '#173454', marginBottom: 0, borderRadius: 8, minHeight: 46},
+    workspaceKpi: {position: 'relative', minHeight: 160, padding: 20, paddingRight: 64, borderRadius: 10, alignItems: 'flex-start'},
+    progressTrack: {height: 6, borderRadius: 4, backgroundColor: c.elevated, overflow: 'hidden', marginTop: 8},
+    progressFill: {height: '100%', borderRadius: 4, backgroundColor: '#234d77'},
+    tablePanel: {marginTop: 14, borderWidth: 1, borderColor: c.border, borderRadius: 10, backgroundColor: c.card, overflow: 'hidden', ...web({boxShadow: c.shadow})},
+    tableHeading: {paddingHorizontal: 20, paddingVertical: 18, marginBottom: 0},
+    tableHeader: {flexDirection: 'row', gap: 12, paddingHorizontal: 20, paddingVertical: 13, backgroundColor: c.bg, borderTopWidth: 1, borderTopColor: c.border},
+    columnLabel: {fontSize: 11, fontWeight: '800', textTransform: 'uppercase', color: c.secondary},
+    tableRow: {flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 20, borderTopWidth: 1, borderTopColor: c.border},
     kpiGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16},
     kpiCard: {
       flexGrow: 1,

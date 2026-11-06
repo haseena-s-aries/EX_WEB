@@ -229,6 +229,16 @@ export const uploadProjectAreaPhoto = (
   );  
 };
 
+export const uploadProjectAreaPhotos = (projectId: string, areaId: string, photos: InspectionPhotoFile[]) => {
+  const form = new FormData();
+  for (const photo of photos) {
+    form.append('Files', photo.webFile ?? ({
+      uri: photo.uri, type: photo.type || 'image/jpeg', name: photo.fileName || photo.name || 'area.jpg',
+    } as any));
+  }
+  return apiClient.post<ProjectAreaPhoto[]>(`/projects/${projectId}/areas/${areaId}/photos`, form);
+};
+
 export const getProjectAreaPhotos = (projectId: string, areaId: string) =>
   apiClient.get<ProjectAreaPhoto[]>(
     `/projects/${projectId}/areas/${areaId}/photos`,
@@ -542,8 +552,8 @@ export const getSurveyorChecklist = () =>
   apiClient.get<SurveyorChecklistItem[]>('/surveyor/checklist');
 
 // Additive repeat-inspection activity API. Existing SurveySession endpoints remain unchanged.
-export const getInspectionActivityHistory = (equipmentId: string) =>
-  apiClient.get<any[]>(`/v1/inspection-activities/equipment/${equipmentId}`);
+export const getInspectionActivityHistory = (equipmentId: string, categoryOnly?: boolean) =>
+  apiClient.get<any[]>(`/v1/inspection-activities/equipment/${equipmentId}`, categoryOnly ? {params:{categoryOnly}} : undefined);
 export const startInspectionActivity = (equipmentId: string, grade: InspectionType) =>
   apiClient.post<any>(`/v1/inspection-activities/equipment/${equipmentId}/start`, {grade});
 export const getInspectionActivity = (activityId: string) =>
@@ -553,7 +563,7 @@ export const createFindingCorrectiveAction = (findingId: string, data: any) => a
 export const reportCorrectiveActionRectification = (actionId: string, data: any) => apiClient.post<any>(`/v1/inspection-activities/corrective-actions/${actionId}/rectification`, data);
 export const submitCorrectiveActionVerification = (actionId: string) => apiClient.post<any>(`/v1/inspection-activities/corrective-actions/${actionId}/submit-verification`);
 export const verifyCorrectiveAction = (actionId: string, acceptCorrection: boolean, comments: string) => apiClient.post<any>(`/v1/inspection-activities/corrective-actions/${actionId}/verification`, {acceptCorrection, comments});
-export const getInspectionDefects = (status?: string, overdueOnly = false) => apiClient.get<any[]>('/v1/inspection-activities/defects', {params: {status, overdueOnly}});
+export const getInspectionDefects = (status?: string, overdueOnly = false, projectId?: string) => apiClient.get<any[]>('/v1/inspection-activities/defects', {params: {status, overdueOnly, projectId}});
 export const decideDefectClosure = (actionId: string, acceptClosure: boolean, comments: string) => apiClient.post<any>(`/v1/inspection-activities/corrective-actions/${actionId}/client-closure`, {acceptClosure, comments});
 export const uploadCorrectiveActionPhoto = (actionId: string, photo: InspectionPhotoFile, role: 'Before' | 'After' | 'Correction') => {
   const form = new FormData();

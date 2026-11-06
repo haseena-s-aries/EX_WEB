@@ -50,3 +50,12 @@ const areaQuery = (areaId?:string) => areaId ? `?areaId=${encodeURIComponent(are
 export const downloadHaerCsv = (id:string, jobNumber:string, areaId?:string) => downloadHaerFile(`/reports/projects/${id}/haer.csv${areaQuery(areaId)}`, `${safeJob(jobNumber)}_HAER.csv`);
 export const downloadHaerPdf = (id:string, jobNumber:string, areaId?:string) => downloadHaerFile(`/reports/projects/${id}/haer.pdf${areaQuery(areaId)}`, `${safeJob(jobNumber)}_HAER.pdf`);
 export const downloadHaerExcel = (id:string, jobNumber:string, areaId?:string) => downloadHaerFile(`/reports/projects/${id}/haer/excel${areaQuery(areaId)}`, `${safeJob(jobNumber)}_HAER.xls`);
+
+export type HaerRegisterRow = HaerEquipment & {
+  areaId: string;
+  itemNumber?: string | null;
+  equipmentName?: string | null;
+  comments?: string | null;
+};
+export const getHaerRegister = (projectId: string) =>
+  apiClient.get<{projectId: string; projectName: string; equipment: HaerRegisterRow[]}>(`/v1/haer/projects/${projectId}/register`);
