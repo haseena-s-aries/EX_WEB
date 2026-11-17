@@ -1,4 +1,9 @@
+import ClientAssignmentPicker from './ClientAssignmentPicker';
+import {chooseAreaAttachment} from './chooseAreaAttachment';
+import {visual} from '../theme/visual';
+import ProjectDateField from './ProjectDateField';
 import CreateProjectVisualStyles from './CreateProjectVisualStyles';
+import ProjectFormBannerArt from './ProjectFormBannerArt';
 import OurCompanySection from './OurCompanySection';
 import ProjectMetadataFields, {ProjectMetadata, emptyProjectMetadata} from './ProjectMetadataFields';
 import ClientDetailsSection from './ClientDetailsSection';
@@ -8,7 +13,6 @@ import HazardousAreaPlanUpload from './HazardousAreaPlanUpload';
 import {HazardousAreaPlanFile} from './hazardousAreaPlan';
 import React, {useState, useRef, useEffect} from 'react';
 import {
-  Modal,
   View,
   Text,
   TextInput,
@@ -22,7 +26,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
-type UserOption = {id: string; displayName: string; managerId?: string | null; managerName?: string | null};
+type UserOption = {id: string; displayName: string; email?: string; managerId?: string | null; managerName?: string | null};
 
 type AreaInput = {
   name: string;
@@ -30,18 +34,19 @@ type AreaInput = {
   fileName: string;
 };
 
-type ProjectFormData = ProjectMetadata & {
+type ProjectFormData = Pick<ProjectMetadata, "description" | "clientName"> & {
   ourCompanyId?: string | null;
   clientLogo?: ClientLogoFile | null;
   hazardousAreaPlan?: HazardousAreaPlanFile | null;
   projectName: string;
-  sector: string;
   jobNumber: string;
+  targetDate: string;
   location: string;
   vesselName: string;
   surveyorId: string;
   qcId: string;
   clientId: string;
+  clientIds: string[];
   areas: AreaInput[];
 };
 
@@ -55,14 +60,6 @@ type Props = {
   loading?: boolean;
 };
 
-const SECTOR_OPTIONS = [
-  'Oil & Gas',
-  'Shipping',
-  'Offshore Wind',
-  'Naval',
-  'Port & Terminal',
-  'Fisheries',
-];
 
 const emptyArea = (): AreaInput => ({name: '', file: null, fileName: ''});
 
@@ -75,19 +72,19 @@ export default function NewProjectModal({
   clients,
   loading,
 }: Props) {
-  const {width, height} = useWindowDimensions();
+  const {width} = useWindowDimensions();
   const compact = width < 700;
   const [ourCompanyId, setOurCompanyId] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<ProjectMetadata>(emptyProjectMetadata);
   const [clientLogo, setClientLogo] = useState<ClientLogoFile | null>(null);
   const [projectName, setProjectName] = useState('');
-  const [sector, setSector] = useState(SECTOR_OPTIONS[0]);
+  const [targetDate, setTargetDate] = useState('');
   const [jobNumber, setJobNumber] = useState('');
   const [location, setLocation] = useState('');
   const [vesselName, setVesselName] = useState('');
   const [surveyorId, setSurveyorId] = useState('');
   const [qcId, setQcId] = useState('');
-  const [clientId, setClientId] = useState('');
+  const [clientIds, setClientIds] = useState<string[]>([]);
   const [areas, setAreas] = useState<AreaInput[]>([emptyArea()]);
   const [error, setError] = useState('');
   const [hazardousAreaPlan, setHazardousAreaPlan] = useState<HazardousAreaPlanFile | null>(null);
@@ -130,11 +127,12 @@ export default function NewProjectModal({
     setMetadata(emptyProjectMetadata()); setClientLogo(null);
     setProjectName('');
     setJobNumber('');
+    setTargetDate('');
     setLocation('');
     setVesselName('');
     setSurveyorId('');
     setQcId('');
-    setClientId('');
+    setClientIds([]);
     setAreas([emptyArea()]);
     setError('');
   };
@@ -157,6 +155,15 @@ export default function NewProjectModal({
       setError('Please fill all required fields (marked *)');
       return;
     }
+    if (!jobNumber.trim()) {
+      setError('Job Number is required.');
+      return;
+    }
+    if (!targetDate) {
+      setError('Target Date is required.');
+      return;
+    }
+    if (!metadata.clientName.trim()) {setError('Client Company Name is required.'); return;}
     if (!surveyorId || !qcId) {
       setError('Please assign a Surveyor and QC');
       return;
@@ -168,43 +175,44 @@ export default function NewProjectModal({
     }
     setError('');
     onCreate({
-      ...metadata, ourCompanyId, clientLogo,
+      description: metadata.description, clientName: metadata.clientName, ourCompanyId, clientLogo,
       projectName,
-      sector,
-      jobNumber,
+      jobNumber: jobNumber.trim(),
+      targetDate,
       location,
       vesselName,
       surveyorId,
       qcId,
-      clientId,
+      clientId: clientIds[0] || '', clientIds,
       areas: filledAreas,
       hazardousAreaPlan,
     });
   };
 
-  const requiredFilled = [projectName, location, vesselName, surveyorId, qcId].filter(
+  const requiredFilled = [projectName, location, vesselName, surveyorId, qcId, metadata.clientName.trim()].filter(
     Boolean,
   ).length;
   const hasArea = areas.some(a => a.name.trim()) ? 1 : 0;
   const filledCount = requiredFilled + hasArea;
-  const totalRequired = 6;
+  const totalRequired = 7;
   const progressPct = Math.round((filledCount / totalRequired) * 100);
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={[styles.overlay, compact && {padding: 10}]}>
-        <Animated.View nativeID="create-project-form" style={[styles.modal, {opacity, transform: [{scale}]}]}>
+    <View style={{flex:1,width:'100%',backgroundColor:'#f5f7fb'}}>
+        <Animated.View nativeID="create-project-form" style={[styles.page, {opacity, transform:[{scale}]}]}>
           <CreateProjectVisualStyles />
-          <View style={[styles.headerBand, compact && styles.compactPadding]}>
-            <View style={styles.headerGlow} />
+          <View nativeID="ex-project-form-banner" style={[styles.headerBand, compact && styles.compactPadding]}>
+            <ProjectFormBannerArt />
             <View style={styles.headerIconWrap}>
               <Text style={styles.headerIcon}>📋</Text>
             </View>
             <View style={{flex: 1, zIndex: 1}}>
-              <Text style={styles.title}>Create New Project</Text>
+              <Text accessibilityRole="header" style={styles.title}>Create New Project</Text>
               <Text style={styles.subtitle}>Set up a new survey project and assign your team</Text>
             </View>
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close project form" onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close project form" disabled={loading} onPress={onClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -223,36 +231,38 @@ export default function NewProjectModal({
             />
           </View>
 
-          <ScrollView contentContainerStyle={[styles.body, compact && styles.compactBody]} style={[styles.bodyScroll, {maxHeight: Math.max(180, height * 0.92 - 210)}]}>
-            <View style={styles.sectionCard}>
-            <StepHeader index={1} color="#2563eb" icon="📁" title="Project Information" />
+          <ScrollView nativeID="ex-project-form-scroll" keyboardShouldPersistTaps="handled"
+            contentContainerStyle={[styles.body, compact && styles.compactBody]} style={{flex:1}}>
+            <View nativeID="ex-project-information" style={styles.sectionCard}>
+            <StepHeader index={1} color="#2563eb" icon="📁" title="PROJECT INFORMATION" />
 
             <Field label="Project Name" required>
               <TextInput
-                style={styles.input}
+                style={[styles.input, {textTransform: 'uppercase'}]}
                 placeholder="e.g. MV Resolute Annual Inspection"
                 placeholderTextColor="#9aa0b4"
                 value={projectName}
-                onChangeText={value => setProjectName(value.toUpperCase())}
-                autoCapitalize="characters"
+                onChangeText={setProjectName}
+                nativeID="project-name-field"
+                autoCapitalize="none"
               />
             </Field>
 
             <View style={[styles.row, compact && styles.stackedRow]}>
               <View style={styles.half}>
-                <Field label="Sector">
-                  <SimpleSelect value={sector} options={SECTOR_OPTIONS} onChange={setSector} />
-                </Field>
+                <ProjectDateField label="Target Date" value={targetDate} onChange={setTargetDate} disabled={loading} required />
               </View>
               <View style={styles.half}>
-                <Field label="Job Number">
+                <Field label="Job Number" required>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, {textTransform: 'uppercase'}]}
+                    accessibilityLabel="Job Number (required)"
                     placeholder="JOB-2026-0453"
                     placeholderTextColor="#9aa0b4"
-                    value={jobNumber}
-                    onChangeText={value => setJobNumber(value.toUpperCase())}
-                autoCapitalize="characters"
+                value={jobNumber}
+                    onChangeText={setJobNumber}
+                    nativeID="project-job-number-field"
+                autoCapitalize="none"
                   />
                 </Field>
               </View>
@@ -262,41 +272,43 @@ export default function NewProjectModal({
               <View style={styles.half}>
                 <Field label="Location" required>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, {textTransform: 'uppercase'}]}
                     placeholder="e.g. Rotterdam, Netherlands"
                     placeholderTextColor="#9aa0b4"
                     value={location}
-                    onChangeText={value => setLocation(value.toUpperCase())}
-                autoCapitalize="characters"
+                    onChangeText={setLocation}
+                    nativeID="project-location-field"
+                autoCapitalize="none"
                   />
                 </Field>
               </View>
               <View style={styles.half}>
                 <Field label="Vessel / Site Name" required>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, {textTransform: 'uppercase'}]}
                     placeholder="e.g. MV Resolute"
                     placeholderTextColor="#9aa0b4"
                     value={vesselName}
-                    onChangeText={value => setVesselName(value.toUpperCase())}
-                autoCapitalize="characters"
+                    onChangeText={setVesselName}
+                    nativeID="project-vessel-field"
+                autoCapitalize="none"
                   />
                 </Field>
               </View>
             </View>
 
-            <ProjectMetadataFields columns={!compact} value={metadata} onChange={setMetadata} inputStyle={styles.input} />
+            <ProjectMetadataFields preserveCase descriptionOnly columns={!compact} value={metadata} onChange={setMetadata} inputStyle={styles.input} />
             </View>
             <View style={styles.sectionCard}>
             <StepHeader index={2} color="#2563eb" icon="📁" title="OUR COMPANY DETAILS" />
             <OurCompanySection value={ourCompanyId} onChange={setOurCompanyId} inputStyle={styles.input} />
             </View>
             <View style={styles.sectionCard}>
-            <StepHeader index={3} color="#2563eb" icon="📁" title="CLIENT DETAILS" />
-            <ClientDetailsSection name={metadata.clientName} onNameChange={clientName => setMetadata({...metadata, clientName})} logo={clientLogo} onLogoChange={setClientLogo} inputStyle={styles.input} disabled={loading} />
+            <StepHeader index={3} color="#2563eb" icon="📁" title="CLIENT COMPANY DETAILS" />
+            <ClientDetailsSection preserveCase required name={metadata.clientName} onNameChange={clientName => setMetadata({...metadata, clientName})} logo={clientLogo} onLogoChange={setClientLogo} inputStyle={styles.input} disabled={loading} />
             </View>
             <View style={styles.sectionCard}>
-            <StepHeader index={4} color="#2563eb" icon="👥" title="Team Assignment" />
+            <StepHeader index={4} color="#2563eb" icon="👥" title="TEAM ASSIGNMENT" />
 
             <View style={[styles.row, compact && styles.stackedRow]}>
               <View style={styles.third}>
@@ -320,13 +332,8 @@ export default function NewProjectModal({
                 </Field>
               </View>
               <View style={styles.third}>
-                <Field label="Assign Client (Optional)">
-                  <SimpleSelect
-                    value={clientId}
-                    placeholder="Select client"
-                    options={clients.map(c => ({label: c.displayName, value: c.id}))}
-                    onChange={setClientId}
-                  />
+                <Field label="Assign Client ID">
+                  <ClientAssignmentPicker value={clientIds} options={clients} onChange={setClientIds} disabled={loading} />
                 </Field>
               </View>
             </View>
@@ -363,7 +370,7 @@ export default function NewProjectModal({
             ) : null}
           </ScrollView>
 
-          <View style={[styles.footer, compact && styles.compactPadding]}>
+          <View nativeID="ex-project-form-footer" style={[styles.footer, compact && styles.compactPadding]}>
             <Text style={styles.progressLabel}>
               {filledCount}/{totalRequired} required fields
             </Text>
@@ -371,6 +378,7 @@ export default function NewProjectModal({
               <TouchableOpacity
                 nativeID="create-project-cancel"
                 accessibilityRole="button"
+                disabled={loading}
                 style={styles.cancelBtn}
                 onPress={() => {
                   reset();
@@ -382,19 +390,18 @@ export default function NewProjectModal({
             </View>
           </View>
         </Animated.View>
-      </View>
-    </Modal>
+    </View>
   );
 }
 
 function StepHeader({index, color, icon, title}: {index: number; color: string; icon: string; title: string}) {
   return (
     <View style={styles.stepHeader}>
-      <View style={[styles.stepBadge, {backgroundColor: color}]}>
+      <View testID="project-form-step-badge" style={[styles.stepBadge, {backgroundColor: color}]}>
         <Text style={styles.stepBadgeText}>{index}</Text>
       </View>
       <Text style={styles.stepIcon}>{icon}</Text>
-      <Text style={styles.stepTitle}>{title}</Text>
+      <Text accessibilityRole="header" style={styles.stepTitle}>{title}</Text>
       <View style={styles.stepLine} />
     </View>
   );
@@ -403,7 +410,7 @@ function StepHeader({index, color, icon, title}: {index: number; color: string; 
 function Field({label, required, children}: {label: string; required?: boolean; children: React.ReactNode}) {
   return (
     <View style={{marginBottom: 16}}>
-      <Text style={styles.label}>
+      <Text testID="project-form-label" style={[styles.label, {textTransform: 'uppercase'}]}>
         {label} {required ? <Text style={styles.required}>*</Text> : !label.includes("Optional") ? <Text style={styles.optional}> · Optional</Text> : null}
       </Text>
       {children}
@@ -439,7 +446,7 @@ function AreaRow({
   return (
     <Animated.View style={[styles.areaCard, {opacity, transform: [{translateY}]}]}>
       <View style={styles.areaCardHeader}>
-        <Text style={styles.areaCardTitle}>Area {index + 1}</Text>
+        <Text accessibilityRole="header" style={styles.areaCardTitle}>Area {index + 1}</Text>
         {canRemove && (
           <TouchableOpacity onPress={onRemove}>
             <Text style={styles.areaRemoveText}>Remove</Text>
@@ -472,7 +479,7 @@ function FileUploadButton({fileName, onPick}: {fileName: string; onPick: (file: 
         <input
           id={inputId}
           type="file"
-          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+          accept="application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp"
           style={{display: 'none'}}
           onChange={(e: any) => {
             const f = e.target.files?.[0];
@@ -481,7 +488,7 @@ function FileUploadButton({fileName, onPick}: {fileName: string; onPick: (file: 
         />
         {/* @ts-ignore */}
         <label htmlFor={inputId} style={uploadLabelStyleWeb}>
-          {fileName ? '✓ Layout selected' : '📤  Choose layout image'}
+          {fileName ? '✓ Layout selected' : '📤  Choose layout image or PDF'}
         </label>
       </View>
     );
@@ -490,8 +497,8 @@ function FileUploadButton({fileName, onPick}: {fileName: string; onPick: (file: 
   return (
     <TouchableOpacity
       style={styles.uploadBoxNative}
-      onPress={() => Alert.alert('Not supported', 'File upload is only available on web for now.')}>
-      <Text style={styles.uploadBoxNativeText}>{fileName ? '✓ Layout selected' : 'Tap to upload (web only)'}</Text>
+      onPress={() => void chooseAreaAttachment(onPick)}>
+      <Text style={styles.uploadBoxNativeText}>{fileName ? '✓ Layout selected' : 'Choose layout image or PDF'}</Text>
     </TouchableOpacity>
   );
 }
@@ -572,19 +579,7 @@ const uploadLabelStyleWeb: any = {
 };
 
 const styles = StyleSheet.create({
-  overlay: {flex: 1, backgroundColor: 'rgba(24, 42, 70, 0.38)', alignItems: 'center', justifyContent: 'center', padding: 20},
-  modal: {
-    width: '100%',
-    maxWidth: 940,
-    maxHeight: '92%' as any,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    overflow: 'hidden',
-    ...Platform.select({
-      web: {boxShadow: '0px 20px 60px rgba(24, 42, 70, 0.22)'},
-      default: {shadowColor: '#000', shadowOffset: {width: 0, height: 14}, shadowOpacity: 0.16, shadowRadius: 34, elevation: 14},
-    }),
-  },
+  page: {flex:1, width:'100%', backgroundColor:'#fff'},
   headerBand: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -593,16 +588,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     position: 'relative',
     overflow: 'hidden',
-    backgroundColor: '#eff6ff',
+    backgroundColor: visual.ink,
     ...Platform.select({
-      web: {backgroundImage: 'linear-gradient(120deg, #ffffff 0%, #eff6ff 65%, #e0f2fe 100%)'},
+      web: {backgroundImage: 'linear-gradient(105deg, #092331 0%, #0b3041 64%, #126077 100%)'},
     }),
   },
   headerGlow: {position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.06)', top: -60, right: -30},
   headerIconWrap: {width: 46, height: 46, borderRadius: 13, backgroundColor: '#dbeafe', alignItems: 'center', justifyContent: 'center', zIndex: 1},
   headerIcon: {fontSize: 20},
-  title: {fontSize: 22, fontWeight: '800', color: '#172b4d'},
-  subtitle: {fontSize: 12.5, color: '#60738e', marginTop: 3},
+  title: {fontFamily: visual.display, fontSize: 26, fontWeight: '800', color: '#f3fbfd'},
+  subtitle: {fontSize: 13, color: '#b9d2dc', marginTop: 3},
   closeBtn: {width: 30, height: 30, borderRadius: 15, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', zIndex: 1},
   closeBtnText: {color: '#41658e', fontSize: 14, fontWeight: '700'},
   progressTrack: {height: 3, backgroundColor: '#eceef4'},
@@ -611,7 +606,7 @@ const styles = StyleSheet.create({
   body: {padding: 24, paddingBottom: 8, backgroundColor: '#f5f8fc'},
   compactPadding: {paddingHorizontal: 16},
   compactBody: {padding: 12},
-  sectionCard: {backgroundColor: '#fff', borderWidth: 1, borderColor: '#dce6f2', borderTopWidth: 3, borderTopColor: '#60a5fa', borderRadius: 12, padding: 18, marginBottom: 16, ...Platform.select({web: {boxShadow: '0 2px 8px rgba(24,42,70,.04)'}, default: {elevation: 1}})},
+  sectionCard: {backgroundColor: '#fff', borderWidth: 1, borderColor: '#dce6f2', borderTopWidth: 3, borderTopColor: '#50a5ae', borderRadius: visual.radius.panel, padding: 18, marginBottom: 16, ...Platform.select({web: {boxShadow: '0 2px 8px rgba(24,42,70,.04)'}, default: {elevation: 1}})},
   stepHeader: {flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 0, marginBottom: 20},
   stepBadge: {width: 25, height: 25, borderRadius: 13, alignItems: 'center', justifyContent: 'center'},
   stepBadgeText: {color: '#fff', fontSize: 11.5, fontWeight: '800'},

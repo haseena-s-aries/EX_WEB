@@ -1,6 +1,8 @@
+import {visual} from '../theme/visual';
+import {OPERATIONS_DARK} from '../theme/operationsPalette';
 import {readTsv} from '../utils/readTsv';
 import React, {useEffect, useMemo, useState} from 'react';
-import {Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {
   bulkRegisterEquipment, editEquipmentIdentification, getEquipmentRegistrationProjects,
 } from '../api/equipmentIdentification';
@@ -10,8 +12,13 @@ import {inspectionLabel} from '../api/adminEquipment';
 import {getHaerRegister, HaerRegisterRow} from '../api/reports';
 import HaerAreaManager from '../components/HaerAreaManager';
 import HaerGrid from '../components/HaerGrid';
-import {DARK, LIGHT} from '../theme/palette';
+import SearchableOptionPicker from '../components/SearchableOptionPicker';
+import {equipmentOptions, equipmentTypes, zoneOptions} from '../equipment/equipmentOptions';
+import {LIGHT} from '../theme/palette';
 import {useThemeMode} from '../theme/useThemeMode';
+import {projectDisplay} from '../utils/projectDisplay';
+
+const OFFSHORE_ART = require('../assets/landing/industry-3.jpg');
 
 type Props = {
   onEquipmentPress: (projectId: string) => void;
@@ -33,7 +40,7 @@ const TECHNICAL = [
   ['specialConditionsOfUse', 'Special Conditions', 180, 2000],
 ] as const;
 const COLUMNS = [
-  {label:'Sl. No', width:65}, {label:'Item #', width:117}, {label:'Ex-Tag', width:158},
+  {label:'Sl. No', width:65}, {label:'Project Name', width:200}, {label:'Item #', width:117}, {label:'Ex-Tag', width:158},
   {label:'Area', width:135}, {label:'Description', width:205},
   {label:'Manufacturer', width:155}, {label:'Type/Model', width:173},
   ...TECHNICAL.slice(1).map(([, label, width]) => ({label, width})),
@@ -60,7 +67,7 @@ const makeId = () => globalThis.crypto?.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yx
 
 export default function AdminEquipmentListScreen({onEquipmentPress, onDocumentsPress, refreshVersion, creationOnly = false}: Props) {
   const mode = useThemeMode();
-  const c = mode === 'dark' ? DARK : LIGHT;
+  const c = mode === 'dark' ? OPERATIONS_DARK : LIGHT;
   const [projects, setProjects] = useState<Awaited<ReturnType<typeof getEquipmentRegistrationProjects>>['data']>([]);
   const [projectId, setProjectId] = useState(ALL_PROJECTS);
   const [rows, setRows] = useState<RegisterRow[]>([]);
@@ -82,8 +89,8 @@ export default function AdminEquipmentListScreen({onEquipmentPress, onDocumentsP
   const [projectQuery, setProjectQuery] = useState('');
   const [manageAreas, setManageAreas] = useState(false);
   const currentProject = projects.find(item => item.id === projectId);
-  const areas = currentProject?.areas.map(area => ({id: area.id, label: area.areaName})) ?? [];
-  const projectChoices = [{id: ALL_PROJECTS, label: 'All Projects'}, ...projects.map(project => ({id: project.id, label: project.projectName}))];
+  const areas = currentProject?.areas.map(area => ({id: area.id, label: projectDisplay(area.areaName)})) ?? [];
+  const projectChoices = [{id: ALL_PROJECTS, label: 'All Projects'}, ...projects.map(project => ({id: project.id, label: projectDisplay(project.projectName)}))];
   const registerProjectIds = projectId === ALL_PROJECTS ? projects.map(project => project.id).join(',') : projectId;
 
   useEffect(() => {
@@ -124,11 +131,12 @@ export default function AdminEquipmentListScreen({onEquipmentPress, onDocumentsP
   const visiblePage = Math.min(page, pageCount);
   const displayed = filtered.slice((visiblePage - 1) * PAGE_SIZE, visiblePage * PAGE_SIZE);
 
-  const button = (label: string, action: () => void, disabled = false, primary = false) => (
+  const button = (label: string, action: () => void, disabled = false, primary = false, stretch = false) => (
     <TouchableOpacity accessibilityRole="button" onPress={action} disabled={disabled} style={[
-      styles.button, {borderColor: c.border, backgroundColor: primary ? '#173454' : c.elevated, opacity: disabled ? .45 : 1},
+      styles.button, {borderColor: c.border, backgroundColor: primary ? '#00D9EE' : c.elevated, opacity: disabled ? .45 : 1},
+      stretch && styles.stretchedButton,
     ]}>
-      <Text style={{color: primary ? '#fff' : c.text, fontWeight: '700'}}>{label}</Text>
+      <Text style={{color: primary ? '#03192C' : c.text, fontWeight: '700'}}>{label}</Text>
     </TouchableOpacity>
   );
   const rowAction = (label: string, action: () => void, disabled = false) =>
@@ -169,10 +177,12 @@ export default function AdminEquipmentListScreen({onEquipmentPress, onDocumentsP
     try {
       const cells = readTsv(paste);
       if (cells[0]?.[0]?.trim().toLowerCase().replace(/[^a-z]/g, '') === 'slno') cells.shift();
-      if (!cells.length || cells.some(row => row.length !== COLUMNS.length))
-        throw new Error('Paste all 21 columns in the displayed order. Keep empty cells in their columns.');
+      if (!cells.length || cells.some(row => row.length !== 21 && row.length !== COLUMNS.length))
+        throw new Error('Paste 22 columns in the displayed order, or the original 21 columns without Project Name. Keep empty cells in their columns.');
       if (drafts.length + cells.length > 100) throw new Error('Save or remove rows before adding more than 100 pending rows.');
-      const imported = cells.map(row => {
+      const imported = cells.map(cellsRow => {
+        // Project is always supplied by the selected project, never by pasted text.
+        const row = cellsRow.length === COLUMNS.length ? [cellsRow[0], ...cellsRow.slice(2)] : cellsRow;
         const draft = createDraft();
         const [type, ...model] = row[6].split(' / ');
         const area = areas.find(option => option.label.toLowerCase() === row[3].trim().toLowerCase());
@@ -246,11 +256,23 @@ export default function AdminEquipmentListScreen({onEquipmentPress, onDocumentsP
     const availability = draft.existing?.metadataAvailability?.[key];
     if (availability === 'NotApplicable') return text('Not Applicable');
     const error = draft.errors[key];
+    const type = key === 'type';
+    const zone = key === 'hazardousAreaZone';
+    const value = draft.values[key] ?? '';
+    const fieldLabel = `${label} for ${draft.values.tagNumber || 'new equipment'}`;
     return <View style={styles.field}>
-      <TextInput accessibilityLabel={`${label} for ${draft.values.tagNumber || 'new equipment'}`} placeholder={label}
-        placeholderTextColor={c.muted} value={draft.values[key] ?? ''} editable={!saving}
+      {type || zone ? <SearchableOptionPicker label={fieldLabel} placeholder={label} value={value}
+        options={[
+          ...(zone ? [{label: 'Clear zone', value: ''}] : []),
+          ...equipmentOptions(type ? equipmentTypes : zoneOptions,
+            rows.map(row => type ? row.equipmentType : row.hazardousAreaZone), value),
+        ]}
+        customLabel={type ? 'Add Custom Type' : 'Add Custom Zone'} disabled={saving} dark={mode === 'dark'}
+        onChange={next => patch(draft.id, key, next)} /> :
+      <TextInput accessibilityLabel={fieldLabel} placeholder={label}
+        placeholderTextColor={c.muted} value={value} editable={!saving}
         onChangeText={value => patch(draft.id, key, value)}
-        style={[styles.input, {backgroundColor:c.card, color:c.text, borderColor:error ? c.critical : c.border}]} />
+        style={[styles.input, {backgroundColor:c.card, color:c.text, borderColor:error ? c.critical : c.border}]} />}
       {!!error && <Text accessibilityRole="alert" style={{color:c.critical, fontSize:11}}>{error}</Text>}
     </View>;
   }
@@ -262,7 +284,7 @@ export default function AdminEquipmentListScreen({onEquipmentPress, onDocumentsP
       {choice(draft.id, 'Select area', draft.areaId, areas, id => setDrafts(previous => previous.map(item =>
         item.id === draft.id ? {...item, areaId:id, errors:{...item.errors, areaId:''}} : item)), saving)}
       {!!draft.errors.areaId && <Text style={{color:c.critical, fontSize:11}}>{draft.errors.areaId}</Text>}
-    </View> : text(projectId === ALL_PROJECTS && row ? [row.area, row.projectName].filter(Boolean).join(" · ") : row?.area);
+    </View> : text(projectId === ALL_PROJECTS && row ? [projectDisplay(row.area), projectDisplay(row.projectName)].filter(Boolean).join(" · ") : projectDisplay(row?.area));
     const actions = draft ? <View style={styles.field}>
       {!!draft.error && <Text accessibilityRole="alert" style={{color:c.critical, fontSize:11}}>{draft.error}</Text>}
       {button('Cancel', () => setDrafts(previous => previous.filter(item => item.id !== draft.id)), saving)}
@@ -277,7 +299,8 @@ export default function AdminEquipmentListScreen({onEquipmentPress, onDocumentsP
     const grade = row?.lastInspectionGrade;
     const gradeLabel = grade === 'Visual' ? 'V' : grade === 'Close' ? 'C' : grade === 'Detailed' ? 'D' : grade;
     return {id: draft?.id ?? row!.equipmentRecordId, cells: [
-      text(row?.sequenceNo), draft ? field(draft, 'equipmentCode', 'Item number') : text(row?.itemNumber),
+      text(row?.sequenceNo), text(projectDisplay(row?.projectName ?? currentProject?.projectName)),
+      draft ? field(draft, 'equipmentCode', 'Item number') : text(row?.itemNumber),
       draft ? field(draft, 'tagNumber', 'Ex-Tag *') : text(row?.tagNumber), area,
       draft ? field(draft, 'description', 'Description') : text(row?.metadataAvailability?.description === 'NotApplicable' ? 'Not Applicable' : row?.description),
       technical('manufacturer', 'Manufacturer'),
@@ -296,41 +319,57 @@ export default function AdminEquipmentListScreen({onEquipmentPress, onDocumentsP
     ...displayed.map(row => gridRow(row, draftsById.get(row.equipmentRecordId))),
   ];
   const canAdd = !loading && !loadError && !!areas.length && !saving && drafts.length < 100;
-  return <ScrollView style={{flex:1, backgroundColor:c.bg}} contentContainerStyle={styles.content}>
-    <Text accessibilityRole="header" style={[styles.title, {color:c.text}]}>HAER</Text>
-    <Text style={{color:c.secondary}}>Hazardous Area Equipment Register</Text>
+  return <ScrollView nativeID="ex-haer" style={{flex:1, backgroundColor:c.bg}}
+    contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <View nativeID="ex-haer-hero" style={styles.hero}>
+      <Image accessible={false} source={OFFSHORE_ART} resizeMode="cover" style={styles.heroImage} />
+      <View nativeID="ex-haer-hero-overlay" pointerEvents="none"
+        style={[StyleSheet.absoluteFill, Platform.OS !== 'web' && styles.nativeOverlay]} />
+      <View style={styles.heroCopy}>
+        <Text style={styles.eyebrow}>ASSET REGISTER  /  HAER</Text>
+        <Text accessibilityRole="header" style={styles.title}>HAER</Text>
+        <Text style={styles.heroDescription}>Manage hazardous-area equipment by project, area and tag.</Text>
+      </View>
+    </View>
+    <View nativeID="ex-haer-panel" style={[styles.panel, {backgroundColor:c.card, borderColor:c.border}]}>
+    <Text accessibilityRole="header" style={[styles.panelTitle, {color:c.text}]}>
+      <Text style={{color:c.cyan}}>▱  </Text>Hazardous Area Equipment Register
+    </Text>
     <View style={styles.toolbar}>
       <View style={styles.projectField}>
         <Text style={{color: c.secondary, fontSize: 11}}>Select Project</Text>
-        {button(`${currentProject?.projectName ?? 'All Projects'} ▾`, () => {
+        {button(`${projectDisplay(currentProject?.projectName) || 'All Projects'} ▾`, () => {
           setProjectQuery(''); setProjectPicker(true);
-        }, loadingProjects || saving || drafts.length > 0)}
+        }, loadingProjects || saving || drafts.length > 0, false, true)}
       </View>
       <View style={styles.projectField}>
-        <Text style={{color:c.secondary,fontSize:11}}>Client Name</Text>
+        <Text style={{color:c.secondary,fontSize:11}}>Client Company Name</Text>
         <View style={[styles.button,{alignSelf:'stretch',backgroundColor:c.card,borderColor:c.border}]}>
           <Text accessibilityLiveRegion="polite" style={{color:c.text}}>
-            {projectId === ALL_PROJECTS ? 'All Clients' : currentProject?.clientName?.trim() || 'No client assigned'}
+            {projectId === ALL_PROJECTS ? 'All Client Companies' : currentProject?.clientName?.trim() || 'Client company not specified'}
           </Text>
         </View>
       </View>
     </View>
-    <View style={styles.toolbar}>
-      <TextInput accessibilityLabel="Search HAER" placeholder="Search item, Ex-Tag, description, manufacturer, serial or area…"
+    <View style={[styles.searchRow, {backgroundColor:c.elevated, borderColor:c.border}]}>
+      <Text accessible={false} style={{color:c.cyan, fontSize:20}}>⌕</Text>
+      <TextInput accessibilityLabel="Search HAER" placeholder="Search project, item, Ex-Tag, description, manufacturer, serial or area…"
         placeholderTextColor={c.muted} value={query} onChangeText={value => {setQuery(value); setPage(1);}}
-        style={[styles.input, styles.search, {color:c.text, backgroundColor:c.card, borderColor:c.border}]} />
-      {button('Refresh', () => setRefresh(value => value + 1), saving || loading)}
-      {button('+ Create / Manage Areas', () => setManageAreas(true), !currentProject || loadingProjects || saving)}
+        style={[styles.search, {color:c.text}]} />
     </View>
     <View style={styles.toolbar}>
       {button('+ Add HAER Record', add, !canAdd, true)}
       {button('+ Bulk Add', () => setBulk(!bulk), !canAdd && !bulk)}
-      {button(saving ? 'Saving…' : 'Save Changes', () => void save(), saving || !drafts.length, true)}
+      {button(saving ? 'Saving…' : 'Save Changes', () => void save(), saving || !drafts.length)}
       {button('Cancel All', () => {setDrafts([]); setMessage('');}, saving || !drafts.length)}
       {text(`${filtered.length} of ${rows.length} equipment records${drafts.length ? ` · ${drafts.length} unsaved` : ''}`)}
+      <View style={styles.secondaryActions}>
+        {button('↻ Refresh', () => setRefresh(value => value + 1), saving || loading)}
+        {button('+ Create / Manage Areas', () => setManageAreas(true), !currentProject || loadingProjects || saving)}
+      </View>
     </View>
     {bulk && <View style={styles.field}>
-      <Text style={{color:c.secondary}}>Paste Excel rows in the same 21-column order. Use “Type / Model” to split that cell. Inspection and status columns are supplied by inspection records.</Text>
+      <Text style={{color:c.secondary}}>Paste Excel rows in the displayed 22-column order, or the original 21-column order without Project Name. Project Name is assigned from the selected project. Use “Type / Model” to split that cell. Inspection and status columns are supplied by inspection records.</Text>
       <TextInput accessibilityLabel="Paste HAER rows from Excel" multiline value={paste} editable={!saving} onChangeText={setPaste}
         placeholder="Paste tab-separated rows" placeholderTextColor={c.muted}
         style={[styles.input, {minHeight:70, backgroundColor:c.card, color:c.text, borderColor:c.border}]} />
@@ -348,6 +387,7 @@ export default function AdminEquipmentListScreen({onEquipmentPress, onDocumentsP
       {button('Previous', () => setPage(visiblePage - 1), visiblePage <= 1)}
       {text(`Page ${visiblePage} of ${pageCount}`)}
       {button('Next', () => setPage(visiblePage + 1), visiblePage >= pageCount)}
+    </View>
     </View>
     <Modal visible={projectPicker} transparent onRequestClose={() => setProjectPicker(false)}>
       <View style={styles.overlay}><View style={[styles.dialog, {backgroundColor: c.card}]}>
@@ -379,13 +419,25 @@ export default function AdminEquipmentListScreen({onEquipmentPress, onDocumentsP
 }
 
 const styles = StyleSheet.create({
-  content:{padding:18, gap:10, paddingBottom:42},
-  title:{fontSize:28,fontWeight:'800'},
-  projectField:{gap:3,flexBasis:220,flexGrow:1},
+  content:{padding:16, gap:16, paddingBottom:32},
+  hero:{minHeight:144, justifyContent:'center', padding:22, borderWidth:1, borderColor:'#126078',
+    borderRadius:18, overflow:'hidden', backgroundColor:'#03192C'},
+  heroImage:{position:'absolute', right:0, width:'63%', height:'100%'},
+  nativeOverlay:{backgroundColor:'#03192C99'},
+  heroCopy:{borderLeftWidth:3, borderLeftColor:'#00D9EE', paddingLeft:16, gap:4},
+  eyebrow:{fontFamily:visual.mono, color:'#00D9EE', fontWeight:'800', fontSize:11, letterSpacing:1.7},
+  title:{fontFamily:visual.display, color:'#F5FAFF', fontSize:38,fontWeight:'900'},
+  heroDescription:{color:'#F5FAFF', fontSize:14},
+  panel:{padding:14, gap:12, borderWidth:1, borderRadius:18, minWidth:0},
+  panelTitle:{fontSize:20, fontWeight:'900'},
+  projectField:{gap:5,flexBasis:220,flexGrow:1,minWidth:0},
   toolbar:{flexDirection:'row',flexWrap:'wrap',alignItems:'center',gap:8},
-  button:{minHeight:34,borderWidth:1,borderRadius:5,paddingVertical:6,paddingHorizontal:9,justifyContent:'center',alignSelf:'flex-start'},
+  secondaryActions:{flexDirection:'row',flexWrap:'wrap',gap:8,marginLeft:'auto'},
+  button:{minHeight:38,borderWidth:1,borderRadius:9,paddingVertical:7,paddingHorizontal:11,justifyContent:'center',alignSelf:'flex-start'},
+  stretchedButton:{alignSelf:'stretch'},
   input:{borderWidth:1,borderRadius:5,paddingHorizontal:7,paddingVertical:5,minHeight:34,fontSize:12},
-  search:{flexGrow:1,minWidth:240},
+  searchRow:{flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:12,minHeight:42,borderWidth:1,borderRadius:10},
+  search:{flex:1,minWidth:0,minHeight:40,fontSize:13},
   field:{gap:4},
   rowActions:{flexDirection:'row', flexWrap:'wrap', gap:7},
   choice:{gap:3},

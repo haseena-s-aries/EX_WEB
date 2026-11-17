@@ -9,6 +9,7 @@ import {InspectionPhotoFile} from '../api/projects';
 
 type Props = {
   disabled?: boolean;
+  allowPdf?: boolean;
   onSelected: (files: InspectionPhotoFile[]) => void;
 };
 
@@ -19,7 +20,19 @@ const toPhotoFile = (asset: Asset): InspectionPhotoFile => ({
   webFile: (asset as any).file,
 });
 
-export default function InspectionPhotoPicker({disabled, onSelected}: Props) {
+export default function InspectionPhotoPicker({disabled, onSelected, allowPdf = true}: Props) {
+  const selectPdf = async () => {
+    const {errorCodes, isErrorWithCode, pick, types} = await import('@react-native-documents/picker');
+    try {
+      const files = await pick({type: [types.pdf], mode: 'import', allowMultiSelection: true});
+      onSelected(files.filter(file => file.name).map(file => ({
+        uri: file.uri, type: 'application/pdf', fileName: file.name!,
+      })));
+    } catch (error) {
+      if (isErrorWithCode(error) && error.code === errorCodes.OPERATION_CANCELED) return;
+      Alert.alert('Could not select PDF', 'Try choosing the file again.');
+    }
+  };
   const selectFromGallery = async () => {
     const result = await launchImageLibrary({mediaType: 'photo', selectionLimit: 0});
     if (result.didCancel) return;
@@ -54,6 +67,10 @@ export default function InspectionPhotoPicker({disabled, onSelected}: Props) {
         style={[styles.button, disabled && styles.disabled]}>
         <Text style={styles.buttonText}>Gallery</Text>
       </TouchableOpacity>
+      {allowPdf && <TouchableOpacity accessibilityRole="button" disabled={disabled} onPress={selectPdf}
+        style={[styles.button, disabled && styles.disabled]}>
+        <Text style={styles.buttonText}>Choose PDF</Text>
+      </TouchableOpacity>}
     </View>
   );
 }

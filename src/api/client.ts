@@ -1,5 +1,7 @@
 import axios from 'axios';
+import {setSessionProfile} from './profileState';
 import {Platform} from 'react-native';
+import {writeBrowserSession} from './browserSession';
 
 const webConfig = (globalThis as typeof globalThis & {
   EX_SURVEY_CONFIG?: {apiBaseUrl?: string};
@@ -19,6 +21,8 @@ const apiClient = axios.create({
 let authToken: string | null = null;
 
 export const setAuthToken = (token: string | null) => {
+  if (Platform.OS === 'web') writeBrowserSession(token);
+  if (!token) setSessionProfile(null);
   authToken = token;
   if (token) {
     apiClient.defaults.headers.common.Authorization = `Bearer ${token}`;

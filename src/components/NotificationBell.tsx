@@ -1,3 +1,5 @@
+import {getAuthToken} from '../api/client';
+import {readAccessNotice,dismissAccessNotice,subscribeUserAccess} from '../api/userAccess';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {AppNotification, buildNotifications, loadDismissedIds, loadReadIds, NotificationType, saveDismissedIds, saveReadIds} from '../notifications/notifications';
@@ -53,13 +55,14 @@ export default function NotificationBell({role, userKey, refreshKey, onSelect, c
   const ICONS = useMemo(() => iconStyles(c), [c]);
 
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  useEffect(() => { setReadIds(loadReadIds(userKey)); setDismissedIds(loadDismissedIds(userKey)); }, [userKey]);
+  useEffect(() => { setItems([]);setReadIds(loadReadIds(userKey)); setDismissedIds(loadDismissedIds(userKey)); }, [userKey]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
+      const token=getAuthToken();
       const next = await buildNotifications(role);
-      if (alive.current) { setItems(next); setFailed(false); }
+      if (alive.current && token===getAuthToken()) { setItems(next); setFailed(false); }
     } catch {
       if (alive.current) setFailed(true);
     } finally {
@@ -74,15 +77,16 @@ export default function NotificationBell({role, userKey, refreshKey, onSelect, c
   }, [refresh]);
   useEffect(() => { if (open) refresh(); }, [open, refresh]);
 
+  useEffect(()=>subscribeUserAccess(()=>void refresh()),[refresh]);
   const persist = (next: Set<string>) => { setReadIds(next); saveReadIds(userKey, next); };
-  const markRead = (id: string) => { if (!readIds.has(id)) persist(new Set<string>(readIds).add(id)); };
-  const markAllRead = () => persist(new Set<string>([...Array.from(readIds), ...items.map(item => item.id)]));
+  const markRead = async (id:string) => {const item=items.find(n=>n.id===id);try{if(item?.serverId)await readAccessNotice(item.serverId);if(alive.current)persist(new Set<string>(readIds).add(id));}catch{if(alive.current)setFailed(true);}};
+  const markAllRead = async () => {try{await Promise.all(items.filter(n=>n.serverId&&!n.readAt).map(n=>readAccessNotice(n.serverId!)));if(alive.current)persist(new Set<string>([...Array.from(readIds),...items.map(n=>n.id)]));}catch{if(alive.current)setFailed(true);void refresh();}};
 
-  const dismiss = (id: string) => { const next = new Set<string>(dismissedIds); next.add(id); setDismissedIds(next); saveDismissedIds(userKey, next); };
+  const dismiss = async(id:string)=>{try{const item=items.find(n=>n.id===id);if(item?.serverId)await dismissAccessNotice(item.serverId);if(alive.current){const next=new Set<string>(dismissedIds);next.add(id);setDismissedIds(next);saveDismissedIds(userKey,next);}}catch{if(alive.current)setFailed(true);}};
   const visible = items.filter(item => !dismissedIds.has(item.id));
-  const unread = visible.filter(item => !readIds.has(item.id)).length;
+  const unread = visible.filter(item => !(item.readAt || readIds.has(item.id))).length;
   // unread first, then read; order inside each group is already newest-first
-  const sorted = [...visible.filter(item => !readIds.has(item.id)), ...visible.filter(item => readIds.has(item.id))];
+  const sorted = [...visible.filter(item => !(item.readAt || readIds.has(item.id))), ...visible.filter(item => (item.readAt || readIds.has(item.id)))];
 
   return <>
     <TouchableOpacity accessibilityLabel={`Notifications${unread ? `, ${unread} unread` : ''}`} onPress={() => setOpen(true)} style={[styles.bell, compact && styles.bellCompact]}>
@@ -107,7 +111,7 @@ export default function NotificationBell({role, userKey, refreshKey, onSelect, c
             {!failed && !loading && visible.length === 0 && <View style={styles.emptyBox}><Text style={styles.emptyIcon}>🔔</Text><Text style={styles.emptyTitle}>No notifications</Text><Text style={styles.empty}>New activity will appear here.</Text></View>}
             {sorted.map(item => {
               const style = ICONS[item.type as NotificationType];
-              const isUnread = !readIds.has(item.id);
+              const isUnread = !(item.readAt || readIds.has(item.id));
               return <View key={item.id} style={[styles.row, isUnread && styles.rowUnread]}>
                 <TouchableOpacity onPress={() => { markRead(item.id); setOpen(false); onSelect?.(item); }} style={styles.rowMain}>
                   <View style={[styles.iconBox, {backgroundColor: style.bg}]}><Text style={styles.iconText}>{style.icon}</Text></View>
@@ -116,7 +120,7 @@ export default function NotificationBell({role, userKey, refreshKey, onSelect, c
                       <Text numberOfLines={1} style={[styles.rowTitle, {color: isUnread ? c.text : c.secondary}]}>{item.title}</Text>
                       {!!item.time && <Text style={styles.rowTime}>{timeAgo(item.time)}</Text>}
                     </View>
-                    <Text numberOfLines={3} style={styles.rowMessage}>{item.message}</Text>
+                    <Text numberOfLines={item.type === 'assigned' ? undefined : 3} style={styles.rowMessage}>{item.message}</Text>
                   </View>
                   {isUnread && <View style={styles.dot} />}
                 </TouchableOpacity>

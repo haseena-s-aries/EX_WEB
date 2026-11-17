@@ -6,4 +6,4 @@ export function validateClientLogo(file: {name?: string | null; type?: string | 
   return !['jpg', 'jpeg', 'png'].includes(extension || '') || (!!file.type && file.type !== expected && file.type !== 'application/octet-stream')
     ? 'Only JPG, JPEG and PNG images are allowed.' : '';
 }
-export type ClientLogoProps = {value: ClientLogoFile | null; onChange: (file: ClientLogoFile | null) => void; disabled?: boolean};
+export type ClientLogoProps = {value: ClientLogoFile | null; onChange: (file: ClientLogoFile | null) => void; disabled?: boolean; label?: string};

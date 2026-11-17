@@ -1,3 +1,4 @@
+jest.mock('../src/components/ReportWorkflowPanel', () => 'ReportWorkflowPanel');
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import {TouchableOpacity} from 'react-native';
@@ -8,12 +9,15 @@ import {
   getSurveyorProjectAreas,
 } from '../src/api/projects';
 
+jest.mock('../src/components/ProjectWorkSchedulePanel', () => 'ProjectWorkSchedulePanel');
+jest.mock('../src/components/InspectionPhotoPicker', () => 'InspectionPhotoPicker');
 jest.mock('../src/components/AuthenticatedImage', () => 'AuthenticatedImage');
 jest.mock('../src/api/projects', () => ({
   getSurveyorProject: jest.fn(),
   getSurveyorProjectAreas: jest.fn(),
   getSurveyorEquipment: jest.fn(),
-  getProjectAreaPhotos: jest.fn(),
+  getProjectAreaPhotos: jest.fn().mockResolvedValue({data: []}),
+  getCommonLayouts: jest.fn().mockResolvedValue({data: []}),
 }));
 
 const project = {
@@ -113,7 +117,8 @@ test('expands project areas and grouped equipment independently', async () => {
   expect(onEquipmentPress).toHaveBeenCalledWith('pipe', 'equipment-1');
 
   await ReactTestRenderer.act(async () => {
-    buttonNamed(renderer.root, 'Rack')?.props.onPress();
+    renderer.root.findAllByType(TouchableOpacity).find(button =>
+      button.props.accessibilityState?.expanded === false && textOf(button).includes('RACK'))?.props.onPress();
   });
   expect(buttonNamed(renderer.root, 'EQ-001')).toBeUndefined();
 });

@@ -1,7 +1,9 @@
+import apiClient from '../api/client';
+import {getAccessNotices} from '../api/userAccess';
 import {getClientNotifications} from '../api/clientDashboard';
-import {getPendingApprovals} from '../api/auth';
 import {
   getAssignmentOptions,
+  getProjectDelayAlerts,
   getProject,
   getProjects,
   getQcProjects,
@@ -24,8 +26,9 @@ export type NotificationTarget =
   | {kind: 'project'; projectId: string}
   | {kind: 'surveyorProject'; projectId: string}
   | {kind: 'surveyorEquipment'; projectId: string; areaId: string; equipmentId: string}
+  | {kind: 'inspectionActivity'; activityId: string}
   | {kind: 'clientProject'; projectId: string}
-  | {kind: 'users'};
+  | {kind: 'users'; userId?:string; roleRequestId?:string};
 
 export type AppNotification = {
   id: string; // stable id: the read/unread state is stored against it
@@ -33,6 +36,8 @@ export type AppNotification = {
   title: string;
   message: string;
   time?: string | null;
+  serverId?:string;
+  readAt?:string;
   target?: NotificationTarget;
 };
 
@@ -105,22 +110,19 @@ async function buildQcNotifications(): Promise<AppNotification[]> {
 
 // ---------------------------------------------------------------- Admin / Manager
 async function buildManagerNotifications(): Promise<AppNotification[]> {
-  const [projectsResult, pendingResult, optionsResult] = await Promise.allSettled([getProjects(), getPendingApprovals(), getAssignmentOptions()]);
+  const [projectsResult, optionsResult, delaysResult] = await Promise.allSettled([getProjects(), getAssignmentOptions(), getProjectDelayAlerts()]);
   const list: AppNotification[] = [];
 
-  // 1. user management: people waiting for approval
-  if (pendingResult.status === 'fulfilled') {
-    const pending: any[] = Array.isArray(pendingResult.value.data) ? pendingResult.value.data : pendingResult.value.data?.users || [];
-    for (const user of pending) {
-      const id = String(first(user, 'id', 'userId', 'email') ?? '');
-      if (!id) continue;
+  if (delaysResult.status === 'fulfilled') {
+    for (const alert of delaysResult.value.data) {
       list.push({
-        id: `users:${id}`,
-        type: 'users',
-        title: 'New user awaiting approval',
-        message: `${first(user, 'displayName', 'name', 'email') || 'A user'}${first(user, 'role') ? ` (${first(user, 'role')})` : ''} requested access.`,
-        time: first(user, 'createdAt', 'requestedAt', 'createdDate') || null,
-        target: {kind: 'users'},
+        id: `project-delay:${alert.id}`, type: 'overdue', title: `Project Delay Alert – ${alert.projectName}`,
+        message: [alert.jobNo, alert.kind === 'Overdue' ? 'Overdue' : 'Delay reported', alert.surveyorName,
+          `Target ${alert.targetDate}`, alert.expectedWorkEndDate && `Expected ${alert.expectedWorkEndDate}`,
+          `${alert.delayDays} calendar days delayed`, alert.delayReason || 'Awaiting Surveyor reason',
+          `Email: ${alert.emailStatus === 'Accepted' ? 'Accepted by SMTP' : alert.emailStatus === 'Sending' ? 'Awaiting confirmation' : alert.emailStatus}`]
+          .filter(Boolean).join(' · '),
+        time: alert.occurredAt, target: {kind: 'project', projectId: alert.projectId},
       });
     }
   }
@@ -233,9 +235,9 @@ async function buildSurveyorNotifications(): Promise<AppNotification[]> {
   if (projectsResult.status === 'fulfilled') {
     for (const project of projectsResult.value.data || []) {
       list.push({
-        id: `sv-assigned:${project.projectId}`,
+        id: `sv-assigned:${project.projectId}${project.isTransferred ? ":handover" : ""}`,
         type: 'assigned',
-        title: 'New project assigned to you',
+        title: project.isTransferred ? 'Project handed over to you' : 'New project assigned to you',
         message: `${project.projectName}${project.jobNo ? ` (${project.jobNo})` : ''}${project.location ? ` · ${project.location}` : ''}`,
         time: project.createdDate || null,
         target: {kind: 'surveyorProject', projectId: String(project.projectId)},
@@ -245,13 +247,31 @@ async function buildSurveyorNotifications(): Promise<AppNotification[]> {
   return newestFirst(list);
 }
 
-export const buildNotifications = (role: string): Promise<AppNotification[]> => {
+const buildDerivedNotifications = (role: string): Promise<AppNotification[]> => {
   const key = role.toLowerCase();
-  if (key === 'client') return getClientNotifications().then(res => newestFirst(res.data.map(n => ({id: n.id, type: /approved/i.test(n.title) ? 'approved' : /report/i.test(n.title) ? 'assigned' : /defect/i.test(n.title) ? 'comments' : 'submitted', title: n.title, message: n.message, time: n.time, target: {kind: 'clientProject', projectId: n.projectId}}))));
+  if (key === 'client') return getClientNotifications().then(res => newestFirst(res.data.map(n => ({id: n.id, type: /approved/i.test(n.title) ? 'approved' : /report|assigned/i.test(n.title) ? 'assigned' : /defect/i.test(n.title) ? 'comments' : 'submitted', title: n.title, message: n.message, time: n.time, target: {kind: 'clientProject', projectId: n.projectId}}))));
   if (key === 'qc') return buildQcNotifications();
   if (key === 'surveyor') return buildSurveyorNotifications();
   if (key === 'admin' || key === 'manager') return buildManagerNotifications();
   return Promise.resolve([]);
+};
+
+export const buildNotifications = async (role:string):Promise<AppNotification[]> => {
+  const [derived,persistent,assignments]=await Promise.allSettled([Promise.resolve().then(()=>buildDerivedNotifications(role)),Promise.resolve().then(()=>getAccessNotices()), role.toLowerCase() === "client" ? Promise.resolve({data: []}) : apiClient.get<any[]>("/projects/assignment-notifications")]);
+  let existing=derived.status==='fulfilled'?derived.value:[];
+  if (assignments.status === 'fulfilled' && Array.isArray(assignments.value.data)) {
+    const notices: AppNotification[] = assignments.value.data.map(n => ({id: `assignment:${n.id}`, type: 'assigned', title: n.title, message: n.message, time: n.time,
+      target: role.toLowerCase() === 'surveyor' ? {kind: 'surveyorProject', projectId:n.projectId} : role.toLowerCase() === 'qc' ? {kind:'qcProject', projectId:n.projectId} : {kind:'project',projectId:n.projectId}}));
+    const assignedProjects = new Set(notices.map(n => n.target && 'projectId' in n.target ? n.target.projectId : ''));
+    existing = [...existing.filter(n => !(n.type === 'assigned' && n.target && 'projectId' in n.target && assignedProjects.has(n.target.projectId))), ...notices];
+  }
+  if(persistent.status!=='fulfilled') {if(derived.status==='rejected')throw derived.reason;return existing;}
+  const notices:AppNotification[]=(persistent.value?.data||[]).map(n=>({id:`access:${n.id}`,serverId:n.id,readAt:n.readAt,
+    type:n.kind==='Decision'||(n.kind==='InspectionReview'&&/approved/i.test(n.title))?'approved':n.kind==='InspectionReview'?'comments':'users',title:n.title,message:n.message,time:n.createdAt,
+    target:n.kind==='Registration'||n.kind==='RoleRequest'?{kind:'users',userId:n.targetUserId,roleRequestId:n.roleRequestId}:
+      n.kind==='InspectionReview'&&n.inspectionActivityId?{kind:'inspectionActivity',activityId:n.inspectionActivityId}:
+      n.kind==='InspectionReview'&&n.projectId&&n.areaId&&n.equipmentId?{kind:'surveyorEquipment',projectId:n.projectId,areaId:n.areaId,equipmentId:n.equipmentId}:undefined}));
+  return newestFirst([...existing,...notices]);
 };
 
 // ---------------------------------------------------------------- read state (per user, kept on this device)

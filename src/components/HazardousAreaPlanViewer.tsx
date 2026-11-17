@@ -15,9 +15,11 @@ import { PlanViewerProps } from './hazardousAreaPlan';
 export default function HazardousAreaPlanViewer({
   title,
   path,
+  local,
   fileName,
   contentType,
   onClose,
+  onDownload,
 }: PlanViewerProps) {
   const { width, height } = useWindowDimensions();
   const [zoom, setZoom] = useState(1);
@@ -29,8 +31,8 @@ export default function HazardousAreaPlanViewer({
     contentType === 'application/pdf' ||
     fileName?.toLowerCase().endsWith('.pdf');
   const source = {
-    uri: getApiResourceUrl(path),
-    headers: { Authorization: `Bearer ${getAuthToken()}` },
+    uri: local ? path : getApiResourceUrl(path),
+    headers: local ? undefined : { Authorization: `Bearer ${getAuthToken()}` },
     cache: false,
   };
   const fit = size.width
@@ -54,6 +56,7 @@ export default function HazardousAreaPlanViewer({
         </Text>
         <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
           {button('Close', onClose)}
+          {onDownload && button('Download', onDownload)}
           {button('−', () => setZoom(v => Math.max(0.5, v / 1.25)))}
           {button('+', () => setZoom(v => Math.min(8, v * 1.25)))}
           {button('Fit', () => setZoom(1))}

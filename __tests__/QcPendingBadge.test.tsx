@@ -7,7 +7,7 @@ import QcPendingBadge from '../src/components/QcPendingBadge';
 const textOf = (node: Renderer.ReactTestInstance): string => node.children.map(child => typeof child === 'string' ? child : textOf(child)).join('');
 test.each(['Qc', 'Manager', 'Admin'])('%s sidebar places only the positive pending count beside QC Pending', async userRole => {
   let renderer!: Renderer.ReactTestRenderer;
-  const props = {active: 'QcPending', userName: 'User', userRole, onNavigate: jest.fn(), onLogout: jest.fn()};
+  const props = {active: 'QcPending', onSettings: jest.fn(), userRole, onNavigate: jest.fn(), onLogout: jest.fn()};
   await Renderer.act(async () => {renderer = Renderer.create(<Sidebar {...props} qcPendingCount={3} />);});
   const item = renderer.root.findAllByType(TouchableOpacity).find(node => textOf(node).startsWith('▤QC Pending'))!;
   expect(textOf(item)).toBe('▤QC PendingAwaiting review3');
@@ -17,7 +17,7 @@ test.each(['Qc', 'Manager', 'Admin'])('%s sidebar places only the positive pendi
 });
 test.each(['Surveyor', 'Client'])('%s cannot see QC Pending or its badge', async userRole => {
   let renderer!: Renderer.ReactTestRenderer;
-  await Renderer.act(async () => {renderer = Renderer.create(<Sidebar active="Dashboard" userName="User" userRole={userRole} onNavigate={jest.fn()} onLogout={jest.fn()} qcPendingCount={3} />);});
+  await Renderer.act(async () => {renderer = Renderer.create(<Sidebar active="Dashboard" onSettings={jest.fn()} userRole={userRole} onNavigate={jest.fn()} onLogout={jest.fn()} qcPendingCount={3} />);});
   expect(textOf(renderer.root)).not.toContain('QC Pending');
   expect(renderer.root.findAllByType(QcPendingBadge)).toHaveLength(0);
   await Renderer.act(async () => {renderer.unmount();});

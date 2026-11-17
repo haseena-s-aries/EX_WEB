@@ -1,3 +1,15 @@
+import ClientAssignmentPicker from './ClientAssignmentPicker';
+import ReportWorkflowPanel from './ReportWorkflowPanel';
+import {chooseAreaAttachment} from './chooseAreaAttachment';
+import {isPdfFile} from '../utils/isPdfFile';
+import ProjectWorkSchedulePanel from './ProjectWorkSchedulePanel';
+import ProjectDateField from './ProjectDateField';
+import {projectDisplay} from '../utils/projectDisplay';
+import ProjectFormBannerArt from './ProjectFormBannerArt';
+import ProjectImageGallery from './ProjectImageGallery';
+import {useThemeMode} from '../theme/useThemeMode';
+import SearchableOptionPicker from './SearchableOptionPicker';
+import ProjectSurveyorManagement from './ProjectSurveyorManagement';
 import {DashboardSectionHeader as SectionHeader} from './DashboardPresentation';
 import {projectDetailStyles as styles} from '../theme/projectDetailStyles';
 import OurCompanySection from './OurCompanySection';
@@ -11,6 +23,7 @@ import HazardousAreaPlanUpload from './HazardousAreaPlanUpload';
 import HazardousAreaPlanSection from './HazardousAreaPlanSection';
 import {HazardousAreaPlanFile} from './hazardousAreaPlan';
 import React, {useEffect, useRef, useState} from 'react';
+import useNativeNavigation from '../navigation/useNativeNavigation';
 import {
   Modal,
   View,
@@ -33,10 +46,12 @@ import {
 } from '../api/projects';
 import {getApiErrorMessage} from '../api/errors';
 
-type UserOption = {id: string; displayName: string; managerId?: string | null; managerName?: string | null};
+type UserOption = {id: string; displayName: string; email?: string; managerId?: string | null; managerName?: string | null};
 
 type Props = {
   userRole?: string;
+  fullPage?: boolean;
+  onEdit?: () => void;
   onDeleted?: () => void | Promise<void>;
   visible: boolean;
   project: any | null;
@@ -47,13 +62,17 @@ type Props = {
     removeClientLogo?: boolean;
     hazardousAreaPlan?: HazardousAreaPlanFile | null;
     projectName: string;
-    sector: string;
     jobNo: string;
+    targetDate: string;
     location: string;
     vesselOrSiteName: string;
     assignedSurveyorId: string;
+    preserveSurveyorAssignment?: boolean;
     assignedQcId: string;
+    additionalQcId?: string | null;
+    updateAdditionalQcAssignment?: boolean;
     assignedClientId?: string | null;
+    assignedClientIds?: string[];
     status: string;
   }) => void;
   onAreasChanged?: () => void;
@@ -61,6 +80,7 @@ type Props = {
   qcUsers: UserOption[];
   clients: UserOption[];
   loading?: boolean;
+  saveError?: string;
 };
 
 type AreaRow = {
@@ -76,14 +96,6 @@ type AreaRow = {
   deleting?: boolean;
 };
 
-const SECTOR_OPTIONS = [
-  'Oil & Gas',
-  'Shipping',
-  'Offshore Wind',
-  'Naval',
-  'Port & Terminal',
-  'Fisheries',
-];
 
 const STATUS_OPTIONS = [
   {label: 'Pending', icon: '⏳', color: '#a75a0b', bg: '#fff0d7'},
@@ -123,6 +135,8 @@ function confirmAction(message: string, confirmLabel: string, onConfirm: () => v
 
 export default function ProjectDetailModal({
   userRole,
+  fullPage = false,
+  onEdit,
   onDeleted,
   visible,
   project,
@@ -133,10 +147,13 @@ export default function ProjectDetailModal({
   qcUsers,
   clients,
   loading,
+  saveError,
 }: Props) {
+  const navigation = useNativeNavigation();
   const {width} = useWindowDimensions();
   const compactInformation = width < 640;
-  const [editing, setEditing] = useState(false);
+  const editing = fullPage;
+  const dark = useThemeMode() === 'dark';
   const [planDetails, setPlanDetails] = useState<any>({});
   const [hazardousAreaPlan, setHazardousAreaPlan] = useState<HazardousAreaPlanFile | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -146,13 +163,14 @@ export default function ProjectDetailModal({
   const [clientLogo, setClientLogo] = useState<ClientLogoFile | null>(null);
   const [removeClientLogo, setRemoveClientLogo] = useState(false);
   const [projectName, setProjectName] = useState('');
-  const [sector, setSector] = useState(SECTOR_OPTIONS[0]);
+  const [targetDate, setTargetDate] = useState('');
   const [jobNo, setJobNo] = useState('');
   const [location, setLocation] = useState('');
   const [vesselOrSiteName, setVesselOrSiteName] = useState('');
   const [surveyorId, setSurveyorId] = useState('');
   const [qcId, setQcId] = useState('');
-  const [clientId, setClientId] = useState('');
+  const [additionalQcId, setAdditionalQcId] = useState('');
+  const [clientIds, setClientIds] = useState<string[]>([]);
   const [status, setStatus] = useState('Pending');
   const [areas, setAreas] = useState<AreaRow[]>([]);
 
@@ -166,13 +184,14 @@ export default function ProjectDetailModal({
     setClientLogo(null); setRemoveClientLogo(false);
     setHazardousAreaPlan(null);
     setProjectName(pick(detail, 'projectName'));
-    setSector(pick(detail, 'sector') || SECTOR_OPTIONS[0]);
     setJobNo(pick(detail, 'jobNo', 'jobNumber'));
+    setTargetDate(detail.targetDate || '');
     setLocation(pick(detail, 'location'));
     setVesselOrSiteName(pick(detail, 'vesselOrSiteName', 'vesselName'));
     setSurveyorId(pick(detail, 'assignedSurveyorId', 'surveyorId'));
     setQcId(pick(detail, 'assignedQcId', 'qcId'));
-    setClientId(pick(detail, 'assignedClientId', 'clientId'));
+    setAdditionalQcId(detail.additionalQcId || '');
+    setClientIds(detail.assignedClientIds ?? (pick(detail, 'assignedClientId', 'clientId') ? [pick(detail, 'assignedClientId', 'clientId')] : []));
     setStatus(pick(detail, 'status', 'projectStatus') || 'Pending');
 
     const rawAreas: any[] = detail.areas || [];
@@ -185,7 +204,7 @@ export default function ProjectDetailModal({
         fileName: '',
         layoutImagePath:
           pick(a, 'layoutImagePath', 'drawingPath', 'filePath') ||
-          pick(a.photos?.[0], 'downloadUrl', 'filePath') ||
+          pick(a.photos?.find((photo: any) => !isPdfFile(photo.fileName)), 'downloadUrl', 'filePath') ||
           null,
         photoCount:
           a.photoCount ?? a.photosCount ?? (Array.isArray(a.photos) ? a.photos.length : 0),
@@ -198,11 +217,10 @@ export default function ProjectDetailModal({
 
   useEffect(() => {
     if (visible && project) {
-      setEditing(false);
       applyDetail(project);
       setLoadingDetail(true);
       getProject(projectId)
-        .then(res => applyDetail(res.data))
+        .then(res => {originalForm.current = undefined; applyDetail(res.data);})
         .catch(err => {
           console.error(err?.response?.data || err.message);
         })
@@ -217,9 +235,63 @@ export default function ProjectDetailModal({
     }
   }, [visible, project]);
 
-  if (!project) return null;
+  const formValues = JSON.stringify({projectName, jobNo, targetDate, location, vesselOrSiteName, qcId, additionalQcId, clientIds, status, metadata, ourCompanyId, removeClientLogo});
+  const allowExit = useRef(false);
+  const originalForm = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!visible || !fullPage || loadingDetail || !planDetails.id && !planDetails.projectId) return;
+    originalForm.current ??= formValues;
+  }, [visible, fullPage, loadingDetail, planDetails, formValues]);
+  const dirty = (!!originalForm.current && originalForm.current !== formValues) ||
+    !!clientLogo || !!hazardousAreaPlan || areas.some(area => area.isNew || !!area.file || area.name !== area.savedName);
+  useEffect(() => {
+    if (!visible || !fullPage || !dirty || loading) return;
+    if (Platform.OS === 'web') {
+      const warn = (event: BeforeUnloadEvent) => {event.preventDefault(); event.returnValue = '';};
+      const navigate = (event: Event) => {
+        if (!window.confirm('Leave Edit Project and discard unsaved form changes?')) event.preventDefault();
+      };
+      window.addEventListener('beforeunload', warn);
+      window.addEventListener('ex-survey:before-navigation', navigate);
+      return () => {
+        window.removeEventListener('beforeunload', warn);
+        window.removeEventListener('ex-survey:before-navigation', navigate);
+      };
+    }
+    return navigation?.addListener('beforeRemove', event => {
+      if (allowExit.current) return;
+      event.preventDefault();
+      Alert.alert('Discard unsaved changes?', 'Saved assignment changes are kept.', [
+        {text: 'Keep editing'}, {text: 'Discard', style: 'destructive', onPress: () => {allowExit.current = true; navigation.dispatch(event.data.action);}},
+      ]);
+    });
+  }, [fullPage, visible, dirty, navigation, loading]);
+
+  if (!project || !visible) return null;
+
+  const cancelEdit = () => {
+    const close = () => {allowExit.current = true; onClose();};
+    if (!dirty) {close(); return;}
+    if (Platform.OS === 'web') {
+      if (window.confirm('Leave Edit Project and discard unsaved form changes?')) close();
+      return;
+    }
+    Alert.alert('Discard unsaved changes?', 'Saved assignment changes are kept.',
+      [{text: 'Keep editing'}, {text: 'Discard', style: 'destructive', onPress: close}]);
+  };
 
   const handleSave = async () => {
+    if (!metadata.clientName.trim()) {
+      if (Platform.OS === 'web') window.alert('Client Company Name is required.');
+      else Alert.alert('Required', 'Client Company Name is required.');
+      return;
+    }
+    if (!targetDate) {
+      const message = 'Select a Target Date before saving.';
+      if (Platform.OS === 'web') window.alert(message);
+      else Alert.alert('Target Date is required', message);
+      return;
+    }
     const pendingAreaIdxs = areas
       .map((a, i) =>
         a.isNew || (a.name.trim() && (a.file || a.name !== a.savedName)) ? i : -1,
@@ -233,13 +305,16 @@ export default function ProjectDetailModal({
     onSave({
       ...metadata, ourCompanyId, clientLogo, removeClientLogo,
       projectName,
-      sector,
       jobNo,
+      targetDate,
       location,
       vesselOrSiteName,
       assignedSurveyorId: surveyorId,
+      preserveSurveyorAssignment: true,
       assignedQcId: qcId,
-      assignedClientId: clientId,
+      additionalQcId: additionalQcId || null,
+      updateAdditionalQcAssignment: additionalQcId !== (planDetails.additionalQcId || ''),
+      assignedClientId: clientIds[0] || null, assignedClientIds: clientIds,
       hazardousAreaPlan,
       status,
     });
@@ -325,66 +400,69 @@ export default function ProjectDetailModal({
   const surveyorName =
     surveyors.find(s => s.id === surveyorId)?.displayName || (surveyorId ? surveyorId : '—');
   const qcName = qcUsers.find(u => u.id === qcId)?.displayName || (qcId ? qcId : '—');
-  const clientName = clients.find(c => c.id === clientId)?.displayName || (clientId ? clientId : '—');
+  const clientName = clientIds.map(id => clients.find(c => c.id === id)?.displayName || planDetails.assignedClients?.find((c: any) => c.id === id)?.displayName || id).join(', ') || '—';
   const statusMeta = STATUS_OPTIONS.find(s => s.label === status) ?? STATUS_OPTIONS[0];
 
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <Animated.View style={[styles.modal, {opacity, transform: [{scale}]}]}>
-          <View style={styles.headerBand}>
-            <View style={styles.headerGlow} />
+  if (fullPage && loadingDetail) return <View style={{padding: 20}}><ActivityIndicator accessibilityLabel="Loading project details" /></View>;
+
+  const content = (
+        <Animated.View nativeID={editing ? 'edit-project-form' : undefined} style={fullPage ? {flex: 1, width: '100%', backgroundColor: '#fff'} : [styles.modal, {opacity, transform: [{scale}]}]}>
+          <View nativeID={editing ? 'ex-project-form-banner' : undefined} style={styles.headerBand}>
+            {editing ? <ProjectFormBannerArt /> : <View style={styles.headerGlow} />}
             <View style={styles.headerIconWrap}>
               <Text style={styles.headerIcon}>📁</Text>
             </View>
             <View style={{flex: 1, zIndex: 1}}>
-              <Text style={styles.title}>{projectName || project.projectName}</Text>
+              <Text accessibilityRole="header" style={styles.title}>{editing ? 'Edit Project' : projectDisplay(projectName || project.projectName)}</Text>
               <Text style={styles.subtitle}>
-                {editing ? 'Editing project details' : 'Project details'}
+                {editing ? `${projectDisplay(projectName || project.projectName)} · Job ${projectDisplay(jobNo)} · ${status}` : 'Project details'}
                 {loadingDetail ? ' · refreshing…' : ''}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity onPress={editing ? cancelEdit : onClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView contentContainerStyle={styles.body} style={styles.bodyScroll}>
-            <SectionHeader color="#8fa7f8" icon="📁" title="Project Information" />
+          <ScrollView nativeID={editing ? 'ex-project-form-scroll' : undefined} keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.body} style={fullPage ? {flex: 1} : styles.bodyScroll}>
+            {!editing&&<ReportWorkflowPanel projectId={String(project.id)} readOnly compact/>}
+            {!!saveError && <Text accessibilityRole="alert" style={{color: "#b42318"}}>{saveError}</Text>}
+            <View nativeID={editing ? 'ex-project-information' : undefined}>
+            <SectionHeader color="#8fa7f8" icon="📁" title="PROJECT INFORMATION" />
 
             {editing ? (
               <>
                 <Field label="Project Name">
-                  <TextInput style={styles.input} value={projectName} onChangeText={value => setProjectName(value.toUpperCase())}
-                autoCapitalize="characters" />
+                  <TextInput nativeID="project-name-field" style={[styles.input, {textTransform: 'uppercase'}]} value={projectName} onChangeText={setProjectName}
+                autoCapitalize="none" />
                 </Field>
-                <View style={styles.row}>
+                <View style={[styles.row, compactInformation && styles.informationStack]}>
                   <View style={styles.half}>
-                    <Field label="Sector">
-                      <SimpleSelect value={sector} options={SECTOR_OPTIONS} onChange={setSector} />
-                    </Field>
+                    <ProjectDateField label="Target Date" value={targetDate} onChange={setTargetDate} disabled={loading} required />
                   </View>
                   <View style={styles.half}>
                     <Field label="Job Number">
-                      <TextInput style={styles.input} value={jobNo} onChangeText={value => setJobNo(value.toUpperCase())}
-                autoCapitalize="characters" />
+                      <TextInput nativeID="project-job-number-field" style={[styles.input, {textTransform: 'uppercase'}]} value={jobNo} onChangeText={setJobNo}
+                autoCapitalize="none" />
                     </Field>
                   </View>
                 </View>
-                <View style={styles.row}>
+                <View style={[styles.row, compactInformation && styles.informationStack]}>
                   <View style={styles.half}>
                     <Field label="Location">
-                      <TextInput style={styles.input} value={location} onChangeText={value => setLocation(value.toUpperCase())}
-                autoCapitalize="characters" />
+                      <TextInput nativeID="project-location-field" style={[styles.input, {textTransform: 'uppercase'}]} value={location} onChangeText={setLocation}
+                autoCapitalize="none" />
                     </Field>
                   </View>
                   <View style={styles.half}>
                     <Field label="Vessel / Site Name">
                       <TextInput
-                        style={styles.input}
+                        nativeID="project-vessel-field"
+                        style={[styles.input, {textTransform: 'uppercase'}]}
                         value={vesselOrSiteName}
-                        onChangeText={value => setVesselOrSiteName(value.toUpperCase())}
-                autoCapitalize="characters"
+                        onChangeText={setVesselOrSiteName}
+                autoCapitalize="none"
                       />
                     </Field>
                   </View>
@@ -393,12 +471,11 @@ export default function ProjectDetailModal({
             ) : (
               <View style={styles.informationPanel}>
                 <View style={[styles.informationRow, compactInformation && styles.informationStack]}>
-                  <ReadField label="Sector" value={sector} half={!compactInformation} information />
-                  <ReadField label="Job Number" value={jobNo || '—'} half={!compactInformation} information />
+                  <ReadField label="Job Number" value={projectDisplay(jobNo) || '—'} half={!compactInformation} information />
                 </View>
                 <View style={[styles.informationRow, compactInformation && styles.informationStack]}>
-                  <ReadField label="Location" value={location || '—'} half={!compactInformation} information />
-                  <ReadField label="Vessel / Site Name" value={vesselOrSiteName || '—'} half={!compactInformation} information />
+                  <ReadField label="Location" value={projectDisplay(location) || '—'} half={!compactInformation} information />
+                  <ReadField label="Vessel / Site Name" value={projectDisplay(vesselOrSiteName) || '—'} half={!compactInformation} information />
                 </View>
                 <View style={[styles.informationRow, compactInformation && styles.informationStack]}>
                   <ReadField label="UID Number" value={metadata.uidNumber || '-'} half={!compactInformation} information />
@@ -411,11 +488,15 @@ export default function ProjectDetailModal({
               </View>
             )}
 
-            {editing && <ProjectMetadataFields value={metadata} onChange={setMetadata} inputStyle={styles.input} />}
+            {!editing && <ReadField label="Target Date" value={targetDate || '—'} information />}
+            {!editing && ['admin', 'manager'].includes(userRole?.toLowerCase() ?? '') &&
+              <ProjectWorkSchedulePanel projectId={projectId} projectName={projectName} />}
+            {editing && <ProjectMetadataFields preserveCase value={metadata} onChange={setMetadata} inputStyle={styles.input} />}
+            </View>
             <SectionHeader color="#8fa7f8" icon="📁" title="OUR COMPANY DETAILS" />
             <OurCompanySection value={ourCompanyId} onChange={editing ? setOurCompanyId : undefined} existing={planDetails.ourCompany} inputStyle={styles.input} />
-            <SectionHeader color="#8fa7f8" icon="📁" title="CLIENT DETAILS" />
-            <ClientDetailsSection name={metadata.clientName} onNameChange={editing ? clientName => setMetadata({...metadata, clientName}) : undefined} logo={clientLogo} onLogoChange={editing ? setClientLogo : undefined} existingPath={planDetails.clientLogoPath} removeExisting={removeClientLogo} onRemoveExisting={editing ? () => setRemoveClientLogo(value => !value) : undefined} inputStyle={styles.input} disabled={loading} />
+            <SectionHeader color="#8fa7f8" icon="📁" title="CLIENT COMPANY DETAILS" />
+            <ClientDetailsSection preserveCase required={editing} name={metadata.clientName} onNameChange={editing ? clientName => setMetadata({...metadata, clientName}) : undefined} logo={clientLogo} onLogoChange={editing ? setClientLogo : undefined} existingPath={planDetails.clientLogoPath} removeExisting={removeClientLogo} onRemoveExisting={editing ? () => setRemoveClientLogo(value => !value) : undefined} inputStyle={styles.input} disabled={loading} />
             <SectionHeader color="#a75a0b" icon="📌" title="Status" />
             {editing ? (
               <View style={styles.statusRow}>
@@ -450,37 +531,29 @@ export default function ProjectDetailModal({
             <SectionHeader color="#8053a6" icon="👥" title="Team Assignment" />
 
             {editing ? (
-              <View style={styles.row}>
-                <View style={styles.third}>
-                  <Field label="Surveyor">
-                    <SimpleSelect
-                      value={surveyorId}
-                      placeholder="Select surveyor"
-                      options={surveyors.map(s => ({label: s.displayName, value: s.id}))}
-                      onChange={setSurveyorId}
-                    />
-                  </Field>
+              <View style={{gap: 16}}>
+                <ProjectSurveyorManagement projectId={projectId} surveyors={surveyors} onPrimaryChanged={setSurveyorId} />
+                <SectionHeader color="#0899a9" icon="✓" title="Quality Control Team" />
+                <View style={[styles.row, compactInformation && styles.informationStack]}>
+                  <View style={styles.half}>
+                    <Field label="Primary QC">
+                      <SearchableOptionPicker label="Primary QC" value={qcId} placeholder="Select Primary QC"
+                        options={qcUsers.filter(u => u.id !== additionalQcId).map(u => ({label: qcAssignmentLabel(u), value: u.id}))}
+                        onChange={setQcId} dark={dark} disabled={loading || loadingDetail} />
+                    </Field>
+                  </View>
+                  <View style={styles.half}>
+                    <Field label="Additional QC (Optional)">
+                      <SearchableOptionPicker label="Additional QC" value={additionalQcId} placeholder="No Additional QC"
+                        options={[{label: 'No Additional QC', value: ''}, ...qcUsers.filter(u => u.id !== qcId).map(u => ({label: qcAssignmentLabel(u), value: u.id}))]}
+                        onChange={setAdditionalQcId} dark={dark} disabled={loading || loadingDetail} />
+                    </Field>
+                  </View>
                 </View>
-                <View style={styles.third}>
-                  <Field label="Assign QC">
-                    <SimpleSelect
-                      value={qcId}
-                      placeholder="Select QC"
-                      options={qcUsers.map(u => ({label: qcAssignmentLabel(u), value: u.id}))}
-                      onChange={setQcId}
-                    />
-                  </Field>
-                </View>
-                <View style={styles.third}>
-                  <Field label="Client (Optional)">
-                    <SimpleSelect
-                      value={clientId}
-                      placeholder="Select client"
-                      options={clients.map(c => ({label: c.displayName, value: c.id}))}
-                      onChange={setClientId}
-                    />
-                  </Field>
-                </View>
+                <SectionHeader color="#0899a9" icon="👥" title="Other Assignments" />
+                <Field label="Assign Client ID">
+                  <ClientAssignmentPicker value={clientIds} options={[...clients, ...(planDetails.assignedClients || []).filter((u: any) => !clients.some(c => c.id === u.id))]} onChange={setClientIds} disabled={loading || loadingDetail} />
+                </Field>
               </View>
             ) : (
               <View style={styles.row}>
@@ -492,6 +565,7 @@ export default function ProjectDetailModal({
 
             <SectionHeader color="#8fa7f8" icon="📄" title="HAZARDOUS AREA PLAN" />
             <HazardousAreaPlanSection key={planDetails.hazardousAreaPlanPath || 'no-plan'} project={planDetails} />
+            {editing && <ProjectImageGallery projectId={projectId} editable />}
             {editing && <HazardousAreaPlanUpload value={hazardousAreaPlan} onChange={setHazardousAreaPlan} disabled={loading || loadingDetail} />}
 
             <SectionHeader color="#8fa7f8" icon="🗺️" title={`Areas ${areas.length ? `(${areas.length})` : ''}`} />
@@ -520,10 +594,10 @@ export default function ProjectDetailModal({
             )}
           </ScrollView>
 
-          <View style={styles.footer}>
+          <View nativeID={editing ? 'ex-project-form-footer' : undefined} style={styles.footer}>
             {editing ? (
               <View style={styles.footerBtns}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditing(false)}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={cancelEdit}>
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
                 <SaveButton
@@ -536,23 +610,22 @@ export default function ProjectDetailModal({
                 <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
                   <Text style={styles.cancelBtnText}>Close</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.editBtn} onPress={() => setEditing(true)}>
+                {!!onEdit && <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
                   <Text style={styles.editBtnText}>✎  Edit Project</Text>
-                </TouchableOpacity>
+                </TouchableOpacity>}
                 <DeleteProjectButton userRole={userRole} projectId={projectId} projectName={projectName} onDeleted={async () => {onClose(); await onDeleted?.();}} />
               </View>
             )}
           </View>
         </Animated.View>
-      </View>
-    </Modal>
   );
+  return fullPage ? content : <Modal visible transparent animationType="fade" onRequestClose={onClose}><View style={styles.overlay}>{content}</View></Modal>;
 }
 
 function Field({label, children}: {label: string; children: React.ReactNode}) {
   return (
     <View style={{marginBottom: 16}}>
-      <Text style={styles.label}>{label}</Text>
+      <Text testID="project-form-label" style={[styles.label, {textTransform: 'uppercase'}]}>{label}</Text>
       {children}
     </View>
   );
@@ -653,7 +726,7 @@ function FileUploadButton({fileName, onPick}: {fileName: string; onPick: (file: 
         <input
           id={inputId}
           type="file"
-          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+          accept="application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp"
           style={{display: 'none'}}
           onChange={(e: any) => {
             const f = e.target.files?.[0];
@@ -662,7 +735,7 @@ function FileUploadButton({fileName, onPick}: {fileName: string; onPick: (file: 
         />
         {/* @ts-ignore */}
         <label htmlFor={inputId} style={uploadLabelStyleWeb}>
-          {fileName ? '✓ Layout selected' : '📤  Choose layout image'}
+          {fileName ? '✓ Layout selected' : '📤  Choose layout image or PDF'}
         </label>
       </View>
     );
@@ -671,8 +744,8 @@ function FileUploadButton({fileName, onPick}: {fileName: string; onPick: (file: 
   return (
     <TouchableOpacity
       style={styles.uploadBoxNative}
-      onPress={() => Alert.alert('Not supported', 'File upload is only available on web for now.')}>
-      <Text style={styles.uploadBoxNativeText}>{fileName ? '✓ Layout selected' : 'Tap to upload (web only)'}</Text>
+      onPress={() => void chooseAreaAttachment(onPick)}>
+      <Text style={styles.uploadBoxNativeText}>{fileName ? '✓ Layout selected' : 'Choose layout image or PDF'}</Text>
     </TouchableOpacity>
   );
 }
@@ -682,7 +755,8 @@ function SaveButton({loading, onPress}: {loading?: boolean; onPress: () => void}
   const animateTo = (v: number) =>
     Animated.spring(scale, {toValue: v, useNativeDriver: Platform.OS !== 'web', speed: 30, bounciness: 6}).start();
   return (
-    <TouchableOpacity onPressIn={() => animateTo(0.96)} onPressOut={() => animateTo(1)} onPress={onPress} disabled={loading}>
+    <TouchableOpacity nativeID="edit-project-submit" accessibilityRole="button" accessibilityState={{disabled: !!loading, busy: !!loading}}
+      onPressIn={() => animateTo(0.96)} onPressOut={() => animateTo(1)} onPress={onPress} disabled={loading}>
       <Animated.View style={[styles.saveBtn, {transform: [{scale}]}]}>
         <Text style={styles.saveBtnText}>{loading ? 'Saving…' : '✓  Save Changes'}</Text>
       </Animated.View>

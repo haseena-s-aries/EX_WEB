@@ -4,10 +4,11 @@ import {InspectionPhotoFile} from '../api/projects';
 
 type Props = {
   disabled?: boolean;
+  allowPdf?: boolean;
   onSelected: (files: InspectionPhotoFile[]) => void;
 };
 
-export default function InspectionPhotoPicker({disabled, onSelected}: Props) {
+export default function InspectionPhotoPicker({disabled, onSelected, allowPdf = true}: Props) {
   const inputRef = useRef<any>(null);
 
   return (
@@ -16,7 +17,7 @@ export default function InspectionPhotoPicker({disabled, onSelected}: Props) {
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+        accept={`image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp${allowPdf ? ',application/pdf,.pdf' : ''}`}
         multiple
         disabled={disabled}
         style={styles.hiddenInput as any}
@@ -32,10 +33,12 @@ export default function InspectionPhotoPicker({disabled, onSelected}: Props) {
         }}
       />
       <TouchableOpacity
+        testID="project-upload-button"
+        accessibilityRole="button"
         disabled={disabled}
         onPress={() => inputRef.current?.click()}
         style={[styles.button, disabled && styles.disabled]}>
-        <Text style={styles.buttonText}>Choose Photos</Text>
+        <Text style={styles.buttonText}>{allowPdf ? 'Choose Photos or PDF' : 'Choose Photos'}</Text>
       </TouchableOpacity>
     </View>
   );

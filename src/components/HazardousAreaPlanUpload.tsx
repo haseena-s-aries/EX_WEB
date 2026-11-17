@@ -46,7 +46,7 @@ export default function HazardousAreaPlanUpload({
   };
   return (
     <View style={{ gap: 8, marginBottom: 16 }}>
-      <Text style={{ fontSize: 13, fontWeight: '700', color: '#5b6178' }}>
+      <Text testID="project-form-label" style={{ fontSize: 13, fontWeight: '700', color: '#5b6178' }}>
         Hazardous Area Plan
       </Text>
       <TouchableOpacity

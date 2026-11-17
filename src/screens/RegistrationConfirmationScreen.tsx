@@ -1,0 +1,6 @@
+import React from 'react';
+import {View,Text,Pressable} from 'react-native';
+import AuthReferenceLayout from '../components/AuthReferenceLayout';
+export default function RegistrationConfirmationScreen({email,role,onLogin}:{email:string;role:string;onLogin:()=>void}){
+ return <AuthReferenceLayout mode="register"><View style={{gap:20}}><Text style={{fontSize:40,color:'#66EAC7'}}>✓</Text><Text accessibilityRole="header" style={{color:'#F5FAFF',fontSize:28,fontWeight:'800'}}>Registration Successful</Text><Text style={{color:'#CEE1EE',fontSize:16,lineHeight:25}}>Your account has been created successfully and is waiting for Admin/Manager approval. You will be notified once your account is approved.</Text><View style={{padding:18,borderRadius:10,borderWidth:1,borderColor:'#27788C',gap:12}}><Text style={{color:'#F5FAFF'}}>Registered Email: {email}</Text><Text style={{color:'#F5FAFF'}}>Requested Role: {role}</Text><Text style={{color:'#FFD074',fontWeight:'700'}}>Account Status: Pending Approval</Text></View><Pressable accessibilityRole="button" onPress={onLogin} style={{padding:16,borderRadius:10,backgroundColor:'#00D9EE',alignItems:'center'}}><Text style={{color:'#03192C',fontWeight:'800'}}>Back to Login</Text></Pressable></View></AuthReferenceLayout>;
+}

@@ -1,13 +1,14 @@
 import React from 'react';
 import Renderer from 'react-test-renderer';
-import {TouchableOpacity} from 'react-native';
+import {StyleSheet, TouchableOpacity} from 'react-native';
 import DashboardScreen from '../src/screens/DashboardScreen';
 import DefectsModal from '../src/components/DefectsModal';
+import {getProjects} from '../src/api/projects';
 import {getDefects} from '../src/api/defects';
 import {LIGHT} from '../src/theme/palette';
 
 jest.mock('../src/api/defects', () => ({getDefects: jest.fn()}));
-jest.mock('../src/api/projects', () => ({getProjects: jest.fn().mockResolvedValue({data: []})}));
+jest.mock('../src/api/projects', () => ({getProjects: jest.fn().mockResolvedValue({data: []}), normalizeProjectStatus: (status: string) => status, projectStatusLabel: (status: string) => status}));
 jest.mock('../src/api/adminEquipment', () => ({loadAllEquipment: jest.fn().mockResolvedValue([]), inspectionKey: (value: string) => value}));
 jest.mock('../src/components/NewProjectModal', () => 'NewProjectModal');
 jest.mock('../src/components/ProjectDetailModal', () => 'ProjectDetailModal');
@@ -58,4 +59,21 @@ test('Load failures are shown as errors rather than a false zero', async () => {
   await Renderer.act(async () => {renderer = Renderer.create(<DashboardScreen userName="Manager" />);});
   expect(textOf(renderer.root)).toContain('Unable to load · Tap to retry');
   expect(textOf(renderer.root)).not.toContain('No open defects');
+});
+
+test('dashboard highlights overdue projects and filters completed projects separately', async () => {
+  (getProjects as jest.Mock).mockResolvedValueOnce({data: [
+    {id: 'overdue', projectName: 'Overdue vessel', status: 'Active', schedule: {status: 'Overdue', delayDays: 2, latestDelayReason: 'Waiting for access'}},
+    {id: 'expected', projectName: 'Expected vessel', status: 'Active', schedule: {status: 'Delay Expected', delayDays: 4}},
+    {id: 'done', projectName: 'Completed vessel', status: 'Completed', schedule: {status: 'Completed', delayDays: 0}},
+  ]});
+  await Renderer.act(async () => {renderer = Renderer.create(<DashboardScreen userName="Manager" userRole="Manager" />);});
+  const card = (title: string) => renderer.root.findAllByType(TouchableOpacity).find(node => textOf(node).includes(title));
+  expect(StyleSheet.flatten(card('Overdue vessel')!.props.style).borderLeftColor).toBe(LIGHT.critical);
+  expect(textOf(card('Overdue vessel')!)).toContain('Waiting for access');
+  expect(textOf(card('Expected vessel')!)).toContain('Delay Expected');
+  expect(StyleSheet.flatten(card('Completed vessel')!.props.style).borderLeftColor).not.toBe(LIGHT.critical);
+  await press('Overdue');
+  expect(card('Overdue vessel')).toBeDefined();
+  expect(card('Completed vessel')).toBeUndefined();
 });

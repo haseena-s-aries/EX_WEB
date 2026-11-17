@@ -1,7 +1,7 @@
 import React from 'react';
 import Renderer from 'react-test-renderer';
 import {TouchableOpacity} from 'react-native';
-import InspectionPlanningScreen from '../src/screens/InspectionPlanningScreen';
+import InspectionPlanningScreen from '../src/screens/AdvancedInspectionPlanningScreen';
 import * as planningApi from '../src/api/inspectionPlanning';
 
 jest.mock('../src/api/inspectionPlanning', () => ({

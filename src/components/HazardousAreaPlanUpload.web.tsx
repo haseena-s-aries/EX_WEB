@@ -17,7 +17,7 @@ export default function HazardousAreaPlanUpload({
   }, [value]);
   return (
     <View style={{ gap: 8, marginBottom: 16 }}>
-      <Text style={{ fontSize: 13, fontWeight: '700', color: '#5b6178' }}>
+      <Text testID="project-form-label" style={{ fontSize: 13, fontWeight: '700', color: '#5b6178' }}>
         Hazardous Area Plan
       </Text>
       {React.createElement('input', {
@@ -58,6 +58,7 @@ export default function HazardousAreaPlanUpload({
         'button',
         {
           type: 'button',
+          'data-project-upload': true,
           disabled,
           onClick: () => fileInput.current?.click(),
           style: {

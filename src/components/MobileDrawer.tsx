@@ -1,13 +1,16 @@
+import {typography} from '../theme/typography';
+import {useUserAccessCounts} from '../api/userAccess';
+import {useSessionProfile} from '../api/profileState';
 import React, {useEffect, useRef, useState} from 'react';
 import {Animated, Easing, Image, Modal, Platform, Pressable, ScrollView, Text, TouchableOpacity, useWindowDimensions, View} from 'react-native';
 import {Colors, tint} from '../theme/palette';
-import {setThemeMode, useThemeMode} from '../theme/useThemeMode';
+import {useThemeMode} from '../theme/useThemeMode';
 
 const ARIES_LOGO = require('../assets/aries-logo.png');
 
 export type AppTab = 'Home' | 'Surveys' | 'Equipment' | 'User' | 'QCReview' | 'QCPending' | 'Reports' | 'Checklists';
 
-type Item = {key: AppTab; label: string; hint: string; glyph: string; tone: keyof Colors};
+type Item = {key: AppTab | 'Settings'; label: string; hint: string; glyph: string; tone: keyof Colors};
 
 const WORKSPACE: Item[] = [
   {key: 'Home', label: 'Home', hint: 'Dashboard & site operations', glyph: '⌂', tone: 'amber'},
@@ -18,7 +21,7 @@ const WORKSPACE: Item[] = [
 ];
 const QUALITY: Item[] = [
   {key: 'QCPending', label: 'QC Pending', hint: 'Awaiting review', glyph: '▤', tone: 'amber'},
-  {key: 'QCReview', label: 'QC Review', hint: 'Assignments & approvals', glyph: '✓', tone: 'success'},
+  {key: 'QCReview', label: 'QC Reviewed List', hint: 'Assignments & approvals', glyph: '✓', tone: 'success'},
 ];
 const ADMIN: Item[] = [{key: 'User', label: 'User Management', hint: 'Approve and assign users', glyph: '☻', tone: 'cyan'}];
 
@@ -82,15 +85,16 @@ type Props = {
   onChange: (tab: AppTab) => void;
   onLogout: () => void;
   c: Colors;
-  userName: string;
-  userRole: string;
+  onSettings: () => void;
+  settingsOpen?: boolean;
   showQc?: boolean;
   qcPendingCount?: number;
   /** Limit the menu to these tabs (native build only has some of the screens). */
   tabs?: AppTab[];
 };
 
-export default function MobileDrawer({visible, onClose, active, onChange, onLogout, c, userName, userRole, showQc, qcPendingCount = 0, tabs}: Props) {
+export default function MobileDrawer({visible, onClose, active, onChange, onLogout, c, onSettings, settingsOpen, showQc, qcPendingCount = 0, tabs}: Props) {
+  const profile=useSessionProfile(); const counts=useUserAccessCounts(['admin','manager'].includes(profile?.role.toLowerCase()||''));
   const {width} = useWindowDimensions();
   const drawerW = Math.min(330, Math.round(width * 0.86));
   const dark = useThemeMode() === 'dark';
@@ -133,9 +137,9 @@ export default function MobileDrawer({visible, onClose, active, onChange, onLogo
   };
 
   const renderItem = (item: Item) => {
-    const on = item.key === active;
+    const on = settingsOpen ? item.key === 'Settings' : item.key === active;
     const toneColor = c[item.tone] as string;
-    const count = item.key === 'QCPending' ? qcPendingCount : 0;
+    const count = item.key === 'QCPending' ? qcPendingCount : item.key === 'User' ? counts.pendingRegistrations : 0;
     return (
       <TouchableOpacity
         key={item.key}
@@ -143,7 +147,7 @@ export default function MobileDrawer({visible, onClose, active, onChange, onLogo
         accessibilityRole="button"
         accessibilityState={{selected: on}}
         accessibilityLabel={item.label}
-        onPress={() => go(item.key)}
+        onPress={() => {if (item.key === 'Settings') {onClose(); onSettings();} else go(item.key);}}
         style={[
           {
             flexDirection: 'row',
@@ -163,7 +167,7 @@ export default function MobileDrawer({visible, onClose, active, onChange, onLogo
           <Text style={{fontSize: 19, color: toneColor}}>{item.glyph}</Text>
         </View>
         <View style={{flex: 1, minWidth: 0}}>
-          <Text numberOfLines={1} style={{fontSize: 15, fontWeight: on ? '800' : '700', color: on ? accentText : c.text}}>{item.label}</Text>
+          <Text style={{...typography.navigation, flexShrink: 1, fontWeight: on ? '700' : '600', color: on ? accentText : c.text}}>{item.label}</Text>
           <Text numberOfLines={1} style={{fontSize: 11.5, color: c.muted, marginTop: 1}}>{item.hint}</Text>
         </View>
         {count > 0 ? (
@@ -178,7 +182,7 @@ export default function MobileDrawer({visible, onClose, active, onChange, onLogo
   };
 
   const section = (label: string, all: Item[]) => {
-    const items = tabs ? all.filter(i => tabs.includes(i.key)) : all;
+    const items = tabs ? all.filter(i => i.key !== 'Settings' && tabs.includes(i.key)) : all;
     if (items.length === 0) return null;
     return (
     <View key={label} style={{marginTop: 18}}>
@@ -230,53 +234,16 @@ export default function MobileDrawer({visible, onClose, active, onChange, onLogo
             </TouchableOpacity>
           </View>
 
-          {/* user card */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 12,
-              marginHorizontal: 16,
-              padding: 12,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: c.border,
-              backgroundColor: dark ? c.card : c.bg,
-            }}>
-            <View style={{width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: tint(c.amber, '26'), borderWidth: 1.5, borderColor: tint(c.amber, '88')}}>
-              <Text style={{color: accentText, fontSize: 17, fontWeight: '900'}}>{(userName || '?').charAt(0).toUpperCase()}</Text>
-            </View>
-            <View style={{flex: 1, minWidth: 0}}>
-              <Text numberOfLines={1} style={{color: c.text, fontSize: 15, fontWeight: '800'}}>{userName}</Text>
-              <View style={{alignSelf: 'flex-start', marginTop: 4, backgroundColor: tint(c.yellow, '26'), borderWidth: 1, borderColor: tint(c.yellow, '66'), borderRadius: 7, paddingHorizontal: 8, paddingVertical: 2}}>
-                <Text style={{color: dark ? c.yellow : c.amber, fontSize: 11, fontWeight: '800'}}>⚡ {userRole}</Text>
-              </View>
-            </View>
-          </View>
-
           {/* scrollable options */}
           <ScrollView style={{flex: 1}} contentContainerStyle={{paddingHorizontal: 12, paddingBottom: 16}} showsVerticalScrollIndicator={false}>
             {section('WORKSPACE', WORKSPACE)}
             {showQc ? section('QUALITY CONTROL', QUALITY) : null}
             {showQc ? section('ADMINISTRATION', ADMIN) : null}
+            <View style={{marginTop: 12}}>{renderItem({key: 'Settings', label: 'Settings', hint: 'Appearance preferences', glyph: '⚙', tone: 'cyan'})}</View>
           </ScrollView>
 
-          {/* footer: theme + logout */}
+          {/* footer */}
           <View style={{borderTopWidth: 1, borderTopColor: c.border, padding: 14, gap: 10, paddingBottom: Platform.OS === 'web' ? 14 : 28}}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              accessibilityRole="switch"
-              accessibilityState={{checked: dark}}
-              accessibilityLabel={dark ? 'Switch to light theme' : 'Switch to dark theme'}
-              onPress={() => setThemeMode(dark ? 'light' : 'dark')}
-              style={[{flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, backgroundColor: c.elevated}, web({cursor: 'pointer'})]}>
-              <Text style={{fontSize: 18}}>{dark ? '🌙' : '☀️'}</Text>
-              <Text style={{flex: 1, color: c.text, fontSize: 14, fontWeight: '700'}}>{dark ? 'Dark theme' : 'Light theme'}</Text>
-              <View style={{width: 46, height: 26, borderRadius: 13, padding: 3, justifyContent: 'center', alignItems: dark ? 'flex-end' : 'flex-start', backgroundColor: dark ? c.amber : c.borderActive}}>
-                <View style={{width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFFFFF'}} />
-              </View>
-            </TouchableOpacity>
-
             <TouchableOpacity
               activeOpacity={0.8}
               accessibilityRole="button"

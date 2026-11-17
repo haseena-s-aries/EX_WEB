@@ -11,7 +11,7 @@ export default function OurCompanySection({value, onChange, existing, inputStyle
   useEffect(() => {if (editable) void load();}, [editable]);
   const selected = companies.find(company => company.id === value) || (existing?.id === value ? existing : null);
   return <View style={{gap: 12, marginBottom: 16}}>
-    <Text style={{fontSize: 12.5, fontWeight: '700', color: '#5b6178'}}>Company Name</Text>
+    <Text testID="project-form-label" style={{fontSize: 12.5, fontWeight: '700', color: '#5b6178', textTransform: 'uppercase'}}>Company Name</Text>
     {editable ? <>
       <TextInput accessibilityLabel="Search or select company" style={inputStyle} value={open ? search : selected?.displayName || ''} placeholder="Search or select company" onFocus={() => {setSearch(''); setOpen(true);}} onPressIn={() => {if (!open) {setSearch(''); setOpen(true);}}} onChangeText={text => {setSearch(text); setOpen(true);}} autoCapitalize="none" />
       {loading && <ActivityIndicator color="#8fa7f8" />}
@@ -23,8 +23,8 @@ export default function OurCompanySection({value, onChange, existing, inputStyle
       {!!value && <TouchableOpacity onPress={() => {onChange?.(null); setOpen(false); setSearch('');}}><Text style={{color: '#718be8'}}>Clear company selection</Text></TouchableOpacity>}
     </> : <Text style={{color: '#242d52'}}>{selected?.displayName || '-'}</Text>}
     {selected && <Text style={{fontWeight: '700', color: '#242d52'}}>{selected.companyName}</Text>}
-    {([['Company Email', selected?.email], ['Company Address', selected?.address], ['Telephone', selected?.telephone], ['Fax', selected?.fax], ['Website', selected?.website]] as const).map(([label, text]) => <View key={label}><Text style={{fontSize: 12.5, fontWeight: '700', color: '#5b6178', marginBottom: 6}}>{label}</Text><Text style={{color: '#242d52'}}>{text || '-'}</Text></View>)}
-    <Text style={{fontSize: 12.5, fontWeight: '700', color: '#5b6178'}}>Company Logo</Text>
+    {([['Company Email', selected?.email], ['Company Address', selected?.address], ['Telephone', selected?.telephone], ['Fax', selected?.fax], ['Website', selected?.website]] as const).map(([label, text]) => <View key={label}><Text testID="project-form-label" style={{fontSize: 12.5, fontWeight: '700', color: '#5b6178', marginBottom: 6, textTransform: 'uppercase'}}>{label}</Text><Text style={{color: '#242d52'}}>{text || '-'}</Text></View>)}
+    <Text testID="project-form-label" style={{fontSize: 12.5, fontWeight: '700', color: '#5b6178', textTransform: 'uppercase'}}>Company Logo</Text>
     {selected?.logoUrl ? <AuthenticatedImage path={selected.logoUrl} resizeMode="contain" placeholderText="No logo available" style={{width: 180, height: 90}} /> : <Text style={{color: '#85899a'}}>No logo available</Text>}
   </View>;
 }

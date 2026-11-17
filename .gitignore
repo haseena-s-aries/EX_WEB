@@ -83,3 +83,10 @@ web-build/
 .bundle/
 # Generated web build
 web-build/
+
+.gradle-build/
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+*.keystore

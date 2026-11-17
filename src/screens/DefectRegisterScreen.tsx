@@ -1,17 +1,22 @@
+import {isPdfFile} from '../utils/isPdfFile';
+import {visual} from '../theme/visual';
+import {OPERATIONS_DARK} from '../theme/operationsPalette';
 import apiClient from '../api/client';
 import {readTsv} from '../utils/readTsv';
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
+import {ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {Defect, DefectInput, getDefects, getRegisterEquipment, getRegisterProjects, RegisterEquipment, RegisterProject, saveDefect, saveDefectPhoto} from '../api/defects';
 import {getApiErrorMessage} from '../api/errors';
 import {getInspectionDefects, InspectionPhotoFile} from '../api/projects';
 import AuthenticatedImage from '../components/AuthenticatedImage';
 import HaerGrid from '../components/HaerGrid';
 import InspectionPhotoPicker from '../components/InspectionPhotoPicker';
-import {DARK, LIGHT} from '../theme/palette';
+import {LIGHT} from '../theme/palette';
 import {useThemeMode} from '../theme/useThemeMode';
 import DefectWorkflowScreen from './DefectWorkflowScreen';
 import RegisterDateInput from '../components/RegisterDateInput';
+
+const OFFSHORE_ART = require('../assets/landing/industry-3.jpg');
 
 const columns = [
   ['Action No', 119], ['Date', 139], ['Item #', 88], ['AOSD ID', 120], ['Fault Category (A, B, C)', 111],
@@ -32,10 +37,10 @@ const human = (value: string) => value.replace(/([a-z])([A-Z])/g, '$1 $2');
 type Draft = {id: string; inspectionLinked?: boolean; data: DefectInput; isNew: boolean; photos: Record<number, InspectionPhotoFile | null>; error?: string};
 type ModernRow = {
   id: string; actionReference?: string; reportedAt: string; inspectionDate?: string; failedGrades?: string;
-  aosdId?: string; faultCategory?: string; remarks?: string; additionalRemarks?: string; photos?: {id:string;url:string}[]; itemNumber?: string; equipmentTag?: string; areaName?: string;
+  aosdId?: string; faultCategory?: string; remarks?: string; additionalRemarks?: string; photos?: {id:string;url:string;fileName?:string}[]; itemNumber?: string; equipmentTag?: string; areaName?: string;
   equipmentDescription?: string; grade: string; observation: string; proposedAction?: string; faultCode?: string;
   actionStatus?: string; statusCode: string; isOverdue: boolean; requiredMaterialsOrSupport?: string;
-  evidence?: {id: string; url: string; role: string}[];
+  evidence?: {id: string; url: string; role: string; fileName?: string}[];
 };
 type Choice = {value: string; label: string};
 type Picker = {title: string; choices: Choice[]; onPick: (value: string) => void; searchable?: boolean};
@@ -51,7 +56,7 @@ const edit = (row: Defect): Draft => ({id: row.id, isNew: false, photos: {}, dat
 const equipmentLabel = (item: RegisterEquipment) => [item.itemNumber, item.tagNumber, item.description, item.area].filter(Boolean).join(' · ');
 
 export default function DefectRegisterScreen({role, onBack}: {role?: string; onBack?: () => void}) {
-  const colors = useThemeMode() === 'dark' ? DARK : LIGHT;
+  const colors = useThemeMode() === 'dark' ? OPERATIONS_DARK : LIGHT;
   const [projects, setProjects] = useState<RegisterProject[]>([]);
   const [project, setProject] = useState('');
   const [loadedProject, setLoadedProject] = useState('');
@@ -79,7 +84,8 @@ export default function DefectRegisterScreen({role, onBack}: {role?: string; onB
   const version = useRef(0);
   const pending = drafts[project] || [];
   const scoped = loadedProject === project;
-  const mayWrite = !!project && scoped && !saving && !busy;
+  const canEditRegister = ['admin','manager','surveyor'].includes(role?.toLowerCase() ?? '');
+  const mayWrite = canEditRegister && !!project && scoped && !saving && !busy;
   const reload = useCallback(async () => {
     if (!project) return;
     const request = ++version.current;
@@ -160,8 +166,9 @@ export default function DefectRegisterScreen({role, onBack}: {role?: string; onB
   };
 
   const button = (text: string, action: () => void, disabled = false, primary = false) =>
-    <Pressable accessibilityRole="button" disabled={disabled} onPress={action} style={[s.button, {borderColor: colors.border, backgroundColor: primary ? '#075da8' : colors.card, opacity: disabled ? 0.48 : 1}]}>
-      <Text style={{color: primary ? '#fff' : colors.text, fontWeight: '700', fontSize: 12}}>{text}</Text>
+    <Pressable accessibilityRole="button" accessibilityState={{disabled}} disabled={disabled} onPress={action}
+      style={[s.button, {borderColor: colors.border, backgroundColor: primary ? '#00D9EE' : colors.elevated, opacity: disabled ? 0.48 : 1}]}>
+      <Text style={{color: primary ? '#03192C' : colors.text, fontWeight: '800', fontSize: 13}}>{text}</Text>
     </Pressable>;
   const value = (text?: string | null) => <Text style={{color: colors.text, fontSize: 12}}>{text || '—'}</Text>;
   const inputStyle = [s.input, {borderColor: colors.border, color: colors.text, backgroundColor: colors.card}];
@@ -172,7 +179,9 @@ export default function DefectRegisterScreen({role, onBack}: {role?: string; onB
     <TextInput accessibilityLabel={label} editable={!saving} value={draft.data[key]} onChangeText={v => patch(draft.id, key, v)} multiline={multiline} style={[inputStyle, multiline && {minHeight: 66, textAlignVertical: 'top'}]} />;
   const dropdown = (draft: Draft, key: keyof DefectInput, label: string, options: string[]) =>
     button(draft.data[key] || `Select ${label}`, () => choose({title: label, choices: choices(options), onPick: v => patch(draft.id, key, v)}), saving);
-  const thumbnail = (path?: string, uri?: string) => (path || uri) ? <Pressable accessibilityRole="button" accessibilityLabel="Preview photo" onPress={() => setPreview({path, uri})}>
+  const thumbnail = (path?: string, uri?: string, fileName?: string) => (path || uri) ? isPdfFile(fileName)
+    ? <AuthenticatedImage path={path} localUri={uri} fileName={fileName} style={s.photo} />
+    : <Pressable accessibilityRole="button" accessibilityLabel="Preview photo" onPress={() => setPreview({path, uri})}>
     {uri ? <Image source={{uri}} style={s.photo}/> : <AuthenticatedImage path={path!} style={s.photo} placeholderText="Photo unavailable"/>}
   </Pressable> : value();
   const photoCell = (slot: number, row?: Defect, draft?: Draft) => {
@@ -181,7 +190,7 @@ export default function DefectRegisterScreen({role, onBack}: {role?: string; onB
     const staged = draft?.photos[slot];
     const stage = (file: InspectionPhotoFile | null) => draft && update(old => old.map(d =>
       d.id === draft.id ? {...d, photos: {...d.photos, [slot]: file}} : d));
-    return <View style={s.stack}>{thumbnail(changed ? undefined : photo?.downloadUrl, staged?.uri)}
+    return <View style={s.stack}>{thumbnail(changed ? undefined : photo?.downloadUrl, staged?.uri, changed ? staged?.fileName || staged?.name : photo?.fileName)}
       {draft && <><InspectionPhotoPicker disabled={saving} onSelected={files => {if (files[0]) stage(files[0]);}}/>
         {(staged || photo && !changed) && button('Remove', () => stage(null), saving)}</>}
     </View>;
@@ -202,7 +211,7 @@ export default function DefectRegisterScreen({role, onBack}: {role?: string; onB
     const code = row?.id || draft?.id;
     return {id: code!, cells: [
       <View style={s.stack}>{value(draft?.isNew ? 'New' : code?.slice(0, 8).toUpperCase())}
-        {draft ? button('Cancel', () => remove(draft.id), saving) : row?.canEdit && button('Edit', () => update(old => [...old, edit(row)]), saving)}
+        {draft ? button('Cancel', () => remove(draft.id), saving) : canEditRegister && row?.canEdit && button('Edit', () => update(old => [...old, edit(row)]), saving)}
         {draft && <Text style={{color: draft.error ? colors.critical : colors.cyan, fontSize: 11}}>{draft.error || 'Unsaved changes'}</Text>}
       </View>,
       draft ? <RegisterDateInput value={draft.data.date} disabled={saving} onChange={v => patch(draft.id, 'date', v)} style={inputStyle}/> : value(row?.registerDate || row?.inspectionDate.slice(0, 10)),
@@ -241,8 +250,8 @@ export default function DefectRegisterScreen({role, onBack}: {role?: string; onB
       draft ? field(draft,'faultCode','Fault code') : value(r.faultCode),
       value(r.areaName), value(grade), value(r.equipmentDescription || r.equipmentTag), value(r.observation),
       draft ? field(draft,'recommendation','Recommendation',true) : value(r.proposedAction), badge(status,r.isOverdue),
-      thumbnail(r.photos?.[0]?.url ?? r.evidence?.find(e=>e.role==='Before')?.url),
-      thumbnail(r.photos?.[1]?.url ?? (!r.photos?.length ? r.evidence?.find(e=>['After','Correction'].includes(e.role))?.url : undefined)),
+      thumbnail(r.photos?.[0]?.url ?? r.evidence?.find(e=>e.role==='Before')?.url, undefined, r.photos?.[0]?.fileName ?? r.evidence?.find(e=>e.role==='Before')?.fileName),
+      thumbnail(r.photos?.[1]?.url ?? (!r.photos?.length ? r.evidence?.find(e=>['After','Correction'].includes(e.role))?.url : undefined), undefined, r.photos?.[1]?.fileName ?? r.evidence?.find(e=>['After','Correction'].includes(e.role))?.fileName),
       draft ? field(draft,'remarks','Remarks 1',true) : value(r.remarks),
       draft ? field(draft,'additionalRemarks','Remarks 2',true) : value(r.additionalRemarks),
     ]};
@@ -269,28 +278,33 @@ export default function DefectRegisterScreen({role, onBack}: {role?: string; onB
     setPaste('');
   };
 
-  if (role?.toLowerCase() === 'qc') return <DefectWorkflowScreen role={role} onBack={onBack}/>;
   const currentProject = projects.find(p => p.id === project);
-  return <ScrollView contentContainerStyle={[s.page, {backgroundColor: colors.bg}]}>
+  const panel = [s.panel, {backgroundColor: colors.card, borderColor: colors.border}];
+  return <ScrollView nativeID="ex-defects" style={{flex: 1, backgroundColor: colors.bg}}
+    contentContainerStyle={s.page} keyboardShouldPersistTaps="handled">
     {onBack && button('Back', onBack)}
-    <View style={[s.line, s.between]}>
-      <View style={s.stack}><Text style={[s.title, {color: colors.text}]}>Defect Register</Text>
-        <Text style={{color: colors.secondary}}>Manage defects by project and link them to equipment already in HAER.</Text></View>
-      <View style={s.line}>
-        {button('+ Add Defect', () => add(), !mayWrite)}
-        {button('+ Bulk Add', () => setBulk(!bulk), !mayWrite)}
-        {button(saving ? 'Saving…' : 'Save Changes', () => void save(), !mayWrite || !pending.length, true)}
-      </View>
+    <View nativeID="ex-defects-hero" style={s.hero}>
+      <Image source={OFFSHORE_ART} resizeMode="cover" style={s.heroPhoto} accessible={false} />
+      <View nativeID="ex-operations-hero-overlay" pointerEvents="none"
+        style={[StyleSheet.absoluteFill, Platform.OS !== 'web' && s.nativeOverlay]} />
+      <Text style={s.eyebrow}>RECTIFICATION  /  DEFECTS</Text>
+      <Text accessibilityRole="header" style={s.heroTitle}>Defect <Text style={s.accent}>Register</Text></Text>
+      <Text style={s.heroDescription}>Manage defects by project and link them to equipment already in HAER.</Text>
     </View>
-    <View style={[s.panel, {backgroundColor: colors.card, borderColor: colors.border}]}>
-      <View style={s.line}>
+    {canEditRegister && <View style={[s.line, {justifyContent: 'flex-end'}]}>
+        {button('+ Add Defect', () => add(), !mayWrite, true)}
+        {button('+ Bulk Add', () => setBulk(!bulk), !mayWrite)}
+        {button(saving ? 'Saving…' : 'Save Changes', () => void save(), !mayWrite || !pending.length)}
+    </View>}
+    <View nativeID="ex-defects-filters" style={panel}>
+      <View style={[s.line, s.projectStrip, {borderColor: colors.border}]}>
         {button(currentProject?.name || 'Select project', () => choose({title: 'Project', choices: projects.map(p => ({value: p.id, label: p.name})), onPick: id => {
           setProject(id); setSelected(''); setPage(0); setStatus(''); setNotice(''); setBulk(false); setPaste('');
         }}), saving || !projects.length)}
-        <View style={[s.button,{borderColor:colors.border,backgroundColor:colors.card}]}>
-          <Text style={{color:colors.secondary,fontSize:11}}>Client Name</Text>
+        <View style={s.client}>
+          <Text style={{color:colors.secondary,fontSize:11}}>Client Company Name</Text>
           <Text accessibilityLiveRegion="polite" style={{color:colors.text}}>
-            {project ? currentProject?.clientName?.trim() || 'No client assigned' : 'Select a project'}
+            {project ? currentProject?.clientName?.trim() || 'Client company not specified' : 'Select a project'}
           </Text>
         </View>
       </View>
@@ -300,7 +314,11 @@ export default function DefectRegisterScreen({role, onBack}: {role?: string; onB
         {button(overdue ? 'Overdue only ✓' : 'Overdue only', () => {setOverdue(!overdue); setPage(0);})}
         {button('Refresh', () => void reload(), busy || saving || !project)}
       </View>
-      <Text style={[s.info, {backgroundColor: colors.elevated, color: colors.text}]}>Inspection-linked defects follow Aries verification and authorized client closure. Surveyors can add defects for equipment in their assigned projects.</Text>
+      <Text style={[s.info, {backgroundColor: colors.elevated, color: colors.text, borderColor: colors.border}]}>
+        <Text style={{color: colors.cyan}}>ⓘ  </Text>Inspection-linked defects follow Aries verification and authorized client closure. Surveyors can add defects for equipment in their assigned projects.
+      </Text>
+    </View>
+    {canEditRegister && <View style={panel}>
       <View style={s.line}>
         <Text style={{fontWeight: '700', color: colors.text}}>Add Defect for Equipment</Text>
         {button(equipment.find(e => e.id === selected) ? equipmentLabel(equipment.find(e => e.id === selected)!) : 'Select equipment', () => pickEquipment(setSelected), !mayWrite)}
@@ -311,14 +329,21 @@ export default function DefectRegisterScreen({role, onBack}: {role?: string; onB
         <TextInput multiline accessibilityLabel="Excel defect rows" value={paste} onChangeText={setPaste} style={[inputStyle, {minHeight: 64}]} editable={!saving}/>
         <View style={s.line}>{button('Add Row', () => add(), !mayWrite)}{button('Import pasted rows', importRows, !mayWrite || !paste.trim())}</View>
       </View>}
-    </View>
+    </View>}
     {!!error && <Text accessibilityRole="alert" style={{color: colors.critical}}>{error}</Text>}
     {!!workflowError && <Text accessibilityRole="alert" style={{color: colors.critical}}>{workflowError}</Text>}
     {!!notice && <Text accessibilityLiveRegion="polite" style={{color: colors.text}}>{notice}</Text>}
     {busy && <ActivityIndicator color={colors.cyan}/>}
-    <Text style={{color: colors.text, fontSize: 17, fontWeight: '800'}}>{visible.length} defects{pending.length ? ` · ${pending.length} unsaved` : ''}</Text>
-    <HaerGrid label="Defect register" columns={columns} rows={gridRows} colors={colors}/>
-    {!gridRows.length && !busy && <Text style={{color: colors.secondary}}>{project ? 'No defects match this filter.' : 'No project is available.'}</Text>}
+    <View nativeID="ex-defects-register" style={panel}>
+      <Text accessibilityRole="header" style={{color: colors.text, fontSize: 18, fontWeight: '800'}}>
+        <Text style={{color: colors.cyan}}>⚠  </Text>{visible.length} defects{pending.length ? ` · ${pending.length} unsaved` : ''}
+      </Text>
+      <HaerGrid label="Defect register" columns={columns} rows={gridRows} colors={colors}/>
+      {!gridRows.length && !busy && <View nativeID="ex-defects-empty" style={s.empty}>
+        <Text accessible={false} style={[s.emptyIcon, {color: colors.cyan, borderColor: colors.border, backgroundColor: colors.elevated}]}>▤</Text>
+        <Text style={{color: colors.text, fontWeight: '800'}}>{project ? 'No defects match this filter.' : 'No project is available.'}</Text>
+      </View>}
+    </View>
     <View style={[s.line, s.between]}>
       <Text style={{color: colors.secondary}}>{visible.length ? `Showing ${currentPage * pageSize + 1}–${currentPage * pageSize + pageRows.length} of ${visible.length}` : 'Showing 0 defects'}</Text>
       <View style={s.line}>
@@ -352,11 +377,24 @@ export default function DefectRegisterScreen({role, onBack}: {role?: string; onB
 }
 
 const s = StyleSheet.create({
-  page: {padding: 20, gap: 14, width: '100%'}, line: {flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 9},
+  page: {padding: 16, gap: 12, width: '100%'}, line: {flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 9},
+  hero: {minHeight: 154, padding: 22, justifyContent: 'center', gap: 6, borderWidth: 1,
+    borderColor: '#126078', borderRadius: 17, backgroundColor: '#03192C', overflow: 'hidden'},
+  heroPhoto: {position: 'absolute', right: 0, width: '76%', height: '100%'},
+  nativeOverlay: {backgroundColor: '#03192C88'},
+  eyebrow: {fontFamily: visual.mono, color: '#00D9EE', fontSize: 11, letterSpacing: 1.6, fontWeight: '800'},
+  heroTitle: {fontFamily: visual.display, color: '#F5FAFF', fontSize: 38, fontWeight: '900'},
+  accent: {color: '#00D9EE'},
+  heroDescription: {color: '#F5FAFF', fontSize: 14, lineHeight: 20},
   between: {justifyContent: 'space-between'}, stack: {gap: 6}, title: {fontSize: 26, fontWeight: '800'},
-  panel: {borderWidth: 1, borderRadius: 8, padding: 12, gap: 12}, info: {padding: 11, borderRadius: 6},
-  button: {minHeight: 34, paddingVertical: 7, paddingHorizontal: 9, borderRadius: 6, borderWidth: 1, justifyContent: 'center'},
-  input: {borderWidth: 1, borderRadius: 6, padding: 7, minHeight: 34, fontSize: 12},
+  panel: {borderWidth: 1, borderRadius: 16, padding: 12, gap: 10, minWidth: 0},
+  projectStrip: {borderBottomWidth: 1, paddingBottom: 10},
+  client: {paddingHorizontal: 10, paddingVertical: 3, gap: 2},
+  info: {padding: 11, borderRadius: 10, borderWidth: 1, lineHeight: 20},
+  empty: {alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 122, padding: 14},
+  emptyIcon: {fontSize: 22, textAlign: 'center', lineHeight: 42, width: 44, borderRadius: 22, borderWidth: 1, overflow: 'hidden'},
+  button: {minHeight: 39, paddingVertical: 7, paddingHorizontal: 11, borderRadius: 10, borderWidth: 1, justifyContent: 'center'},
+  input: {borderWidth: 1, borderRadius: 9, padding: 8, minHeight: 39, fontSize: 12},
   badge: {fontWeight: '700', fontSize: 11, borderRadius: 20, paddingVertical: 5, paddingHorizontal: 8, alignSelf: 'flex-start'},
   photo: {width: 108, height: 70, borderRadius: 5}, largePhoto: {width: '100%', height: 340},
   overlay: {flex: 1, justifyContent: 'center', alignItems: 'center', padding: 14, backgroundColor: '#0008'},

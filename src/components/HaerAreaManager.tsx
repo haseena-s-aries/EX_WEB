@@ -1,3 +1,4 @@
+import {isPdfFile} from '../utils/isPdfFile';
 import React, {useEffect, useState} from 'react';
 import {Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {addProjectArea, getProjectAreaPhotos, InspectionPhotoFile, ProjectAreaPhoto, updateProjectArea, uploadProjectAreaPhotos} from '../api/projects';
@@ -5,15 +6,16 @@ import {getApiErrorMessage} from '../api/errors';
 import AuthenticatedImage from './AuthenticatedImage';
 import InspectionPhotoPicker from './InspectionPhotoPicker';
 import type {Colors} from '../theme/palette';
+import {projectDisplay} from '../utils/projectDisplay';
 
 type Area = {id: string; areaName: string};
 type Draft = {key: number; id?: string; name: string; savedName?: string; pending: InspectionPhotoFile[]; error?: string};
 type Props = {
   project: {id: string; projectName: string; areas: Area[]};
-  canEdit: boolean; colors: Colors; onClose: () => void; onAreaSaved: (area: Area) => void;
+  canEdit: boolean; colors: Colors; onClose: () => void; onAreaSaved: (area: Area) => void; onSaved?: () => void;
 };
 
-export default function HaerAreaManager({project, canEdit, colors, onClose, onAreaSaved}: Props) {
+export default function HaerAreaManager({project, canEdit, colors, onClose, onAreaSaved, onSaved}: Props) {
   const [drafts, setDrafts] = useState<Draft[]>(() => project.areas.map((a, key) =>
     ({key, id: a.id, name: a.areaName, savedName: a.areaName, pending: []})));
   const [initialAreas] = useState(() => project.areas);
@@ -73,6 +75,7 @@ export default function HaerAreaManager({project, canEdit, colors, onClose, onAr
     }
     setMessage(`${saved} saved · ${failed} need attention`);
     setBusy(false);
+    onSaved?.();
   }
 
   const button = (label: string, action: () => void, disabled = busy) =>
@@ -85,7 +88,8 @@ export default function HaerAreaManager({project, canEdit, colors, onClose, onAr
     return local ? <Image source={{uri: path}} style={style} resizeMode="contain"/> :
       <AuthenticatedImage path={path} style={style} placeholderText="Photo unavailable"/>;
   };
-  const thumb = (path: string, local: boolean) =>
+  const thumb = (path: string, local: boolean, fileName?: string | null) =>
+    isPdfFile(fileName) ? <AuthenticatedImage path={local ? undefined : path} localUri={local ? path : undefined} fileName={fileName} style={s.thumb} /> :
     <TouchableOpacity accessibilityRole="button" accessibilityLabel="Preview area photo" onPress={() => setPreview({path, local})}>
       {image(path, local)}
     </TouchableOpacity>;
@@ -94,7 +98,7 @@ export default function HaerAreaManager({project, canEdit, colors, onClose, onAr
     <View style={s.overlay}>
       <View style={[s.panel, {backgroundColor: colors.card}]}>
         <Text accessibilityRole="header" style={[s.title, {color: colors.text}]}>Manage Areas</Text>
-        <Text style={{color: colors.secondary}}>{project.projectName}</Text>
+        <Text style={{color: colors.secondary}}>{projectDisplay(project.projectName)}</Text>
         {preview ? <>
           {image(preview.path, preview.local, true)}
           {button('Close preview', () => setPreview(undefined), false)}
@@ -110,10 +114,10 @@ export default function HaerAreaManager({project, canEdit, colors, onClose, onAr
               <View style={s.line}>
                 {(d.id ? stored[d.id] ?? [] : []).map(photo => {
                   const path = photo.downloadUrl || photo.filePath;
-                  return path ? <View key={photo.id}>{thumb(path, false)}</View> : null;
+                  return path ? <View key={photo.id}>{thumb(path, false, photo.fileName)}</View> : null;
                 })}
                 {d.pending.map((photo, index) => <View key={index} style={{gap: 4}}>
-                  {photo.uri && thumb(photo.uri, true)}
+                  {photo.uri && thumb(photo.uri, true, photo.fileName || photo.name)}
                   {button('Remove photo', () => patch(d.key, {pending: d.pending.filter((_, i) => i !== index)}))}
                 </View>)}
               </View>

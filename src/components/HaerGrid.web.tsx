@@ -1,3 +1,4 @@
+import {visual} from '../theme/visual';
 import React from 'react';
 import type {HaerGridProps} from './HaerGrid';
 
@@ -7,9 +8,9 @@ export default function HaerGrid({columns, rows, colors, label = 'HAER register'
     if (fullWidth || index > 1) return {};
     return {position: 'sticky', left: index === 0 ? 0 : columns[0].width, zIndex: 2};
   }
-  const cell: React.CSSProperties = {borderRight: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}`, verticalAlign: 'top', padding: 7, boxSizing: 'border-box', overflowWrap: 'anywhere'};
-  return <div role="region" aria-label={`${label} table`} tabIndex={0} style={{overflow: 'auto', maxHeight: '65vh', border: `1px solid ${colors.border}`, borderRadius: 6}}>
-    <table aria-label={label} style={{width: fullWidth ? '100%' : totalWidth, minWidth: totalWidth, tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12}}>
+  const cell: React.CSSProperties = {borderRight: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}`, verticalAlign: 'top', padding: 10, boxSizing: 'border-box', overflowWrap: 'anywhere'};
+  return <div className="ex-grid" role="region" aria-label={`${label} table`} tabIndex={0} style={{overflow: 'auto', maxHeight: '65vh', border: `1px solid ${colors.border}`, borderRadius: visual.radius.panel}}>
+    <table aria-label={label} style={{width: fullWidth ? '100%' : totalWidth, minWidth: totalWidth, tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0, fontSize: 13, color: colors.text, fontFamily: visual.body}}>
       <colgroup>{columns.map((column, index) => <col key={index} style={{width: column.width}} />)}</colgroup>
       <thead>
         <tr>{columns.map((column, index) => {
@@ -18,18 +19,25 @@ export default function HaerGrid({columns, rows, colors, label = 'HAER register'
           return <th key={index} scope={inGroup ? 'colgroup' : 'col'} colSpan={inGroup ? columnGroup.count : undefined}
             rowSpan={columnGroup && !inGroup ? 2 : undefined} style={{
               ...cell, ...pinned(index), position:'sticky',top:0,zIndex:index<2?4:3,
-              background:'#a9cbe8',color:'#142d46',textAlign:inGroup?'center':'left',verticalAlign:'middle',height:columnGroup?32:46,
+              background: visual.rail,color:'#ebf8fa',fontFamily: visual.mono,letterSpacing: .45,fontSize: 11,textAlign:inGroup?'center':'left',verticalAlign:'middle',height:columnGroup?32:46,
             }}>{inGroup ? columnGroup.label : column.label}</th>;
         })}</tr>
         {columnGroup && <tr>{columns.slice(columnGroup.start,columnGroup.start+columnGroup.count).map(column =>
-          <th scope="col" key={column.label} style={{...cell,position:'sticky',top:32,zIndex:3,background:'#a9cbe8',color:'#142d46',height:32}}>
+          <th scope="col" key={column.label} style={{...cell,position:'sticky',top:32,zIndex:3,background: visual.rail,color:'#ebf8fa',fontFamily: visual.mono,letterSpacing: .45,fontSize: 11,height:32}}>
             {column.label}
           </th>)}</tr>}
       </thead>
-      <tbody>{rows.map(row => <tr key={row.id} onClick={row.onPress ? event => {
+      <tbody>{rows.map((row, rowIndex) => <tr key={row.id} tabIndex={row.onPress ? 0 : undefined}
+        onKeyDown={row.onPress ? event => {
+          if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            row.onPress?.();
+          }
+        } : undefined}
+        onClick={row.onPress ? event => {
         if (!(event.target instanceof Element) || !event.target.closest('button, input, a, [role="button"], [role="checkbox"]')) row.onPress?.();
       } : undefined} style={row.onPress ? {cursor: 'pointer'} : undefined}>{row.cells.map((value, index) =>
-        <td key={index} style={{...cell, ...pinned(index), backgroundColor: row.selected ? (colors.card === '#FFFFFF' ? '#e5f2fc' : colors.elevated) : colors.card}}>{value}</td>,
+        <td key={index} style={{...cell, ...pinned(index), backgroundColor: row.selected ? colors.elevated : rowIndex % 2 ? colors.bg : colors.card}}>{value}</td>,
       )}</tr>)}</tbody>
     </table>
   </div>;

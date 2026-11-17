@@ -22,7 +22,6 @@ import DefectRegisterScreen from '../screens/DefectRegisterScreen';
 // import SurveyorProjectDetailsScreen from '../screens/SurveyorProjectDetailsScreen';
 // import SurveyorAreaDetailsScreen from '../screens/SurveyorAreaDetailsScreen';
 // import SurveyorEquipmentDetailsScreen from '../screens/SurveyorEquipmentDetailsScreen';
-// import SurveyorInspectionScreen from '../screens/SurveyorInspectionScreen';
 // import {sendOtp, verifyOtp, completeRegistration, loginUser} from '../api/auth';
 // import {getAssignmentOptions} from '../api/projects';
 // import {setAuthToken} from '../api/client';
@@ -363,20 +362,6 @@ import DefectRegisterScreen from '../screens/DefectRegisterScreen';
 //           )}
 //         </Stack.Screen>
 
-//         <Stack.Screen name="SurveyorInspection">
-//           {({navigation, route}: any) => (
-//             <SafeAreaView style={styles.dashboardShell}>
-//               <SurveyorInspectionScreen
-//                 equipmentId={route.params.equipmentId}
-//                 inspectorName={currentUser?.displayName || 'Surveyor'}
-//                 onBack={() => navigation.goBack()}
-//                 onSaved={() =>
-//                   setSurveyorRefreshVersion(version => version + 1)
-//                 }
-//               />
-//             </SafeAreaView>
-//           )}
-//         </Stack.Screen>
 //       </Stack.Navigator>
 //     </NavigationContainer>
 //   );
@@ -416,6 +401,11 @@ import DefectRegisterScreen from '../screens/DefectRegisterScreen';
 // }
 
 
+import AccountRecoveryScreen from '../screens/AccountRecoveryScreen';
+
+import RegistrationConfirmationScreen from '../screens/RegistrationConfirmationScreen';
+import UserManagementScreen from '../screens/UserManagementScreen';
+import {useUserAccessCounts} from '../api/userAccess';
 import ClientWorkspace from '../screens/ClientWorkspace';
 import ManagerQcReviewScreen from '../screens/ManagerQcReviewScreen';
 import ReportsScreen from '../screens/ReportsScreen';
@@ -438,13 +428,15 @@ import OtpScreen from '../screens/OtpScreen';
 import LoginScreen from '../screens/LoginScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import SurveyorDashboardScreen from '../screens/SurveyorDashboardScreen';
+import NotificationBell from '../components/NotificationBell';
+import ProjectDetailsScreen from '../screens/ProjectDetailsScreen';
 import SurveyorProjectDetailsScreen from '../screens/SurveyorProjectDetailsScreen';
 import SurveyorAreaDetailsScreen from '../screens/SurveyorAreaDetailsScreen';
 import {NativeNfcScanner} from '../identification/equipmentScanner';
 import {decodeQrCodeImage} from '../identification/equipmentScanner';
 import {launchCamera} from 'react-native-image-picker';
 import SurveyorEquipmentDetailsScreen from '../screens/SurveyorEquipmentDetailsScreen';
-import SurveyorInspectionScreen from '../screens/SurveyorInspectionScreen';
+import EquipmentInspectionScreen from '../screens/EquipmentInspectionScreen';
 import InspectionActivityScreen from '../screens/InspectionActivityScreen';
 import OfflineInspectionScreen from '../screens/OfflineInspectionScreen';
 import ScanEquipmentScreen from '../screens/ScanEquipmentScreen';
@@ -458,7 +450,7 @@ import {getAssignmentOptions} from '../api/projects';
 import {setAuthToken} from '../api/client';
 import QcDashboardScreen from '../screens/QcDashboardScreen';
 import QcProjectDetailsScreen from '../screens/QcProjectDetailsScreen';
-import MobileDrawer, {MenuButton, AppTab} from '../components/MobileDrawer';
+import AppearanceSettings from '../components/AppearanceSettings';
 import {useThemeMode} from '../theme/useThemeMode';
 import {Colors, DARK, LIGHT} from '../theme/palette';
 const Stack = createNativeStackNavigator();
@@ -473,6 +465,7 @@ export default function AppNavigator() {
     email?: string;
     companyName?: string;
   } | null>(null);
+  const accessCounts=useUserAccessCounts(['admin','manager'].includes(currentUser?.role.toLowerCase()||''));
   const [assignmentOptions, setAssignmentOptions] = useState<any[]>([]);
   const [surveyorRefreshVersion, setSurveyorRefreshVersion] = useState(0);
  
@@ -482,8 +475,9 @@ export default function AppNavigator() {
   const themeMode = useThemeMode();
   const tc = themeMode === 'dark' ? DARK : LIGHT;
   const styles = useMemo(() => makeStyles(tc), [tc]);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
     const logout = (navigation: any) => {
+    setSettingsOpen(false);
     setAuthToken(null); setCurrentUser(null); setAssignmentOptions([]);
     navigation.reset({index: 0, routes: [{name: 'Login'}]});
   };
@@ -508,7 +502,7 @@ export default function AppNavigator() {
                   console.error(err?.response?.data || err.message);
                   Alert.alert(
                     'Error',
-                    err?.response?.data?.message || 'Could not send OTP',
+                    err?.response?.data?.error || err?.response?.data?.message || 'Could not send OTP',
                   );
                 } finally {
                   setLoading(false);
@@ -529,13 +523,13 @@ export default function AppNavigator() {
                 try {
                   const email = route.params?.email ?? '';
                   await verifyOtp(email, otp);
-                  await completeRegistration(email, pendingPassword);
-                  navigation.navigate('Login');
+                  const result=await completeRegistration(email,pendingPassword);setPendingPassword('');
+                  navigation.replace('RegistrationConfirmation',{email:result.data.user.email,role:result.data.user.role});
                 } catch (err: any) {
                   console.error(err?.response?.data || err.message);
                   Alert.alert(
                     'Error',
-                    err?.response?.data?.message || 'Invalid or expired OTP',
+                    err?.response?.data?.error || err?.response?.data?.message || 'Invalid or expired OTP',
                   );
                 } finally {
                   setLoading(false);
@@ -556,6 +550,9 @@ export default function AppNavigator() {
           )}
 </Stack.Screen>
  
+        <Stack.Screen name="RegistrationConfirmation">{({navigation,route}:any)=><RegistrationConfirmationScreen email={route.params.email} role={route.params.role} onLogin={()=>navigation.reset({index:0,routes:[{name:'Login'}]})}/>}</Stack.Screen>
+        {currentUser&&['admin','manager'].includes(currentUser.role.toLowerCase())&&<Stack.Screen name="UserManagement">{({navigation}:any)=><SafeAreaView style={styles.dashboardShell}><UserManagementScreen userRole={currentUser.role} onBack={()=>navigation.goBack()}/></SafeAreaView>}</Stack.Screen>}
+         <Stack.Screen name="ForgotPassword">{({navigation}: any) => <AccountRecoveryScreen mode="forgot" onLogin={() => navigation.navigate('Login')} />}</Stack.Screen>
          <Stack.Screen name="Login">
           {({navigation}) => (
 <LoginScreen
@@ -591,12 +588,13 @@ export default function AppNavigator() {
                   console.error(err?.response?.data || err.message);
                   Alert.alert(
                     'Error',
-                    err?.response?.data?.message || 'Login failed',
+                    err?.response?.data?.error || err?.response?.data?.message || 'Login failed',
                   );
                 } finally {
                   setLoading(false);
                 }
               }}
+              onForgotPassword={() => navigation.navigate('ForgotPassword')}
               onGoToSignup={() => navigation.navigate('Signup')}
               onOfflineLogin={offlineStoreAvailable ? async (email,password) => {
                 if (!email) { Alert.alert('Email needed','Enter the email from your last online sign-in to open its encrypted offline cache.'); return; }
@@ -615,13 +613,18 @@ export default function AppNavigator() {
 <Text style={styles.brand}>Ex Survey</Text>
 <Text style={styles.role}>{currentUser?.role || 'User'}</Text>
 </View>
+<TouchableOpacity accessibilityRole="button" onPress={() => setSettingsOpen(true)} style={styles.logoutButton}>
+<Text style={styles.logoutText}>Settings</Text>
+</TouchableOpacity>
 <TouchableOpacity
                   accessibilityRole="button"
                   onPress={() => logout(navigation)}
                   style={styles.logoutButton}>
 <Text style={styles.logoutText}>Log out</Text>
 </TouchableOpacity>
+{settingsOpen && <AppearanceSettings onClose={() => setSettingsOpen(false)} onProfileUpdated={p => setCurrentUser(u => u && (!u.id || u.id === p.id) ? {...u, displayName: p.displayName, email: p.email} : u)} onSessionEnd={() => logout(navigation)} />}
 </View>}
+              {currentUser&&['admin','manager'].includes(currentUser.role.toLowerCase())&&<TouchableOpacity accessibilityRole="button" onPress={()=>navigation.navigate('UserManagement')} style={styles.logoutButton}><Text style={styles.logoutText}>User Management ({accessCounts.pendingRegistrations})</Text></TouchableOpacity>}
               {currentUser && ['admin', 'manager', 'surveyor', 'qc'].includes(currentUser.role.toLowerCase()) && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('DefectRegister')} style={styles.logoutButton}><Text style={styles.logoutText}>Defects</Text></TouchableOpacity>}
               {currentUser && currentUser.role.toLowerCase() !== 'client' && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('Reports')} style={styles.logoutButton}><Text style={styles.logoutText}>Reports</Text></TouchableOpacity>}
               {['Admin','Surveyor'].includes(currentUser?.role ?? '') && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('ChecklistAdmin')} style={styles.logoutButton}><Text style={styles.logoutText}>Checklists</Text></TouchableOpacity>}
@@ -630,7 +633,7 @@ export default function AppNavigator() {
               {offlineStoreAvailable && currentUser?.role?.toLowerCase()==='surveyor' && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('OfflineInspections')} style={styles.logoutButton}><Text style={styles.logoutText}>Offline inspections</Text></TouchableOpacity>}
               {(currentUser?.role === 'Manager' || currentUser?.role === 'Admin') && (
 <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('ManagerQcReview')} style={styles.logoutButton}>
-<Text style={styles.logoutText}>QC Review</Text>
+<Text style={styles.logoutText}>QC Reviewed List</Text>
 </TouchableOpacity>
               )}
               {(currentUser?.role === 'Manager' || currentUser?.role === 'Admin' || currentUser?.role?.toLowerCase() === 'qc') && (
@@ -638,7 +641,7 @@ export default function AppNavigator() {
 <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}><Text style={styles.logoutText}>QC Pending</Text><QcPendingBadge count={qcPendingCount} /></View>
 </TouchableOpacity>
               )}
-              {currentUser?.role?.toLowerCase() === 'client' ? (<ClientWorkspace userName={currentUser.displayName} userKey={`Client:${currentUser.id || currentUser.displayName}`} showNavigation profile={currentUser} onLogout={() => logout(navigation)} />) : currentUser?.role?.toLowerCase() === 'qc' ? (
+              {currentUser?.role?.toLowerCase() === 'client' ? (<ClientWorkspace userName={currentUser.displayName} userKey={`Client:${currentUser.id || currentUser.displayName}`} showNavigation profile={currentUser} onProfileUpdated={p => setCurrentUser(u => u && (!u.id || u.id === p.id) ? {...u, displayName: p.displayName, email: p.email} : u)} onLogout={() => logout(navigation)} />) : currentUser?.role?.toLowerCase() === 'qc' ? (
 <QcDashboardScreen
                   userName={currentUser.displayName || 'QC'}
                   refreshVersion={qcRefreshVersion}
@@ -651,6 +654,14 @@ export default function AppNavigator() {
 <SurveyorDashboardScreen
                   userName={currentUser.displayName || 'Surveyor'}
                   refreshVersion={surveyorRefreshVersion}
+                  accessory={<NotificationBell role={currentUser.role} userKey={currentUser.id || currentUser.email || ''}
+                    onSelect={notification => {
+                      const target = notification.target;
+                      if (target?.kind === 'inspectionActivity') navigation.navigate('InspectionActivityDetail', {activityId: target.activityId});
+                      else if (target?.kind === 'surveyorEquipment') navigation.navigate('SurveyorEquipmentDetails', {
+                        projectId: target.projectId, areaId: target.areaId, equipmentId: target.equipmentId,
+                      });
+                    }} />}
                   onProjectPress={projectId =>
                     navigation.navigate('SurveyorProjectDetails', {projectId})
                   }
@@ -665,6 +676,14 @@ export default function AppNavigator() {
               ) : (
 <DashboardScreen
                   userRole={currentUser?.role}
+                  onEditProject={projectId => navigation.navigate('EditProject', {projectId})}
+                  accessory={['Admin', 'Manager'].includes(currentUser?.role ?? '') && <NotificationBell
+                    role={currentUser?.role ?? ''} userKey={currentUser?.id || currentUser?.email || ''}
+                    onSelect={notification => {
+                      if (notification.target?.kind === 'project')
+                        navigation.navigate('ProjectDetails', {projectId: notification.target.projectId});
+                    }} />}
+
                   userName={currentUser?.displayName || 'User'}
                   surveyors={assignmentOptions.filter(
                     user => user.role === 'Surveyor',
@@ -681,14 +700,31 @@ export default function AppNavigator() {
           )}
 </Stack.Screen>
         {offlineStoreAvailable && currentUser?.role?.toLowerCase()==='surveyor' && <Stack.Screen name="OfflineInspections">{({navigation})=><SafeAreaView style={styles.dashboardShell}><OfflineInspectionScreen accountId={currentUser.email||currentUser.id||''} onBack={()=>navigation.goBack()} /></SafeAreaView>}</Stack.Screen>}
+        <Stack.Screen name="ProjectDetails">
+          {({navigation, route}: any) => <SafeAreaView style={styles.dashboardShell}>
+            <ProjectDetailsScreen userRole={currentUser?.role} projectId={route.params.projectId}
+              onBack={() => navigation.goBack()} onEdit={() => navigation.navigate('EditProject', {projectId: route.params.projectId})}
+              surveyors={assignmentOptions.filter(user => user.role === 'Surveyor')}
+              qcUsers={assignmentOptions.filter(user => user.role === 'Qc' || user.role === 'QC')}
+              clients={assignmentOptions.filter(user => user.role === 'Client')} />
+          </SafeAreaView>}
+        </Stack.Screen>
+        <Stack.Screen name="EditProject">
+          {({navigation, route}: any) => <SafeAreaView style={styles.dashboardShell}>
+            <ProjectDetailsScreen editOnly userRole={currentUser?.role} projectId={route.params.projectId}
+              onBack={() => navigation.goBack()} surveyors={assignmentOptions.filter(user => user.role === 'Surveyor')}
+              qcUsers={assignmentOptions.filter(user => user.role === 'Qc' || user.role === 'QC')}
+              clients={assignmentOptions.filter(user => user.role === 'Client')} />
+          </SafeAreaView>}
+        </Stack.Screen>
         <Stack.Screen name="DefectRegister">
           {({navigation}) => <DefectRegisterScreen role={currentUser?.role} onBack={() => navigation.goBack()}/>}
         </Stack.Screen>
         <Stack.Screen name="EquipmentIdentification">
-          {({navigation}:any)=><SafeAreaView style={styles.dashboardShell}><ScanEquipmentScreen accountId={currentUser?.email||currentUser?.id||''} role={currentUser?.role||''} online={!!currentUser} onBack={()=>navigation.goBack()} onOpenInspection={equipmentId=>navigation.navigate('InspectionActivities',{equipmentId})} onOpenOffline={()=>navigation.navigate('OfflineInspections')} /></SafeAreaView>}
+          {({navigation}:any)=><SafeAreaView style={styles.dashboardShell}><ScanEquipmentScreen accountId={currentUser?.email||currentUser?.id||''} role={currentUser?.role||''} online={!!currentUser} onBack={()=>navigation.goBack()} onOpenInspection={(equipmentId,context)=>navigation.navigate('InspectionActivities',{equipmentId,equipmentContext:context,fromIdentification:true})} onOpenOffline={()=>navigation.navigate('OfflineInspections')} /></SafeAreaView>}
         </Stack.Screen>
         <Stack.Screen name="ChecklistAdmin">
-          {({navigation}) => <EquipmentCategoryChecklistScreen canManageCatalog={currentUser?.role === 'Admin'} onBack={() => navigation.goBack()}/>}
+          {({navigation, route}: any) => <EquipmentCategoryChecklistScreen initialProject={route.params?.initialProject || ''} initialArea={route.params?.initialArea || ''} initialEquipment={route.params?.initialEquipment || ''} readOnly={currentUser?.role?.toLowerCase() === 'qc'} canManageCatalog={currentUser?.role === 'Admin'} onBack={() => navigation.goBack()}/>}
         </Stack.Screen>
         <Stack.Screen name="EquipmentRegister">
           {({navigation}: any) => <SafeAreaView style={styles.dashboardShell}><AdminEquipmentListScreen creationOnly={currentUser?.role === 'Surveyor'} onEquipmentPress={projectId => navigation.navigate(currentUser?.role === 'Surveyor' ? 'SurveyorProjectDetails' : 'ProjectDetails', {projectId})} onDocumentsPress={row=>navigation.navigate('EquipmentDocuments', {projectId:row.projectId,areaId:row.areaId,equipmentId:row.id})}/></SafeAreaView>}
@@ -698,7 +734,7 @@ export default function AppNavigator() {
         </Stack.Screen>
  
         <Stack.Screen name="Reports">
-          {({navigation}) => <SafeAreaView style={styles.dashboardShell}>{currentUser?.role?.toLowerCase() === 'client' ? <ClientWorkspace userName={currentUser.displayName} userKey={`Client:${currentUser.id || currentUser.displayName}`} section="Reports" showNavigation profile={currentUser} onLogout={() => logout(navigation)} /> : <ReportsScreen onBack={() => navigation.goBack()} />}</SafeAreaView>}
+          {({navigation}) => <SafeAreaView style={styles.dashboardShell}>{currentUser?.role?.toLowerCase() === 'client' ? <ClientWorkspace userName={currentUser.displayName} userKey={`Client:${currentUser.id || currentUser.displayName}`} section="Reports" showNavigation profile={currentUser} onProfileUpdated={p => setCurrentUser(u => u && (!u.id || u.id === p.id) ? {...u, displayName: p.displayName, email: p.email} : u)} onLogout={() => logout(navigation)} /> : <ReportsScreen role={currentUser?.role} onBack={() => navigation.goBack()} />}</SafeAreaView>}
 </Stack.Screen>
         {(currentUser?.role === 'Manager' || currentUser?.role === 'Admin') && (
 <Stack.Screen name="ManagerQcReview">
@@ -804,7 +840,7 @@ export default function AppNavigator() {
                 refreshVersion={surveyorRefreshVersion}
                 onBack={() => navigation.goBack()}
                 onInspect={() =>
-                  navigation.navigate('SurveyorInspection', {
+                  navigation.navigate('EquipmentInspection', {
                     projectId: route.params.projectId,
                     areaId: route.params.areaId,
                     equipmentId: route.params.equipmentId,
@@ -816,26 +852,28 @@ export default function AppNavigator() {
           )}
 </Stack.Screen>
  
+        <Stack.Screen name="EquipmentInspection">
+          {({navigation, route}: any) => <SafeAreaView style={styles.dashboardShell}>
+            <EquipmentInspectionScreen projectId={route.params.projectId} areaId={route.params.areaId} equipmentId={route.params.equipmentId}
+              onBack={() => navigation.goBack()} onSaved={() => setSurveyorRefreshVersion(version => version + 1)}
+              onLegacy={() => navigation.navigate('InspectionActivities', {equipmentId: route.params.equipmentId})}
+              onModifyChecklist={() => navigation.navigate('ChecklistAdmin', {initialProject: route.params.projectId, initialArea: route.params.areaId, initialEquipment: route.params.equipmentId})} />
+          </SafeAreaView>}
+        </Stack.Screen>
+        {/* Compatibility route: old navigation state opens the supported inspection screen. */}
         <Stack.Screen name="SurveyorInspection">
-          {({navigation, route}: any) => (
-<SafeAreaView style={styles.dashboardShell}>
-<SurveyorInspectionScreen
-              projectId={route.params.projectId}
-                equipmentId={route.params.equipmentId}
-                inspectorName={currentUser?.displayName || 'Surveyor'}
-                onBack={() => navigation.goBack()}
-                onSaved={() =>
-                  setSurveyorRefreshVersion(version => version + 1)
-                }
-              />
-</SafeAreaView>
-          )}
-</Stack.Screen>
+          {({navigation, route}: any) => <SafeAreaView style={styles.dashboardShell}>
+            <EquipmentInspectionScreen projectId={route.params?.projectId} areaId={route.params?.areaId} equipmentId={route.params.equipmentId}
+              onBack={() => navigation.goBack()} onSaved={() => setSurveyorRefreshVersion(version => version + 1)}
+              onLegacy={() => navigation.navigate('InspectionActivities', {equipmentId: route.params.equipmentId})}
+              onModifyChecklist={() => navigation.navigate('ChecklistAdmin', {initialProject: route.params.projectId, initialArea: route.params.areaId, initialEquipment: route.params.equipmentId})} />
+          </SafeAreaView>}
+        </Stack.Screen>
 
         <Stack.Screen name="InspectionActivities">
           {({navigation, route}: any) => (
             <SafeAreaView style={styles.dashboardShell}>
-              <InspectionActivityScreen equipmentId={route.params.equipmentId} role={currentUser?.role} onBack={() => navigation.goBack()} />
+              <InspectionActivityScreen equipmentId={route.params.equipmentId} equipmentContext={route.params.equipmentContext} backLabel={route.params.fromIdentification?'Back to Equipment Identification':undefined} role={currentUser?.role} onBack={() => navigation.goBack()} />
             </SafeAreaView>
           )}
         </Stack.Screen>

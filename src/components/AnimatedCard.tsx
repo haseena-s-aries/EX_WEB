@@ -1,5 +1,5 @@
 import React, {useEffect, useRef} from 'react';
-import {Animated, StyleSheet, ViewStyle, Platform} from 'react-native';
+import {AccessibilityInfo, Animated, StyleSheet, ViewStyle, Platform} from 'react-native';
 
 type Props = {
   children: React.ReactNode;
@@ -7,22 +7,25 @@ type Props = {
 };
 
 export default function AnimatedCard({children, style}: Props) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(24)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 450,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 450,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-    ]).start();
+    let active = true;
+    let animation: Animated.CompositeAnimation | undefined;
+    const start = (reduceMotion: boolean) => {
+      if (!active || reduceMotion) return;
+      opacity.setValue(.72);
+      translateY.setValue(6);
+      animation = Animated.parallel([
+        Animated.timing(opacity, {toValue: 1, duration: 240, useNativeDriver: Platform.OS !== 'web'}),
+        Animated.timing(translateY, {toValue: 0, duration: 240, useNativeDriver: Platform.OS !== 'web'}),
+      ]);
+      animation.start();
+    };
+    if (Platform.OS === 'web') start(typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+    else void AccessibilityInfo.isReduceMotionEnabled?.().then(start).catch(() => {});
+    return () => {active = false; animation?.stop();};
   }, [opacity, translateY]);
 
   return (

@@ -1,5 +1,6 @@
+import ModuleHeading from '../components/ModuleHeading';
 import React, {useEffect, useState} from 'react';
-import {Image, Modal, ScrollView, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {Modal, ScrollView, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import apiClient from '../api/client';
 import {allCheckpoints, ChecklistCategory, getChecklistCatalog} from '../api/equipmentChecklistCatalog';
 import {getApiErrorMessage} from '../api/errors';
@@ -7,8 +8,10 @@ import {addInspectionFinding, getInspectionActivity, getInspectionActivityHistor
 import AuthenticatedImage from '../components/AuthenticatedImage';
 import HaerGrid from '../components/HaerGrid';
 import InspectionPhotoPicker from '../components/InspectionPhotoPicker';
+import EquipmentCategoryChecklistScreen from './EquipmentCategoryChecklistScreen';
 import RegisterDateInput from '../components/RegisterDateInput';
-import {DARK, LIGHT} from '../theme/palette';
+import {LIGHT} from '../theme/palette';
+import {OPERATIONS_DARK} from '../theme/operationsPalette';
 import {useThemeMode} from '../theme/useThemeMode';
 
 const sections = [['Apparatus', 'A – APPARATUS'], ['Installation', 'B – INSTALLATION'], ['Environment', 'C – ENVIRONMENT']];
@@ -29,14 +32,14 @@ const columns = [
 type Point = {section:string; itemNumber:number; text:string; code:string; protectionApplicability:string};
 type Draft = {grades?:GradeResults; remarks?:string; comment?:string; photos?:InspectionPhotoFile[]};
 type Activity = {
-  id:string; rowVersion:string; reviewStatus:string; equipmentComments?:string;
+  id:string; rowVersion:string; reviewStatus:string; isOnHold?:boolean; equipmentComments?:string;
   checkpoints:{id:string; questionCode:string; questionText:string; sectionCode:string; applicabilityCode:string}[];
   responses:{id:string; checkpointDefinitionSnapshotId:string; responseCode:string|null; gradeResultsJson?:string|null; inspectionComment?:string; observation?:string}[];
-  evidence:{id:string; url:string; checkpointResponseRevisionId?:string; checkpointDefinitionSnapshotId?:string}[];
+  evidence:{id:string; url:string; fileName?:string; checkpointResponseRevisionId?:string; checkpointDefinitionSnapshotId?:string}[];
 };
 
-export default function CategoryInspectionEntryScreen({project, item, onBack, onSaved, onLegacy}: {project:string; item:string; onBack:()=>void; onSaved:()=>void; onLegacy:()=>void}) {
-  const c = useThemeMode() === 'dark' ? DARK : LIGHT;
+export default function CategoryInspectionEntryScreen({project, item, areaId, initialDraft, onBack, onSaved, onLegacy, onModifyChecklist}: {project:string; item:string; areaId?:string; initialDraft?: {id:string; startedAt:string}; onBack:()=>void; onSaved:()=>void; onLegacy?:()=>void; onModifyChecklist?:()=>void}) {
+  const c = useThemeMode() === 'dark' ? OPERATIONS_DARK : LIGHT;
   const [categories,setCategories] = useState<ChecklistCategory[]>([]);
   useEffect(() => {
     let active = true;
@@ -45,6 +48,7 @@ export default function CategoryInspectionEntryScreen({project, item, onBack, on
     return ()=>{active=false;};
   }, []);
   const [date, setDate] = useState(() => {
+    if (initialDraft) return initialDraft.startedAt.slice(0, 10);
     const now = new Date();
     return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   });
@@ -59,7 +63,7 @@ export default function CategoryInspectionEntryScreen({project, item, onBack, on
   const [error, setError] = useState('');
   const [equipmentComments,setEquipmentComments] = useState<string>();
   const [equipmentPhotos,setEquipmentPhotos] = useState<InspectionPhotoFile[]>([]);
-  const [submitStatus,setSubmitStatus] = useState(false);
+  const [pendingStatus,setPendingStatus] = useState<'Ongoing' | 'Hold' | 'Completed'>();
   const [statusPicker,setStatusPicker] = useState(false);
   const [notice, setNotice] = useState('');
   const [gradePicker,setGradePicker] = useState<{code:string; grade:Grade}>();
@@ -67,29 +71,32 @@ export default function CategoryInspectionEntryScreen({project, item, onBack, on
   const [attachmentSearch,setAttachmentSearch] = useState('');
   const [attachmentCode,setAttachmentCode] = useState('');
   const [preview, setPreview] = useState('');
+  const [modifyingChecklist,setModifyingChecklist] = useState(false);
   const [openedKey, setOpenedKey] = useState('');
   const base = `/v1/inspection-activities/category-checklist/projects/${project}/equipment/${item}`;
   const key = `${project}/${item}/${date}`;
-  const editable = !activity || activity.reviewStatus === 'Draft' || activity?.reviewStatus === 'ChangesRequested';
+  const editable = !activity || activity.reviewStatus === 'Draft' || activity.reviewStatus === 'ChangesRequested';
+  const inspectionStatus = !editable ? 'Completed' : pendingStatus ?? (activity?.isOnHold ? 'Hold' : 'Ongoing');
   useEffect(() => {
     let active = true;
     if (item)
-      apiClient.get<Point[]>(base, {params:{category:allCheckpoints,activityId:activity?.id}}).then(r => {if (active) setPoints(r.data);})
-        .catch(e => {if (active) setError(inspectionError(e, 'Could not load checkpoints.'));});
+      apiClient.get<Point[]>(base, {params:{category:allCheckpoints,activityId:activity?.id}}).then(r => {if (active) {setPoints(r.data);setError(current=>/technically approved Sample Checklist|No published Sample Checklist/i.test(current)?'':current);}})
+        .catch(e => {if (active) {const message=inspectionError(e, 'Could not load checkpoints.');setError(/technically approved Sample Checklist|No published Sample Checklist/i.test(message)?'':message);}});
     return () => {active = false;};
   }, [activity?.id, base, item]);
 
   useEffect(() => {
     let active = true;
     if (item && date) getInspectionActivityHistory(item, true).then(async ({data}) => {
-      const existing = data.find((row:{startedAt:string})=>row.startedAt.slice(0,10)===date);
+      const existing = initialDraft && initialDraft.startedAt.slice(0,10) === date
+        ? initialDraft : data.find((row:{startedAt:string})=>row.startedAt.slice(0,10)===date);
       if (existing && active) {
         const loaded = (await getInspectionActivity(existing.id)).data as Activity;
         if (active) setActivity(current=>current ?? loaded);
       }
     }).catch(e=>{if(active)setError(inspectionError(e,'Could not load previous inspection details. You can still enter a draft and retry saving.'));});
     return ()=>{active=false;};
-  }, [date,item]);
+  }, [date,item,initialDraft]);
 
   async function loadOrCreateInspection(): Promise<Activity> {
     if (activity) return (await getInspectionActivity(activity.id)).data;
@@ -115,7 +122,7 @@ export default function CategoryInspectionEntryScreen({project, item, onBack, on
     finally {setBusy(false);}
   }
   function resetSelection() {
-    setActivity(undefined); setOpenedKey(''); setAttachmentCode(''); setEquipmentComments(undefined); setEquipmentPhotos([]); setSubmitStatus(false); setError(''); setNotice('');
+    setActivity(undefined); setOpenedKey(''); setAttachmentCode(''); setEquipmentComments(undefined); setEquipmentPhotos([]); setPendingStatus(undefined); setError(''); setNotice('');
   }
   const readGrades = (json?:string|null): GradeResults => json ? JSON.parse(json) as GradeResults : {};
   const patch = (code:string, value:Draft) => setDrafts(old => ({...old,[code]:{...old[code],...value}}));
@@ -138,6 +145,8 @@ export default function CategoryInspectionEntryScreen({project, item, onBack, on
       await uploadActivityPhoto(current.id, photo, responseId);
       patch(code, {photos:draft.photos!.slice(i + 1)});
     }
+    if (draft.photos?.length) current = (await getInspectionActivity(current.id)).data;
+    setActivity(current);
     setDrafts(old => {const next = {...old}; delete next[code]; return next;});
     return current;
   }
@@ -145,13 +154,17 @@ export default function CategoryInspectionEntryScreen({project, item, onBack, on
     if (!editable || busy || !date) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      let current = await loadOrCreateInspection();
+      let current = activity ?? await loadOrCreateInspection();
+      if (activity && (await getInspectionActivity(activity.id)).data.rowVersion !== activity.rowVersion)
+        throw new Error('Another Surveyor saved changes. Reload the saved inspection and reconcile your edits before saving.');
+
       setActivity(current);
       if (current.reviewStatus !== 'Draft' && current.reviewStatus !== 'ChangesRequested')
         throw new Error('This inspection is read-only.');
-      if (!findingCode && equipmentComments !== undefined) {
+      const hold = inspectionStatus === 'Hold';
+      if (!findingCode && (equipmentComments !== undefined || hold !== !!current.isOnHold)) {
         await apiClient.put(`/v1/inspection-activities/${current.id}/equipment-comments`,
-          {comments:equipmentComments,rowVersion:current.rowVersion});
+          {comments:equipmentComments ?? current.equipmentComments,rowVersion:current.rowVersion,isOnHold:hold});
         current = (await getInspectionActivity(current.id)).data;
         setActivity(current);setEquipmentComments(undefined);
       }
@@ -159,8 +172,14 @@ export default function CategoryInspectionEntryScreen({project, item, onBack, on
         await uploadActivityPhoto(current.id,photo);
         setEquipmentPhotos(pending=>pending.slice(1));
       }
+      if (!findingCode && equipmentPhotos.length) current = (await getInspectionActivity(current.id)).data;
       const entries = findingCode ? [[findingCode, drafts[findingCode] ?? {}] as const] : Object.entries(drafts);
-      for (const [code, draft] of entries) current = await persist(current, code, draft);
+      const baseline = activity ?? current;
+      for (const [code, draft] of entries) {
+        if (storedFor(baseline, code).response?.id !== storedFor(current, code).response?.id)
+          throw new Error('Another Surveyor updated this checkpoint. Reload the saved inspection and reconcile your edits.');
+        current = await persist(current, code, draft);
+      }
       if (findingCode) {
         const response = storedFor(current, findingCode).response;
         const observation = response?.inspectionComment?.trim() || response?.observation?.trim();
@@ -170,10 +189,13 @@ export default function CategoryInspectionEntryScreen({project, item, onBack, on
         setNotice('Defect raised.');
       } else if (submit) {
         await submitInspectionActivity(current.id);
-        setSubmitStatus(false);
+        setPendingStatus(undefined);
         setNotice('Inspection submitted for review.');
         onSaved();
-      } else setNotice('Draft saved.');
+      } else {
+        setPendingStatus(undefined);
+        setNotice(hold ? 'Inspection saved on hold.' : 'Draft saved.');
+      }
       setActivity((await getInspectionActivity(current.id)).data);
     } catch(e) {setError(inspectionError(e, e instanceof Error ? e.message : 'Could not save the inspection.'));}
     finally {setBusy(false);}
@@ -223,11 +245,31 @@ export default function CategoryInspectionEntryScreen({project, item, onBack, on
     } catch(e) {setError(inspectionError(e,'Could not remove the photo.'));}
     finally {setBusy(false);}
   }
-  const dirty = Object.keys(drafts).length > 0 || equipmentComments !== undefined || equipmentPhotos.length > 0;
+  const dirty = Object.keys(drafts).length > 0 || equipmentComments !== undefined || equipmentPhotos.length > 0 || pendingStatus !== undefined;
   const locked = busy || dirty;
-  return <ScrollView style={{flex:1,backgroundColor:c.bg}} contentContainerStyle={{padding:18,gap:12}}>
-    <View style={line}>{button('Back',onBack,locked)}{button('Grade-based inspection history',onLegacy,locked)}</View>
-    <Text accessibilityRole="header" style={{fontSize:26,fontWeight:'800',color:c.text}}>Equipment Inspection</Text>
+  if (modifyingChecklist) return <EquipmentCategoryChecklistScreen initialProject={project} initialArea={areaId} initialEquipment={item}
+    onBack={async ()=>{
+      setModifyingChecklist(false);
+      try {
+        const refreshed = (await apiClient.get<Point[]>(base, {params:{category:allCheckpoints,activityId:activity?.id}})).data;
+        setPoints(refreshed);
+        if (activity) setActivity((await getInspectionActivity(activity.id)).data);
+        setError('');
+      } catch(e) { setError(inspectionError(e,'Checklist refreshed with an error. Your inspection draft is still preserved.')); }
+    }} />;
+  return <ScrollView nativeID="ex-category-inspection" style={{flex:1,backgroundColor:c.bg}}
+    keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:16,gap:14}}>
+    <View style={line}>{button('Back',onBack,locked)}
+      {activity && button('Reload saved inspection', async () => {
+        setBusy(true);
+        try {
+          setActivity((await getInspectionActivity(activity.id)).data);
+          setError('');
+          setNotice('Latest saved inspection loaded. Review your pending edits before saving.');
+        } catch (e) {setError(inspectionError(e, 'Could not reload the inspection.'));}
+        finally {setBusy(false);}
+      }, busy)}{onLegacy && button('Grade-based inspection history',onLegacy,locked)}</View>
+    <ModuleHeading eyebrow="FIELD RECORD  /  CHECKPOINTS" title="Equipment Inspection" description="Record results and evidence for the selected equipment." />
     <View style={line}>
       {button('Previous Inspections',()=>void openHistory(),!item||locked)}
       <RegisterDateInput value={date} disabled={locked} onChange={value=>{setDate(value);resetSelection();}} style={input}/>
@@ -236,19 +278,25 @@ export default function CategoryInspectionEntryScreen({project, item, onBack, on
     {!!notice && <Text style={{color:c.text}}>{notice}</Text>}
     {!!item && !activity && <View style={line}>
       {button('Checklist Items',()=>void open(),busy||!date,true)}
+      {button('Modify Checklist',()=>setModifyingChecklist(true),busy||!date)}
       {text('Open or create a draft to enter results for the checkpoints below.')}
     </View>}
     {!!points.length && <View style={line}>
-      {text(activity?.reviewStatus ?? 'Draft')}
+      {editable && button('Modify Checklist',()=>{
+        if (dirty && !globalThis.confirm('Your inspection answers, remarks, and photos will remain here while you edit the checklist. Continue?')) return;
+        if (onModifyChecklist) onModifyChecklist(); else setModifyingChecklist(true);
+      },busy)}
+      {text(inspectionStatus)}
+      {activity && activity.reviewStatus !== 'Draft' && text(`QC · ${activity.reviewStatus.replace(/([a-z])([A-Z])/g, '$1 $2')}`)}
       {text(`${points.filter(point => {
         const saved = activity ? storedFor(activity, point.code).response : undefined;
         const changes = drafts[point.code]?.grades;
         return changes || saved?.gradeResultsJson
           ? Object.values({...readGrades(saved?.gradeResultsJson),...changes}).some(Boolean) : !!saved?.responseCode;
       }).length} / ${points.length} answered`)}
-      {button(submitStatus?'Save and Submit':'Save Draft',()=>void save(submitStatus),busy||!editable||!date)}
-      {button('Submit Inspection',()=>void save(true),busy||!editable,true)}
-      {dirty && button('Discard unsaved changes',()=>{setDrafts({});setEquipmentComments(undefined);setEquipmentPhotos([]);setSubmitStatus(false);},busy)}
+      {button(inspectionStatus === 'Completed' ? 'Save and Submit' : 'Save Draft',()=>void save(inspectionStatus === 'Completed'),busy||!editable||!date)}
+      {button('Submit Inspection',()=>void save(true),busy||!editable||inspectionStatus === 'Hold',true)}
+      {dirty && button('Discard unsaved changes',()=>{setDrafts({});setEquipmentComments(undefined);setEquipmentPhotos([]);setPendingStatus(undefined);},busy)}
     </View>}
     {sections.map(([section,label])=>{
       const items = points.filter(p=>p.section===section);
@@ -264,11 +312,11 @@ export default function CategoryInspectionEntryScreen({project, item, onBack, on
         value={equipmentComments ?? activity?.equipmentComments ?? ''} onChangeText={setEquipmentComments}
         style={{...input,minHeight:90,textAlignVertical:'top'}}/>
       <Text style={{color:c.text,fontWeight:'700'}}>Inspection Status</Text>
-      {button(submitStatus ? 'Submitted on save' : activity?.reviewStatus ?? 'Draft',()=>setStatusPicker(true),busy||!editable,false,'Inspection Status')}
+      {button(inspectionStatus,()=>setStatusPicker(true),busy||!editable,false,'Inspection Status')}
       <Text style={{color:c.text,fontWeight:'700'}}>Equipment Photos</Text>
       <View style={line}>{activity?.evidence.filter(photo=>!photo.checkpointResponseRevisionId).map(photo=><View key={photo.id} style={{gap:4}}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Preview equipment photo" onPress={()=>setPreview(photo.url)}>
-          <AuthenticatedImage path={photo.url} style={{width:110,height:78}}/>
+          <AuthenticatedImage path={photo.url} fileName={photo.fileName} style={{width:110,height:78}}/>
         </TouchableOpacity>
         {activity.reviewStatus==='Draft' && button('Remove equipment photo',()=>void removePhoto(photo.id),busy)}
       </View>)}</View>
@@ -276,7 +324,7 @@ export default function CategoryInspectionEntryScreen({project, item, onBack, on
         <InspectionPhotoPicker disabled={busy} onSelected={photos=>setEquipmentPhotos(previous=>[...previous,...photos])}/>
       </View>}
       {equipmentPhotos.map((photo,index)=><View key={index} style={line}>
-        {photo.uri && <Image source={{uri:photo.uri}} style={{width:88,height:60,borderRadius:4}}/>}
+        {photo.uri && <AuthenticatedImage localUri={photo.uri} fileName={photo.fileName || photo.name} style={{width:88,height:60,borderRadius:4}}/>}
         {text(photo.fileName || photo.name || `Pending equipment photo ${index+1}`)}
         {button('Remove pending equipment photo',()=>setEquipmentPhotos(previous=>previous.filter((_,i)=>i!==index)),busy)}
       </View>)}
@@ -288,7 +336,7 @@ export default function CategoryInspectionEntryScreen({project, item, onBack, on
       {associatedPoint && text('Photos for this checkpoint')}
       <View style={line}>{(associatedPoint ? selectedPhotos : []).map(photo=><View key={photo.id} style={{gap:4}}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Preview inspection photo" onPress={()=>setPreview(photo.url)}>
-          <AuthenticatedImage path={photo.url} style={{width:110,height:78}}/>
+          <AuthenticatedImage path={photo.url} fileName={photo.fileName} style={{width:110,height:78}}/>
         </TouchableOpacity>
         {activity?.reviewStatus === 'Draft' && button('Remove photo',()=>void removePhoto(photo.id),busy)}
       </View>)}</View>
@@ -309,8 +357,10 @@ export default function CategoryInspectionEntryScreen({project, item, onBack, on
     <Modal transparent visible={statusPicker} onRequestClose={()=>setStatusPicker(false)}>
       <View style={{flex:1,backgroundColor:'#0008',justifyContent:'center',alignItems:'center',padding:16}}>
         <View style={{backgroundColor:c.card,padding:14,borderRadius:8,gap:8,width:'100%',maxWidth:320}}>
-          {button(activity?.reviewStatus ?? 'Draft',()=>{setSubmitStatus(false);setStatusPicker(false);})}
-          {button('Submit for review',()=>{setSubmitStatus(true);setStatusPicker(false);})}
+          {(['Ongoing', 'Hold', 'Completed'] as const).map(status =>
+            <View key={status}>{button(status, () => {setPendingStatus(status); setStatusPicker(false);},
+              false, inspectionStatus === status)}</View>
+          )}
           {button('Cancel',()=>setStatusPicker(false))}
         </View>
       </View>

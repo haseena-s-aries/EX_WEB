@@ -1,3 +1,5 @@
+import AuthReferenceLayout from '../components/AuthReferenceLayout';
+import {visual} from '../theme/visual';
 import React, {createContext, useContext, useMemo, useState} from 'react';
 import {
   View,
@@ -11,8 +13,6 @@ import {
   ScrollView,
   Image,
   ImageSourcePropType,
-  StyleProp,
-  ViewStyle,
   useWindowDimensions,
 } from 'react-native';
 import AnimatedCard from '../components/AnimatedCard';
@@ -29,7 +29,6 @@ import {
   GoogleMark,
   MicrosoftMark,
   FaceIdIcon,
-  RefineryScene,
 } from '../components/LoginArt';
 
 /* ------------------------------------------------------------------ */
@@ -39,12 +38,12 @@ import {
 export type ThemeMode = 'light' | 'dark';
 
 export const LIGHT_COLORS = {
-  primary: '#EA580C',
-  primaryPressed: '#C2410C',
-  gradFrom: '#D97706',
-  gradTo: '#EA580C',
+  primary: '#0b596a',
+  primaryPressed: '#084756',
+  gradFrom: '#0d6072',
+  gradTo: '#128296',
   onPrimary: '#FFFFFF',
-  page: '#F8FAFC',
+  page: '#edf5f7',
   card: '#FFFFFF',
   sheet: '#FFFFFF',
   surfaceAlt: '#F1F5F9',
@@ -58,21 +57,19 @@ export const LIGHT_COLORS = {
   muted: '#64748B',
   icon: '#94A3B8',
   error: '#EF4444',
-  link: '#C2410C', // darker than the CTA so small link text stays AA-readable
-  heroBg: '#EDF2F8',
-  heroBgRgb: '237,242,248',
+  link: '#086276', // darker than the CTA so small link text stays AA-readable
   heroRule: 'rgba(15,23,42,0.18)',
   footerBar: 'rgba(15,23,42,0.55)',
-  focusGlow: 'rgba(234,88,12,0.15)',
+  focusGlow: 'rgba(18,130,150,0.18)',
   cardShadow: '0px 12px 40px rgba(15, 23, 42, 0.06)',
   sheetShadow: '0px -8px 30px rgba(15, 23, 42, 0.10)',
 };
 
 export const DARK_COLORS: typeof LIGHT_COLORS = {
-  primary: '#F59E0B',
-  primaryPressed: '#D97706',
-  gradFrom: '#EA580C',
-  gradTo: '#F59E0B',
+  primary: '#7be0cd',
+  primaryPressed: '#62cbb8',
+  gradFrom: '#65ceb9',
+  gradTo: '#8ee2d1',
   onPrimary: '#0B0F19', // dark text: white on amber only reaches ~2:1
   page: '#0B0F19',
   card: '#111827',
@@ -88,15 +85,17 @@ export const DARK_COLORS: typeof LIGHT_COLORS = {
   muted: '#94A3B8',
   icon: '#94A3B8',
   error: '#F87171',
-  link: '#FBBF24',
-  heroBg: '#090D16',
-  heroBgRgb: '9,13,22',
+  link: '#81ddd0',
   heroRule: 'rgba(148,163,184,0.35)',
   footerBar: 'rgba(9,13,22,0.72)',
-  focusGlow: 'rgba(245,158,11,0.22)',
+  focusGlow: 'rgba(123,224,205,0.22)',
   cardShadow: '0px 0px 80px rgba(245, 158, 11, 0.07)',
   sheetShadow: '0px -8px 30px rgba(0, 0, 0, 0.55)',
 };
+
+const REFERENCE_COLORS = {...DARK_COLORS, primary: '#00e5f5', primaryPressed: '#20f1fc',
+  gradFrom: '#00e5f5', gradTo: '#00e5f5', onPrimary: '#042338', inputBg: '#153d58',
+  inputBorder: '#2c5671', muted: '#c7e0f1', link: '#b9f8ff', focusGlow: '#00e5f538'};
 
 type Colors = typeof LIGHT_COLORS;
 
@@ -122,51 +121,47 @@ function makeStyles(c: Colors, dark: boolean) {
     },
 
     /* desktop split */
-    split: {flex: 1, flexDirection: 'row', padding: 16, gap: 16},
+    split: {flex: 1, flexDirection: 'row', padding: 12, gap: 12},
     hero: {
       flex: 1.1,
-      minHeight: 760,
+      minHeight: 660,
       borderRadius: 20,
       overflow: 'hidden',
       justifyContent: 'space-between',
-      backgroundColor: c.heroBg,
+      backgroundColor: visual.deep,
     },
-    heroSky: dark
-      ? {}
-      : {
-          backgroundColor: '#E6EDF6',
-          ...web({
-            backgroundImage:
-              'linear-gradient(180deg, #D9E4F2 0%, #EEF2F8 52%, #FBEBD6 100%)',
-          }),
-        },
-    heroContent: {paddingTop: 56, paddingHorizontal: 56, maxWidth: 520},
+    heroContent: {zIndex: 2, paddingTop: 44, paddingHorizontal: 34, maxWidth: 620},
+    coverKicker: {fontFamily: visual.mono, fontSize: 11, color: visual.signal, letterSpacing: 1.5, marginTop: 47, fontWeight: '700'},
+    coverScrim: {position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(6,24,36,.76)'},
+    coverScan: {position: 'absolute', width: 260, height: 260, borderRadius: 130, borderWidth: 1, borderColor: '#8ce6e484', right: -35, bottom: 76},
+    coverScanInner: {position: 'absolute', top: 33, right: 33, bottom: 33, left: 33, borderWidth: 1, borderColor: '#8ce6e457', borderRadius: 130},
     heroTitle: {
       ...(FONT as object),
-      fontSize: 36,
-      lineHeight: 44,
+      fontSize: 48,
+      lineHeight: 51,
       fontWeight: '700',
-      color: c.text,
-      letterSpacing: -0.8,
-      marginTop: 36,
+      color: "#f3fbfd",
+      letterSpacing: -1.8,
+      marginTop: 10,
     },
     heroBody: {
       ...(FONT as object),
       fontSize: 16,
       lineHeight: 24,
-      color: c.label,
+      color: "#d3e8ee",
       marginTop: 16,
       maxWidth: 360,
     },
-    pillRow: {flexDirection: 'row', marginTop: 40},
+    pillRow: {flexDirection: 'row', flexWrap: 'wrap', rowGap: 10, marginTop: 30},
     pill: {paddingRight: 20, gap: 8, alignItems: 'flex-start'},
     pillDivider: {
       paddingLeft: 20,
       borderLeftWidth: 1,
       borderLeftColor: c.heroRule,
     },
-    pillText: {...(FONT as object), fontSize: 12, lineHeight: 16, color: c.label},
+    pillText: {...(FONT as object), fontSize: 12, lineHeight: 16, color: '#d3e8ee'},
     heroFooter: {
+      zIndex: 2,
       height: 56,
       justifyContent: 'center',
       paddingHorizontal: 56,
@@ -189,7 +184,7 @@ function makeStyles(c: Colors, dark: boolean) {
     cardDesktop: {
       maxWidth: 440,
       padding: 36,
-      borderRadius: 16,
+      borderRadius: visual.radius.hero,
       borderWidth: 1,
       borderColor: c.border,
       backgroundColor: c.card,
@@ -198,18 +193,20 @@ function makeStyles(c: Colors, dark: boolean) {
     },
 
     /* mobile */
-    mobileHero: {height: 320, overflow: 'hidden', backgroundColor: c.heroBg},
+    mobileHero: {height: 236, overflow: 'hidden', backgroundColor: visual.deep},
     mobileHeroContent: {
-      alignItems: 'center',
-      paddingTop: Platform.OS === 'web' ? 36 : 56,
+      zIndex: 2,
+      alignItems: 'flex-start',
+      paddingHorizontal: 24,
+      paddingTop: Platform.OS === 'web' ? 34 : 48,
     },
     slogan: {
       ...(FONT as object),
-      textAlign: 'center',
-      fontSize: 15,
-      lineHeight: 21,
-      color: c.label,
-      marginTop: 10,
+      fontSize: 24,
+      lineHeight: 30,
+      fontWeight: '800',
+      color: '#e7f8fa',
+      marginTop: 12,
     },
     sheet: {
       maxWidth: '100%',
@@ -361,97 +358,8 @@ const useTheme = () => useContext(ThemeCtx) as ThemeValue;
 /* ------------------------------------------------------------------ */
 
 const LIGHT_PHOTO: ImageSourcePropType = require('../assets/refinery_towers_sharp.png');
-// Despite the file names: "_mobile" is the portrait shot, "_hero" the landscape one.
-const DARK_PHOTO_TALL: ImageSourcePropType = require('../assets/refinery_dark_theme_hero.png');
-const DARK_PHOTO_WIDE: ImageSourcePropType = require('../assets/refinery_dark_theme_hero.png');
-const LIGHT_PHOTO_ASPECT = 1800 / 1201;
-
-const PHOTOS: Record<ThemeMode, {desktop: ImageSourcePropType; mobile: ImageSourcePropType}> = {
-  light: {desktop: LIGHT_PHOTO, mobile: LIGHT_PHOTO},
-  dark: {desktop: DARK_PHOTO_TALL, mobile: DARK_PHOTO_WIDE},
-};
-
-/**
- * Hero photo. Either anchored to the bottom and fading into the hero
- * background (`fadeHeight`), or filling the whole panel (`fill`) with an
- * optional left-to-right `scrim` so overlaid text stays readable.
- */
-function HeroPhoto({
-  source,
-  fadeHeight = 0,
-  height,
-  fill,
-  dim = 0,
-  scrim,
-}: {
-  source: ImageSourcePropType;
-  fadeHeight?: number;
-  height?: number;
-  fill?: boolean;
-  dim?: number;
-  scrim?: boolean;
-}) {
-  const {c} = useTheme();
-  const steps = 14;
-  const box: StyleProp<ViewStyle> = fill
-    ? StyleSheet.absoluteFill
-    : [
-        {position: 'absolute', left: 0, bottom: 0, width: '100%'},
-        height ? {height} : {aspectRatio: LIGHT_PHOTO_ASPECT},
-      ];
-  return (
-    <View pointerEvents="none" style={box}>
-      <Image
-        source={source}
-        resizeMode="cover"
-        accessibilityIgnoresInvertColors
-        style={StyleSheet.absoluteFill}
-      />
-      {dim > 0 ? (
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            {backgroundColor: `rgba(${c.heroBgRgb},${dim})`},
-          ]}
-        />
-      ) : null}
-      {scrim ? (
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            bottom: 0,
-            left: 0,
-            width: '85%',
-            flexDirection: 'row',
-          }}>
-          {Array.from({length: steps}).map((_, i) => (
-            <View
-              key={i}
-              style={{
-                flex: 1,
-                backgroundColor: `rgba(${c.heroBgRgb},${(0.88 * (1 - i / (steps - 1))).toFixed(2)})`,
-              }}
-            />
-          ))}
-        </View>
-      ) : null}
-      {fadeHeight > 0 ? (
-        <View style={{position: 'absolute', top: 0, left: 0, right: 0, height: fadeHeight}}>
-          {Array.from({length: steps}).map((_, i) => (
-            <View
-              key={i}
-              style={{
-                height: fadeHeight / steps,
-                backgroundColor: `rgba(${c.heroBgRgb},${(1 - i / (steps - 1)).toFixed(2)})`,
-              }}
-            />
-          ))}
-        </View>
-      ) : null}
-    </View>
-  );
-}
+const DARK_PHOTO: ImageSourcePropType = require('../assets/refinery_dark_theme_hero.png');
+const PHOTOS: Record<ThemeMode, ImageSourcePropType> = {light: LIGHT_PHOTO, dark: DARK_PHOTO};
 
 /* ------------------------------------------------------------------ */
 /* Pieces                                                              */
@@ -459,13 +367,13 @@ function HeroPhoto({
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function Brand({size = 40, nameSize = 26}: {size?: number; nameSize?: number}) {
+function Brand({size = 40, nameSize = 26, onCover = false}: {size?: number; nameSize?: number; onCover?: boolean}) {
   const {c, s, dark} = useTheme();
   return (
     <View style={s.brandRow}>
       <AriesLogo size={size} />
-      <Text style={[s.brandName, {fontSize: nameSize}]}>
-        {dark ? (
+      <Text style={[s.brandName, {fontSize: nameSize}, onCover && {color: "#f3fbfd"}]}>
+        {dark && !onCover ? (
           <>
             Ex-<Text style={{color: c.primary}}>Survey</Text>
           </>
@@ -516,7 +424,7 @@ function Field({
 
   return (
     <View style={s.field}>
-      <Text style={s.label}>{label}</Text>
+      {Platform.OS !== 'web' && <Text style={s.label}>{label}</Text>}
       <View
         style={[
           s.inputBox,
@@ -672,7 +580,8 @@ type Props = {
   onThemeChange?: (mode: ThemeMode) => void;
   onLogin: (email: string, password: string, rememberMe?: boolean) => void;
   onOfflineLogin?: (email: string,password:string) => void;
-  onGoToSignup: () => void;
+  onGoToSignup?: () => void;
+  onBackToHome?: () => void;
   loading?: boolean;
   /** Overrides the bundled photo. Pass null for no photo (light theme draws an illustration). */
   heroImage?: ImageSourcePropType | null;
@@ -688,16 +597,16 @@ export default function LoginScreen(props: Props) {
   const mode: ThemeMode = useThemeMode(props.theme);
 
   const value = useMemo<ThemeValue>(() => {
-    const dark = mode === 'dark';
-    const c = dark ? DARK_COLORS : LIGHT_COLORS;
+    const dark = Platform.OS === 'web' || mode === 'dark';
+    const c = Platform.OS === 'web' ? REFERENCE_COLORS : dark ? DARK_COLORS : LIGHT_COLORS;
     return {c, s: makeStyles(c, dark), dark};
   }, [mode]);
 
   return (
     <ThemeCtx.Provider value={value}>
-      <View style={value.s.screen}>
+      <View nativeID={Platform.OS === 'web' ? undefined : 'ex-auth'} style={value.s.screen}>
         <LoginBody {...props} mode={mode} />
-        {props.showThemeToggle === false ? null : <ThemeToggle onChange={props.onThemeChange} />}
+        {Platform.OS === 'web' || props.showThemeToggle === false ? null : <ThemeToggle onChange={props.onThemeChange} />}
       </View>
     </ThemeCtx.Provider>
   );
@@ -708,6 +617,7 @@ function LoginBody({
   onLogin,
   onOfflineLogin,
   onGoToSignup,
+  onBackToHome,
   loading,
   heroImage,
   onForgotPassword,
@@ -729,8 +639,7 @@ function LoginBody({
   const inputHeight = isDesktop ? 48 : 52;
   const radius = isDesktop ? 8 : 12;
 
-  const desktopPhoto = heroImage === undefined ? PHOTOS[mode].desktop : heroImage;
-  const mobilePhoto = heroImage === undefined ? PHOTOS[mode].mobile : heroImage;
+  const coverPhoto = heroImage === undefined ? PHOTOS[mode] : heroImage;
 
   const handleLogin = () => {
     const trimmed = email.trim();
@@ -752,18 +661,20 @@ function LoginBody({
 
   const form = (
     <>
-      <Text
+      {Platform.OS !== 'web' && <>
+      <Text accessibilityRole="header"
         style={[
           s.title,
           isDesktop ? s.titleWeb : s.titleMobile,
           !isDesktop && {textAlign: 'center'},
         ]}>
-        Welcome Back
+        Sign in to Ex-Survey
       </Text>
       <Text style={[s.subtitle, !isDesktop && {textAlign: 'center', marginBottom: 20}]}>
         {isDesktop ? 'Sign in to your Ex-Survey account' : 'Sign in to your account'}
       </Text>
 
+      </>}
       <Field
         label="Email Address"
         icon="mail"
@@ -772,7 +683,7 @@ function LoginBody({
           setEmail(t);
           setEmailError('');
         }}
-        placeholder="you@company.com"
+        placeholder={Platform.OS === 'web' ? 'Email' : 'you@company.com'}
         error={emailError}
         height={inputHeight}
         radius={radius}
@@ -788,7 +699,7 @@ function LoginBody({
           setPassword(t);
           setPasswordError('');
         }}
-        placeholder="Enter your password"
+        placeholder={Platform.OS === 'web' ? 'Password' : 'Enter your password'}
         error={passwordError}
         height={inputHeight}
         radius={radius}
@@ -859,38 +770,42 @@ function LoginBody({
         </>
       ) : null}
 
-      <View style={s.footerRow}>
+      {Platform.OS !== 'web' && onGoToSignup && <View style={s.footerRow}>
         <Text style={s.meta}>Don't have an account? </Text>
         <Text onPress={onGoToSignup} accessibilityRole="link" style={[s.meta, s.link]}>
-          Request access
+          Register
         </Text>
-      </View>
+      </View>}
       {onOfflineLogin ? <Pressable accessibilityRole="button" onPress={() => onOfflineLogin(email.trim(),password)} style={{alignSelf:'center',paddingVertical:12}}><Text style={[s.meta,s.link]}>Open downloaded offline inspections</Text><Text style={[s.meta,{textAlign:'center',fontSize:11}]}>Enter the email and password from your last online sign-in</Text></Pressable> : null}
     </>
   );
+
+  if (Platform.OS === 'web') {
+    return <AuthReferenceLayout mode="login" onSwitch={onGoToSignup} onBackToHome={onBackToHome} photo={heroImage}>{form}</AuthReferenceLayout>;
+  }
 
   /* ---------------- desktop: split screen ---------------- */
   if (isDesktop) {
     const heroInner = (
       <>
         <View style={s.heroContent}>
-          <Brand size={46} nameSize={30} />
-          <Text style={s.heroTitle}>Inspection Intelligence for a Safer Tomorrow</Text>
+          <Brand size={46} nameSize={29} onCover />
+          <Text style={s.coverKicker}>FIELD OPERATIONS  /  EX WORKSPACE</Text>
+          <Text style={s.heroTitle}>From deck to final report.</Text>
           <Text style={s.heroBody}>
-            Streamline inspections, ensure compliance, and keep your people and
-            assets safe.
+            Plan surveys, verify equipment and follow inspection work through quality review.
           </Text>
           <View style={s.pillRow}>
             {PILLS.map(({label, Icon}, i) => (
               <View key={label} style={[s.pill, i > 0 && s.pillDivider]}>
-                <Icon color={c.text} />
+                <Icon color={visual.signal} />
                 <Text style={s.pillText}>{label}</Text>
               </View>
             ))}
           </View>
         </View>
-        <View style={[s.heroFooter, desktopPhoto ? s.heroFooterPhoto : null]}>
-          <Text style={s.heroFooterText}>PEOPLE  |  PLANTS  |  A SAFER TOMORROW</Text>
+        <View style={[s.heroFooter, coverPhoto ? s.heroFooterPhoto : null]}>
+          <Text style={s.heroFooterText}>VESSEL & SITE  /  INSPECTION WORKSPACE</Text>
         </View>
       </>
     );
@@ -901,19 +816,13 @@ function LoginBody({
           contentContainerStyle={{flexGrow: 1, minHeight: winHeight}}
           keyboardShouldPersistTaps="handled">
           <View style={s.split}>
-            <View style={[s.hero, !desktopPhoto && s.heroSky]}>
-              {desktopPhoto ? (
-                dark ? (
-                  <HeroPhoto source={desktopPhoto} fill dim={0.3} scrim />
-                ) : (
-                  <HeroPhoto source={desktopPhoto} fadeHeight={90} />
-                )
-              ) : dark ? null : (
-                <RefineryScene variant="desktop" groundHeight={56} />
-              )}
+            <View nativeID="ex-cover-panel" style={s.hero}>
+              {coverPhoto && <Image source={coverPhoto} resizeMode="cover" style={[StyleSheet.absoluteFill, {width: '100%', height: '100%'}]} />}
+              <View pointerEvents="none" style={s.coverScrim} />
+              <View pointerEvents="none" nativeID="ex-cover-scan" style={s.coverScan}><View style={s.coverScanInner} /></View>
               {heroInner}
             </View>
-            <View style={s.formPane}>
+            <View nativeID="ex-entry-form" style={s.formPane}>
               <AnimatedCard style={s.cardDesktop}>{form}</AnimatedCard>
             </View>
           </View>
@@ -928,20 +837,13 @@ function LoginBody({
       style={[s.screen, {minHeight: winHeight}]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={{flexGrow: 1}} keyboardShouldPersistTaps="handled">
-        <View style={[s.mobileHero, !mobilePhoto && s.heroSky]}>
-          {mobilePhoto ? (
-            <HeroPhoto
-              source={mobilePhoto}
-              fadeHeight={56}
-              height={210}
-              dim={dark ? 0.25 : 0}
-            />
-          ) : dark ? null : (
-            <RefineryScene variant="mobile" />
-          )}
+        <View nativeID="ex-cover-panel" style={s.mobileHero}>
+          {coverPhoto && <Image source={coverPhoto} resizeMode="cover" style={[StyleSheet.absoluteFill, {width: '100%', height: '100%'}]} />}
+          <View pointerEvents="none" style={s.coverScrim} />
           <View style={s.mobileHeroContent}>
-            <Brand size={34} nameSize={24} />
-            <Text style={s.slogan}>Same commitment.{'\n'}On the go.</Text>
+            <Brand size={34} nameSize={24} onCover />
+            <Text style={[s.coverKicker, {marginTop: 16}]}>FIELD OPERATIONS  /  EX WORKSPACE</Text>
+            <Text style={s.slogan}>From deck to final report.</Text>
           </View>
         </View>
         <AnimatedCard style={s.sheet}>{form}</AnimatedCard>

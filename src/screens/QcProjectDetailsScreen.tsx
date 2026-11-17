@@ -1,9 +1,13 @@
+import {OPERATIONS_DARK as palette} from '../theme/operationsPalette';
+import ReportWorkflowPanel from '../components/ReportWorkflowPanel';
+import {isPdfFile} from '../utils/isPdfFile';
 import React, {useCallback, useEffect, useState} from 'react';
-import {ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {ActivityIndicator, Image, LayoutAnimation, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View} from 'react-native';
 import {getApiErrorMessage} from '../api/errors';
 import {approveQcInspection, getQcArea, getQcEquipmentInspection, getQcProject, requestQcChanges, startQcReview, updateQcComments} from '../api/projects';
 import AuthenticatedImage from '../components/AuthenticatedImage';
 import ZoomableImageViewer, {ViewerPin} from '../components/ZoomableImageViewer';
+import {projectDisplay} from '../utils/projectDisplay';
 
 type Props = {projectId: string; projectSummary?: any; onBack: () => void};
 const first = (obj: any, ...keys: string[]) => {
@@ -55,14 +59,17 @@ const rollupQcStatus = (statuses: string[], fallback?: string) => {
 // Status text colour next to the "Review / View inspection" button.
 const statusColor = (status: any) => {
   const value = String(status ?? '');
-  if (/changes.?requested|changes required/i.test(value)) return '#d12f3a'; // red
-  if (/approved/i.test(value)) return '#1f7a4d'; // green
-  if (/pending.?review|in.?review/i.test(value)) return '#e07b00'; // orange
+  if (/changes.?requested|changes required/i.test(value)) return palette.critical; // red
+  if (/approved/i.test(value)) return palette.success; // green
+  if (/in.?review/i.test(value)) return palette.cyan;
+  if (/pending.?review/i.test(value)) return palette.amber; // orange
   return undefined; // anything else keeps the default grey
 };
 const imagePath = (item: any) => first(item, 'downloadUrl', 'filePath', 'layoutImagePath', 'layoutPath', 'areaImagePath', 'imagePath', 'photoPath', 'equipmentImagePath', 'equipmentPhotoPath', 'storageKey', 'path', 'url');
 
 export default function QcProjectDetailsScreen({projectId, projectSummary, onBack}: Props) {
+  const compact=useWindowDimensions().width<700;
+  const [expanded,setExpanded]=useState<Record<string,boolean>>({});
   const [project, setProject] = useState<any>(null);
   const [areas, setAreas] = useState<any[]>([]);
   const [areaDetails, setAreaDetails] = useState<Record<string, any>>({});
@@ -245,11 +252,17 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
       const photoId = first(photo, 'fileId', 'photoId', 'id');
       return inspectionIdForPhotos && photoId ? `/qc/inspections/${inspectionIdForPhotos}/photos/${photoId}` : undefined;
     };
+    const equipmentPhotos = array(item, 'equipmentImages', 'equipmentPhotos', 'images', 'photos');
+    const inspectionPhotos = array(inspection, 'inspectionPhotos', 'photos', 'images', 'inspectionImages');
+    const documents = new Map([
+      ...equipmentPhotos.filter(photo => isPdfFile(photo.fileName)).map(photo => [toPath(photo), photo.fileName] as const),
+      ...inspectionPhotos.filter(photo => isPdfFile(photo.fileName)).map(photo => [inspectionPhotoPath(photo), photo.fileName] as const),
+    ]);
     const photoPaths = Array.from(new Set([
       first(equipmentInfo, 'imagePath', 'photoPath', 'equipmentImagePath', 'equipmentPhotoPath'),
-      ...array(item, 'equipmentImages', 'equipmentPhotos', 'images', 'photos').map(toPath),
-      ...array(inspection, 'inspectionPhotos', 'photos', 'images', 'inspectionImages').map(inspectionPhotoPath),
-    ].filter(Boolean)));
+      ...equipmentPhotos.map(toPath),
+      ...inspectionPhotos.map(inspectionPhotoPath),
+    ].filter(path => !!path && !documents.has(path))));
     const checklist = array(inspection, 'checklistAnswers');
     const findings = array(inspection, 'findings');
     const remarks = first(inspection, 'surveyorRemarks');
@@ -279,9 +292,14 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
             <Field label="Certificate Number" value={first(equipmentInfo, 'certificateNumber') || first(inspection, 'certificateNumber')} />
             <Field label="Added Date" value={formatDate(first(equipmentInfo, 'createdAt'))} />
             <Field label="Last Updated" value={formatDate(first(equipmentInfo, 'updatedAt'))} />
-            <Field label="Inspection Status" value={statusText} />
+            <Field label="Inspection Grade" value={first(inspection,'inspectionType','grade')} />
+            <Field label="Inspector" value={first(inspection,'inspectorName','surveyorName') || first(equipmentInfo,'inspectorName','surveyorName')} />
+            <Field label="QC Status" value={statusText} />
           </View>
 
+          {!!documents.size && <View style={styles.photoGrid}>
+            {Array.from(documents).map(([path, fileName]) => path && <AuthenticatedImage key={path} path={path} fileName={fileName} style={styles.photo} />)}
+          </View>}
           {photoPaths.length > 0 && <>
             <Text style={styles.blockTitle}>Photos</Text>
             <View style={styles.photoGrid}>{photoPaths.map((path: any, i: number) => <TouchableOpacity key={`${path}-${i}`} accessibilityLabel="View photo" activeOpacity={0.85} onPress={() => setViewer({images: photoPaths.filter(Boolean), index: photoPaths.filter(Boolean).indexOf(path), title: String(first(equipmentInfo, 'tagNumber') || 'Inspection photo'), subtitle: areaName})}><AuthenticatedImage path={path} resizeMode="cover" style={styles.photo} /></TouchableOpacity>)}</View>
@@ -294,8 +312,8 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
               const kind = yesNo(value);
               const comment = first(answer, 'comment');
               return <View key={`answer-${i}`} style={[styles.checkRow, i > 0 && styles.checkRowBorder]}>
-                <View style={{flex: 1}}><Text style={styles.checkQuestion}>{first(answer, 'question') || `Checklist item ${i + 1}`}</Text>{!!comment && <Text style={styles.muted}>{comment}</Text>}</View>
-                {kind ? <Text style={[styles.chip, kind === 'yes' ? styles.chipYes : styles.chipNo]}>{kind === 'yes' ? 'Yes' : 'No'}</Text> : <Text style={styles.checkValue}>{value != null && value !== '' ? String(value) : '—'}</Text>}
+                <View style={{flex: 1}}>{first(answer,'inspectionType','grade')&&<Text style={styles.muted}>Grade: {first(answer,'inspectionType','grade')}</Text>}<Text style={styles.checkQuestion}>{first(answer, 'question') || `Checklist item ${i + 1}`}</Text>{!!comment && <Text style={styles.muted}>{comment}</Text>}</View>
+                {kind ? <Text style={[styles.chip, kind === 'yes' ? styles.chipYes : styles.chipNo]}>{kind === 'yes' ? 'P' : 'F'}</Text> : <Text style={styles.checkValue}>{value != null && value !== '' ? String(value) : '—'}</Text>}
               </View>;
             })}</View>
           </>}
@@ -319,7 +337,7 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
           {locked
             ? <Text style={styles.awaiting}>{/approved/i.test(String(statusText)) ? 'This inspection is approved and locked.' : 'Changes were requested. Wait for the Surveyor to resubmit the inspection.'}</Text>
             : <>
-              <TextInput editable={!disabled} value={comments[equipmentId] || ''} onChangeText={value => setComments(previous => ({...previous, [equipmentId]: value}))} multiline placeholder="Add QC comments" placeholderTextColor="#9095a4" style={styles.footerInput} />
+              <TextInput editable={!disabled} value={comments[equipmentId] || ''} onChangeText={value => setComments(previous => ({...previous, [equipmentId]: value}))} multiline placeholder="Add QC comments" placeholderTextColor={palette.secondary} style={styles.footerInput} />
               <View style={styles.footerRow}>
                 <View style={styles.severityRow}><Text style={styles.severityLabel}>Change severity</Text>{(['Low', 'Medium', 'High', 'Critical'] as const).map(level => <TouchableOpacity key={level} onPress={() => setSeverities(previous => ({...previous, [equipmentId]: level}))} style={[styles.severityOption, severity === level && styles.severitySelected]}><Text style={[styles.severityText, severity === level && styles.severitySelectedText]}>{level}</Text></TouchableOpacity>)}</View>
                 <View style={styles.actionsRight}>
@@ -335,17 +353,21 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
     </Modal>;
   };
 
-  if (loading) return <View style={styles.state}><ActivityIndicator color="#3f47d6" /><Text style={styles.muted}>Loading project details...</Text></View>;
+  if (loading) return <View style={styles.state}><ActivityIndicator color={palette.cyan} /><Text style={styles.muted}>Loading project details...</Text></View>;
   if (error || !project) return <View style={styles.state}><Text style={styles.title}>Project unavailable</Text><Text style={styles.muted}>{error}</Text><TouchableOpacity onPress={onBack}><Text style={styles.link}>Back to QC projects</Text></TouchableOpacity></View>;
 
-  const name = first(project, 'projectName', 'name') || 'Project';
+  const name = projectDisplay(first(project, 'projectName', 'name')) || 'PROJECT';
   return <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
     <TouchableOpacity onPress={onBack} style={styles.back}><Text style={styles.link}>‹ Back to QC projects</Text></TouchableOpacity>
-    <View style={styles.hero}><Text style={styles.eyebrow}>PROJECT DETAILS</Text><Text style={styles.title}>{name}</Text><Text style={styles.subtitle}>Job {first(project, 'jobNo', 'jobNumber') || '—'} · {first(project, 'location') || 'Location not set'}</Text></View>
+    <View style={styles.hero}>
+      <Image source={require('../assets/landing/industry-3.jpg')} resizeMode="cover" style={StyleSheet.absoluteFill} accessible={false}/><View pointerEvents="none" style={[StyleSheet.absoluteFill,{backgroundColor:'rgba(3,25,44,0.86)'}]}/>
+      <Text style={styles.eyebrow}>QUALITY CONTROL  /  PROJECT REVIEW</Text><Text style={styles.title}>{name}</Text><Text style={styles.subtitle}>Job {projectDisplay(first(project, 'jobNo', 'jobNumber')) || '—'} · {projectDisplay(first(project, 'location')) || 'Location not set'}</Text>
+      <View style={styles.headerBadges}><Text style={styles.statusPill}>Project: {first(project,'projectStatus','status') || '—'}</Text><Text style={[styles.statusPill,{color:statusColor(first(project,'qcStatus','qcReviewStatus','reviewStatus')) || palette.text}]}>QC: {first(project,'qcStatus','qcReviewStatus','reviewStatus') || '—'}</Text></View>
+      <ReportWorkflowPanel projectId={projectId} readOnly compact/>
+    </View>
     <View style={styles.card}><Text style={styles.sectionTitle}>Project Details</Text><View style={styles.details}>
-      <Info label="Sector" value={first(project, 'sector')} />
-      <Info label="Job Number" value={first(project, 'jobNo', 'jobNumber')} />
-      <Info label="Location" value={first(project, 'location')} />
+      <Info label="Job Number" value={projectDisplay(first(project, 'jobNo', 'jobNumber'))} />
+      <Info label="Location" value={projectDisplay(first(project, 'location'))} />
       <Info label="Vessel / Site" value={first(project, 'vesselOrSiteName', 'vesselName')} />
       <Info label="Surveyor" value={first(project, 'assignedSurveyor', 'surveyorName')} />
       <Info label="QC" value={first(project, 'assignedQc', 'qcName')} />
@@ -353,7 +375,7 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
       <Info label="Project Status" value={first(project, 'projectStatus', 'status')} />
       <Info label="QC Status" value={first(project, 'qcStatus', 'qcReviewStatus', 'reviewStatus', 'status')} />
       <Info label="Created Date" value={formatDate(first(project, 'createdDate', 'createdAt'))} />
-      <Info label="Due Date" value={formatDate(first(project, 'dueDate', 'reviewDueDate', 'qcDueDate'))} />
+      <Info label="Due Date" value={formatDate(first(project, 'targetDate', 'dueDate', 'reviewDueDate', 'qcDueDate'))} />
     </View></View>
     <View style={styles.heading}><Text style={styles.sectionTitle}>Areas and Equipment</Text><Text style={styles.muted}>{areas.length} areas</Text></View>
     {!!notice && <View style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></View>}
@@ -363,12 +385,21 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
       const equipment = equipmentList(detail, area);
       const photos = [...array(detail, 'photos', 'images', 'areaPhotos'), ...(imagePath(detail) ? [imagePath(detail)] : [])];
       return <View key={areaId} style={styles.area}>
-        <View style={styles.areaHead}><Text style={styles.areaName}>{first(area, 'areaName', 'name') || `Area ${index + 1}`}</Text><Text style={styles.muted}>{equipment.length || first(area, 'equipmentCount') || 0} equipment · {first(area, 'photoCount') ?? photos.length} images</Text></View>
-        <View style={styles.areaBody}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Toggle ${first(area,'areaName','name') || 'area'}`} accessibilityState={{expanded:expanded[areaId]!==false}} onPress={()=>{if(Platform.OS!=='web')LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);setExpanded(previous=>({...previous,[areaId]:previous[areaId]===false}));}} style={styles.areaHead}>
+          <View style={styles.headingRow}><Text style={styles.areaName}>▦ {projectDisplay(first(area, 'areaName', 'name')) || `Area ${index + 1}`}</Text><Text style={styles.link}>{expanded[areaId]===false?'Expand ＋':'Collapse −'}</Text></View>
+          <Text style={styles.muted}>{equipment.length || first(area, 'equipmentCount') || 0} equipment · {equipment.filter((item,i)=>{const v=equipmentView(item,i);return v.hasSubmittedInspection&&!v.locked;}).length} pending review · {equipment.filter((item,i)=>/approved/i.test(String(equipmentView(item,i).statusText))).length} QC approved</Text>
+        </TouchableOpacity>
+        {expanded[areaId]!==false&&<View style={styles.areaBody}>
           {photos.length > 0 && <ScrollView horizontal>{photos.map((photo: any, photoIndex: number) => {
-            const photoPaths = photos.map((entry: any) => (typeof entry === 'string' ? entry : imagePath(entry))).filter(Boolean) as string[];
             const photoPath = typeof photo === 'string' ? photo : imagePath(photo);
-            const pins: ViewerPin[] = equipment.map((item: any, pinIndex: number) => {
+            if (isPdfFile(photo.fileName)) return <AuthenticatedImage key={photoIndex} path={photoPath} fileName={photo.fileName} style={styles.areaImage} />;
+            const photoKey = photo?.id ? `area:${photo.id}` : null;
+            const defaultPath = imagePath(detail);
+            const imageEquipment = equipment.filter((item: any, pinIndex: number) => {
+              const key = first(item, 'layoutImageKey') ?? first(equipmentView(item, pinIndex).fullEquipment, 'layoutImageKey');
+              return key ? key === photoKey : photoPath === defaultPath;
+            });
+            const pins: ViewerPin[] = imageEquipment.map((item: any, pinIndex: number) => {
               const view = equipmentView(item, pinIndex);
               return {
                 id: String(view.equipmentId),
@@ -379,15 +410,17 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
                 lines: [[first(view.fullEquipment, 'type'), first(view.fullEquipment, 'location')].filter(Boolean).join(' · '), `QC status: ${view.statusText}`],
               };
             });
-            return <TouchableOpacity key={photoIndex} accessibilityLabel="View area image" activeOpacity={0.85} onPress={() => setViewer({images: photoPaths, index: Math.max(0, photoPaths.indexOf(photoPath as string)), title: String(first(area, 'areaName', 'name') || `Area ${index + 1}`), subtitle: `${equipment.length} equipment`, pins})}><AuthenticatedImage path={photoPath} resizeMode="contain" style={styles.areaImage} /></TouchableOpacity>;
+            return <TouchableOpacity key={photoIndex} accessibilityLabel="View area image" activeOpacity={0.85} onPress={() => setViewer({images: [photoPath], index: 0, title: String(first(area, 'areaName', 'name') || `Area ${index + 1}`), subtitle: `${imageEquipment.length} equipment`, pins})}><AuthenticatedImage path={photoPath} resizeMode="contain" style={styles.areaImage} /></TouchableOpacity>;
           })}</ScrollView>}
           {equipment.length === 0 ? <Text style={styles.muted}>No equipment listed in this area.</Text> : equipment.map((item: any, equipmentIndex: number) => {
             const {equipmentId, fullEquipment, hasSubmittedInspection, statusText, locked} = equipmentView(item, equipmentIndex);
             const areaLabel = String(first(area, 'areaName', 'name') || `Area ${index + 1}`);
-            return <View key={equipmentId} style={styles.equipmentRow}>
+            return <View key={equipmentId} style={[styles.equipmentRow,compact&&{flexDirection:'column',alignItems:'stretch'}]}>
               <View style={{flex: 1, minWidth: 0}}>
-                <Text numberOfLines={1} style={styles.equipmentName}>{first(fullEquipment, 'tagNumber', 'equipmentId', 'name') || `Equipment ${equipmentIndex + 1}`}</Text>
+                <Text style={styles.equipmentName}>{first(fullEquipment, 'tagNumber', 'equipmentId', 'name') || `Equipment ${equipmentIndex + 1}`}</Text>
                 <Text numberOfLines={1} style={styles.muted}>{[first(fullEquipment, 'type'), first(fullEquipment, 'equipmentCode'), first(fullEquipment, 'location')].filter(Boolean).join(' · ') || 'Equipment'}</Text>
+                {first(fullEquipment,'description','equipmentDescription','equipmentName')&&<Text style={styles.infoValue}>{first(fullEquipment,'description','equipmentDescription','equipmentName')}</Text>}
+                <Text style={styles.muted}>Inspection: {first(inspections[equipmentId],'inspectionStatus') || first(fullEquipment,'inspectionStatus') || '—'} · Inspector: {first(inspections[equipmentId],'inspectorName','surveyorName') || first(fullEquipment,'inspectorName','surveyorName') || '—'}</Text>
                 {first(fullEquipment, 'rfidTagUid') ? <Text numberOfLines={1} style={styles.muted}>RFID: {first(fullEquipment, 'rfidTagUid')}</Text> : null}
                 {!hasSubmittedInspection && <Text style={styles.awaiting}>Waiting for the surveyor to submit the inspection.</Text>}
               </View>
@@ -395,7 +428,7 @@ export default function QcProjectDetailsScreen({projectId, projectSummary, onBac
               <TouchableOpacity disabled={!hasSubmittedInspection || busyEquipmentId === equipmentId} onPress={() => reviewEquipment(item, areaLabel)} style={[styles.rowButton, !hasSubmittedInspection && styles.disabledButton]}><Text style={styles.buttonText}>{busyEquipmentId === equipmentId ? 'Opening…' : locked ? 'View inspection' : 'Review inspection'}</Text></TouchableOpacity>
             </View>;
           })}
-        </View>
+        </View>}
       </View>;
     })}
     {reviewing && renderReviewModal()}
@@ -412,81 +445,83 @@ function Field({label, value}: {label: string; value?: any}) {
 }
 
 const styles = StyleSheet.create({
-  screen: {flex: 1, backgroundColor: '#f7f9ff'},
-  content: {padding: 24, paddingBottom: 48, maxWidth: 1180, width: '100%', alignSelf: 'center'},
+  headerBadges: {flexDirection:'row',flexWrap:'wrap',gap:10,marginVertical:8},
+  headingRow: {flexDirection:'row',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',gap:12},
+  screen: {flex: 1, backgroundColor: palette.bg},
+  content: {padding: 24, paddingBottom: 48, maxWidth: 1600, width: '100%', alignSelf: 'center'},
   back: {alignSelf: 'flex-start', paddingVertical: 8, marginBottom: 8},
-  link: {fontSize: 12, color: '#3f47d6', fontWeight: '800'},
-  hero: {backgroundColor: '#242d52', borderRadius: 14, padding: 24, minHeight: 130, justifyContent: 'center'},
-  eyebrow: {fontSize: 10, color: '#b8a5f8', fontWeight: '800', letterSpacing: 1.1},
-  title: {fontSize: 23, color: '#fff', fontWeight: '800', marginTop: 7},
-  subtitle: {fontSize: 12, color: '#d0d4e9', marginTop: 6},
-  card: {backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#e5e9f6', padding: 18, marginTop: 14},
-  sectionTitle: {fontSize: 17, color: '#242d52', fontWeight: '800'},
+  link: {fontSize: 14, color: palette.cyan, fontWeight: '800'},
+  hero: {overflow:'hidden',borderWidth:1,borderColor:palette.borderActive,gap:10,backgroundColor: palette.card, borderRadius: 14, padding: 24, minHeight: 130, justifyContent: 'center'},
+  eyebrow: {fontSize: 13, color: '#8ed8d2', fontWeight: '800', letterSpacing: 1.1},
+  title: {fontSize: 30, color: palette.text, fontWeight: '800', marginTop: 7},
+  subtitle: {fontSize: 14, color: '#b9d2dc', marginTop: 6},
+  card: {backgroundColor: palette.card, borderRadius: 16, borderWidth: 1, borderColor: palette.border, padding: 18, marginTop: 14},
+  sectionTitle: {fontSize: 17, color: palette.text, fontWeight: '800'},
   details: {flexDirection: 'row', flexWrap: 'wrap', gap: 18, marginTop: 14},
   info: {flexGrow: 1, flexBasis: 160},
-  infoLabel: {fontSize: 9, color: '#9095a5', fontWeight: '800'},
-  infoValue: {fontSize: 13, color: '#3d4159', fontWeight: '700', marginTop: 4},
+  infoLabel: {fontSize: 14, color: palette.secondary, fontWeight: '800'},
+  infoValue: {fontSize: 16, color: palette.text, fontWeight: '700', marginTop: 4},
   heading: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, marginBottom: 10},
-  muted: {fontSize: 12, color: '#777c8d', marginTop: 5},
-  area: {backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#e5e9f6', marginBottom: 10, overflow: 'hidden'},
+  muted: {fontSize: 14, color: palette.secondary, marginTop: 5},
+  area: {backgroundColor: palette.card, borderRadius: 16, borderWidth: 1, borderColor: palette.border, marginBottom: 10, overflow: 'hidden'},
   areaHead: {padding: 16},
-  areaName: {fontSize: 15, fontWeight: '800', color: '#242d52'},
-  areaBody: {padding: 14, borderTopWidth: 1, borderColor: '#eef0f5', gap: 12},
-  areaImage: {width: 250, height: 170, marginRight: 9, borderRadius: 7, backgroundColor: '#eef0f6'},
-  equipment: {padding: 14, borderWidth: 1, borderColor: '#e8eaf1', borderRadius: 8, marginBottom: 4},
-  equipmentRow: {flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderWidth: 1, borderColor: '#e8eaf1', borderRadius: 8, marginBottom: 4},
-  rowButton: {backgroundColor: '#3f47d6', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 7, alignItems: 'center'},
-  modalBackdrop: {flex: 1, backgroundColor: 'rgba(23, 29, 54, 0.62)', alignItems: 'center', justifyContent: 'center', padding: 18},
-  modalCard: {width: '100%', maxWidth: 900, maxHeight: '94%', backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden'},
-  modalHeader: {flexDirection: 'row', alignItems: 'center', gap: 12, padding: 18, borderBottomWidth: 1, borderColor: '#e5e9f6'},
+  areaName: {fontSize: 15, fontWeight: '800', color: palette.text},
+  areaBody: {padding: 14, borderTopWidth: 1, borderColor: palette.border, gap: 12},
+  areaImage: {width: 250, height: 170, marginRight: 9, borderRadius: 7, backgroundColor: palette.elevated},
+  equipment: {padding: 14, borderWidth: 1, borderColor: palette.border, borderRadius: 8, marginBottom: 4},
+  equipmentRow: {flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderWidth: 1, borderColor: palette.border, borderRadius: 8, marginBottom: 4},
+  rowButton: {minHeight:46,justifyContent:'center',backgroundColor: palette.elevated, borderWidth:1,borderColor:palette.cyan, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 7, alignItems: 'center'},
+  modalBackdrop: {flex: 1, backgroundColor: 'rgba(0, 10, 20, 0.85)', alignItems: 'center', justifyContent: 'center', padding: 18},
+  modalCard: {width: '100%', maxWidth: 1440, maxHeight: '94%', backgroundColor: palette.card, borderRadius: 12, overflow: 'hidden'},
+  modalHeader: {flexDirection: 'row', alignItems: 'center', gap: 12, padding: 18, borderBottomWidth: 1, borderColor: palette.border},
   modalContent: {padding: 20, paddingBottom: 12},
-  statusPill: {fontSize: 10, color: '#5d56ba', fontWeight: '800', backgroundColor: '#f0eeff', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 14, overflow: 'hidden'},
-  blockTitle: {fontSize: 13, color: '#242d52', fontWeight: '800', marginTop: 18, marginBottom: 10},
+  statusPill: {fontSize: 13, color: palette.cyan, fontWeight: '800', backgroundColor: palette.elevated, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 14, overflow: 'hidden'},
+  blockTitle: {fontSize: 16, color: palette.text, fontWeight: '800', marginTop: 18, marginBottom: 10},
   grid: {flexDirection: 'row', flexWrap: 'wrap'},
-  field: {width: '25%', minWidth: 170, paddingRight: 14, marginBottom: 14},
+  field: {flexGrow:1,flexBasis:200,minWidth:140, paddingRight: 14, marginBottom: 14},
   photoGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
-  photo: {width: 200, height: 140, borderRadius: 8, backgroundColor: '#eef0f6'},
-  listBox: {borderWidth: 1, borderColor: '#e5e9f6', borderRadius: 8, overflow: 'hidden'},
+  photo: {width: 200, height: 140, borderRadius: 8, backgroundColor: palette.elevated},
+  listBox: {borderWidth: 1, borderColor: palette.border, borderRadius: 8, overflow: 'hidden'},
   checkRow: {flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 14},
-  checkRowBorder: {borderTopWidth: 1, borderTopColor: '#eef0f5'},
-  checkQuestion: {fontSize: 12, color: '#242d52', fontWeight: '700'},
-  checkValue: {fontSize: 12, color: '#3d4159', fontWeight: '700'},
-  chip: {fontSize: 10, fontWeight: '800', paddingVertical: 4, paddingHorizontal: 12, borderRadius: 12, overflow: 'hidden', minWidth: 44, textAlign: 'center'},
-  chipYes: {color: '#1d7048', backgroundColor: '#e3f5ec'},
-  chipNo: {color: '#bf3441', backgroundColor: '#fdebed'},
-  remarkBox: {marginTop: 16, padding: 14, backgroundColor: '#f7f9ff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e9f6'},
-  remarkText: {fontSize: 12, color: '#3d4159', marginTop: 4, lineHeight: 18},
-  modalFooter: {padding: 16, borderTopWidth: 1, borderColor: '#e5e9f6', backgroundColor: '#fafbff'},
-  footerInput: {minHeight: 56, maxHeight: 110, borderWidth: 1, borderColor: '#d8dbe5', borderRadius: 6, padding: 10, color: '#272b49', backgroundColor: '#fff', textAlignVertical: 'top'},
+  checkRowBorder: {borderTopWidth: 1, borderTopColor: palette.border},
+  checkQuestion: {fontSize: 14, color: palette.text, fontWeight: '700'},
+  checkValue: {fontSize: 14, color: palette.text, fontWeight: '700'},
+  chip: {fontSize: 13, fontWeight: '800', paddingVertical: 4, paddingHorizontal: 12, borderRadius: 12, overflow: 'hidden', minWidth: 44, textAlign: 'center'},
+  chipYes: {color: palette.success, backgroundColor: '#0a493b'},
+  chipNo: {color: palette.critical, backgroundColor: '#512735'},
+  remarkBox: {marginTop: 16, padding: 14, backgroundColor: palette.bg, borderRadius: 8, borderWidth: 1, borderColor: palette.border},
+  remarkText: {fontSize: 14, color: palette.text, marginTop: 4, lineHeight: 18},
+  modalFooter: {padding: 16, borderTopWidth: 1, borderColor: palette.border, backgroundColor: palette.bar},
+  footerInput: {minHeight: 56, maxHeight: 110, borderWidth: 1, borderColor: palette.borderActive, borderRadius: 6, padding: 10, color: palette.text, backgroundColor: palette.card, textAlignVertical: 'top'},
   footerRow: {flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10},
   actionsRight: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
-  modalClose: {borderRadius: 7, borderWidth: 1, borderColor: '#dce1ee', paddingVertical: 9, paddingHorizontal: 14},
-  eyebrowDark: {fontSize: 10, color: '#685bd0', fontWeight: '800', letterSpacing: 1.1, marginBottom: 4},
+  modalClose: {borderRadius: 7, borderWidth: 1, borderColor: palette.borderActive, paddingVertical: 9, paddingHorizontal: 14},
+  eyebrowDark: {fontSize: 13, color: palette.cyan, fontWeight: '800', letterSpacing: 1.1, marginBottom: 4},
   equipmentDetails2: {flexDirection: 'row', flexWrap: 'wrap', gap: 14},
   equipmentTop: {flexDirection: 'row', gap: 10, alignItems: 'center'},
-  equipmentDetails: {flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#eef0f5'},
-  equipmentName: {fontSize: 13, color: '#242d52', fontWeight: '800'},
-  status: {fontSize: 10, color: '#555b73', fontWeight: '800'},
-  equipmentImage: {width: '100%', height: 210, marginTop: 12, borderRadius: 6, backgroundColor: '#eef0f6'},
-  reviewButton: {backgroundColor: '#3f47d6', padding: 11, borderRadius: 7, alignItems: 'center', marginTop: 12},
-  buttonText: {color: '#fff', fontSize: 11, fontWeight: '800'},
-  input: {minHeight: 64, borderWidth: 1, borderColor: '#d8dbe5', borderRadius: 6, padding: 10, color: '#272b49', marginTop: 10, textAlignVertical: 'top'},
+  equipmentDetails: {flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: palette.border},
+  equipmentName: {fontSize: 16, color: palette.text, fontWeight: '800'},
+  status: {fontSize: 13, color: palette.secondary, fontWeight: '800'},
+  equipmentImage: {width: '100%', height: 210, marginTop: 12, borderRadius: 6, backgroundColor: palette.elevated},
+  reviewButton: {backgroundColor: palette.cyan, padding: 11, borderRadius: 7, alignItems: 'center', marginTop: 12},
+  buttonText: {backgroundColor:'transparent',color: palette.text, fontSize: 14, fontWeight: '800'},
+  input: {minHeight: 64, borderWidth: 1, borderColor: palette.borderActive, borderRadius: 6, padding: 10, color: palette.text, marginTop: 10, textAlignVertical: 'top'},
   actions: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8},
-  changeButton: {paddingHorizontal: 12, paddingVertical: 9, borderRadius: 6, backgroundColor: '#fdebed'},
-  changeText: {fontSize: 10, color: '#bf3441', fontWeight: '800'},
-  commentButton: {paddingHorizontal: 12, paddingVertical: 9, borderRadius: 6, backgroundColor: '#eef0ff'},
-  commentText: {fontSize: 10, color: '#3f47d6', fontWeight: '800'},
+  changeButton: {paddingHorizontal: 12, paddingVertical: 9, borderRadius: 6, backgroundColor: '#512735'},
+  changeText: {fontSize: 13, color: palette.critical, fontWeight: '800'},
+  commentButton: {paddingHorizontal: 12, paddingVertical: 9, borderRadius: 6, backgroundColor: palette.elevated},
+  commentText: {fontSize: 13, color: palette.cyan, fontWeight: '800'},
   approveButton: {paddingHorizontal: 14, paddingVertical: 9, borderRadius: 6, backgroundColor: '#258455'},
   disabledButton: {opacity: 0.45},
   severityRow: {flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 10},
-  severityLabel: {fontSize: 10, color: '#555a70', fontWeight: '800', marginRight: 3},
-  severityOption: {paddingHorizontal: 9, paddingVertical: 6, borderWidth: 1, borderColor: '#d8dbe5', borderRadius: 5},
-  severitySelected: {borderColor: '#3f47d6', backgroundColor: '#eef0ff'},
-  severityText: {fontSize: 10, color: '#666b7d', fontWeight: '700'},
-  severitySelectedText: {color: '#3f47d6'},
-  awaiting: {fontSize: 11, color: '#a75a0b', marginTop: 12},
-  finding: {padding: 10, borderWidth: 1, borderColor: '#e5e9f6', borderRadius: 6, marginTop: 8},
-  notice: {padding: 12, backgroundColor: '#eef0ff', borderRadius: 7, marginBottom: 10},
-  noticeText: {fontSize: 12, color: '#3038a8', fontWeight: '700'},
-  state: {flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, backgroundColor: '#f7f9ff'},
+  severityLabel: {fontSize: 13, color: palette.secondary, fontWeight: '800', marginRight: 3},
+  severityOption: {paddingHorizontal: 9, paddingVertical: 6, borderWidth: 1, borderColor: palette.borderActive, borderRadius: 5},
+  severitySelected: {borderColor: palette.cyan, backgroundColor: palette.elevated},
+  severityText: {fontSize: 13, color: palette.secondary, fontWeight: '700'},
+  severitySelectedText: {color: palette.cyan},
+  awaiting: {fontSize: 11, color: palette.amber, marginTop: 12},
+  finding: {padding: 10, borderWidth: 1, borderColor: palette.border, borderRadius: 6, marginTop: 8},
+  notice: {padding: 12, backgroundColor: palette.elevated, borderRadius: 7, marginBottom: 10},
+  noticeText: {fontSize: 14, color: palette.cyan, fontWeight: '700'},
+  state: {flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, backgroundColor: palette.bg},
 });

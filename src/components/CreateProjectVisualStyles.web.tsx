@@ -2,6 +2,18 @@ import React from 'react';
 
 // Scoped to this modal so shared inputs keep their existing appearance elsewhere.
 const css = `
+#create-project-form [role=heading],
+#create-project-form [data-testid="project-form-label"],
+#create-project-form label:not([for]) { text-transform: uppercase; }
+#create-project-form [data-project-identity] { text-transform: uppercase; }
+#create-project-form #project-name-field,
+#create-project-form #project-job-number-field,
+#create-project-form #project-location-field,
+#create-project-form #project-vessel-field,
+#ex-project-form-scroll #project-name-field,
+#ex-project-form-scroll #project-job-number-field,
+#ex-project-form-scroll #project-location-field,
+#ex-project-form-scroll #project-vessel-field { text-transform: uppercase; }
 #create-project-form input:not([type=file]),
 #create-project-form textarea,
 #create-project-form select {

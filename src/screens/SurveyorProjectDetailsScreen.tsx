@@ -1,6 +1,18 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import ReportWorkflowPanel from '../components/ReportWorkflowPanel';
+import {isPdfFile} from '../utils/isPdfFile';
+import ProjectWorkSchedulePanel from '../components/ProjectWorkSchedulePanel';
+import HaerAreaManager from '../components/HaerAreaManager';
+import ProjectImageGallery from '../components/ProjectImageGallery';
+import {Colors, LIGHT} from '../theme/palette';
+import {OPERATIONS_DARK} from '../theme/operationsPalette';
+import {visual} from '../theme/visual';
+import {projectDisplay} from '../utils/projectDisplay';
+import {useThemeMode} from '../theme/useThemeMode';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
+  Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -40,9 +52,9 @@ const formatInspectionStatus = (value?: string | null) => {
 };
 
 const STATUS_BADGES: Record<string, {backgroundColor: string; color: string}> = {
-  assigned: {backgroundColor: '#f0eeff', color: '#718be8'},
+  assigned: {backgroundColor: '#e3eff1', color: '#718be8'},
   pending: {backgroundColor: '#fff0d7', color: '#a75a0b'},
-  active: {backgroundColor: '#f0eeff', color: '#718be8'},
+  active: {backgroundColor: '#e3eff1', color: '#718be8'},
   'in progress': {backgroundColor: '#f1eaf3', color: '#8053a6'},
   completed: {backgroundColor: '#e5eef7', color: '#3b68aa'},
   'on hold': {backgroundColor: '#fde8e2', color: '#ba4e3c'},
@@ -55,6 +67,10 @@ export default function SurveyorProjectDetailsScreen({
   onEquipmentPress,
   refreshVersion,
 }: Props) {
+  const colors = useThemeMode() === 'dark' ? OPERATIONS_DARK : LIGHT;
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const [manageAreas,setManageAreas] = useState(false);
+  const [areaImages,setAreaImages] = useState<Record<string,string[]>>({});
   const [project, setProject] = useState<SurveyorProjectDetails | null>(null);
   const [areas, setAreas] = useState<SurveyorAreaSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,8 +84,8 @@ export default function SurveyorProjectDetailsScreen({
     string | null
   >(null);
 
-  const loadProject = useCallback(async () => {
-    setLoading(true);
+  const loadProject = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError('');
     try {
       const [projectResponse, areaResponse] = await Promise.all([
@@ -80,9 +96,7 @@ export default function SurveyorProjectDetailsScreen({
       const loadedAreas = await Promise.all(
         areaResponse.data.map(async area => {
           const [photos, equipment] = await Promise.all([
-            area.layoutImagePath
-              ? Promise.resolve(null)
-              : getProjectAreaPhotos(projectId, area.areaId).catch(() => null),
+            getProjectAreaPhotos(projectId, area.areaId).catch(() => null),
             getSurveyorEquipment(projectId, area.areaId),
           ]);
           return {
@@ -90,14 +104,16 @@ export default function SurveyorProjectDetailsScreen({
               ...area,
               layoutImagePath:
                 area.layoutImagePath ||
-                photos?.data?.[0]?.downloadUrl ||
-                photos?.data?.[0]?.filePath,
+                photos?.data?.find(photo => !isPdfFile(photo.fileName))?.downloadUrl ||
+                photos?.data?.find(photo => !isPdfFile(photo.fileName))?.filePath,
             },
+            images: (photos?.data ?? []).filter(photo => !isPdfFile(photo.fileName)).map(photo=>photo.downloadUrl || photo.filePath).filter((path): path is string => !!path),
             equipment: equipment.data,
           };
         }),
       );
       setAreas(loadedAreas.map(item => item.area));
+      setAreaImages(Object.fromEntries(loadedAreas.map(item=>[item.area.areaId,item.images])));
       setEquipmentByArea(
         Object.fromEntries(
           loadedAreas.map(item => [item.area.areaId, item.equipment]),
@@ -118,7 +134,7 @@ export default function SurveyorProjectDetailsScreen({
   }, [loadProject, refreshVersion]);
 
   if (loading) {
-    return <PageState message="Loading project details..." />;
+    return <PageState styles={styles} message="Loading project details..." />;
   }
 
   if (error || !project) {
@@ -130,7 +146,7 @@ export default function SurveyorProjectDetailsScreen({
           <TouchableOpacity style={styles.secondaryButton} onPress={onBack}>
             <Text style={styles.secondaryButtonText}>Back</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.primaryButton} onPress={loadProject}>
+          <TouchableOpacity style={styles.primaryButton} onPress={()=>void loadProject()}>
             <Text style={styles.primaryButtonText}>Try again</Text>
           </TouchableOpacity>
         </View>
@@ -150,17 +166,20 @@ export default function SurveyorProjectDetailsScreen({
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView nativeID="ex-view-project" style={styles.screen} contentContainerStyle={styles.content}>
       <TouchableOpacity onPress={onBack} style={styles.backButton}>
         <Text style={styles.backText}>&lt; Back to projects</Text>
       </TouchableOpacity>
 
-      <View style={styles.header}>
+      <View nativeID="ex-view-project-hero" style={styles.header}>
+        <Image source={require('../assets/landing/industry-3.jpg')} resizeMode="cover" style={styles.heroPhoto} accessible={false} />
+        <View nativeID="ex-operations-hero-overlay" pointerEvents="none"
+          style={[StyleSheet.absoluteFill, Platform.OS !== 'web' && styles.nativeOverlay]} />
         <View style={styles.headerMain}>
           <Text style={styles.eyebrow}>PROJECT DETAILS</Text>
-          <Text style={styles.title}>{project.projectName}</Text>
+          <Text accessibilityRole="header" style={styles.title}>{projectDisplay(project.projectName)}</Text>
           <View style={styles.headerMeta}>
-            <Text style={styles.headerMetaText}>Job {project.jobNo || 'Not set'}</Text>
+            <Text style={styles.headerMetaText}>Job {projectDisplay(project.jobNo) || 'Not set'}</Text>
             <Text style={styles.headerMetaText}>Created {formatDate(project.createdDate)}</Text>
           </View>
         </View>
@@ -169,29 +188,31 @@ export default function SurveyorProjectDetailsScreen({
         </View>
       </View>
 
+      <ReportWorkflowPanel projectId={projectId} readOnly compact/>
+      <ProjectWorkSchedulePanel projectId={projectId} projectName={project.projectName} editable overview />
+
       <View style={styles.twoColumn}>
-        <View style={styles.cardWide}>
+        <View testID="project-view-card" style={styles.cardWide}>
           <Text style={styles.cardTitle}>Project Details</Text>
           <View style={styles.detailsGrid}>
-            <Detail label="Project Name" value={project.projectName} />
-            <Detail label="Sector" value={project.sector} />
-            <Detail label="Job Number" value={project.jobNo} />
-            <Detail label="Location" value={project.location} />
-            <Detail label="Vessel / Site Name" value={project.vesselOrSiteName} />
-            <Detail label="Created Date" value={formatDate(project.createdDate)} />
+            <Detail styles={styles} label="Project Name" value={projectDisplay(project.projectName)} />
+            <Detail styles={styles} label="Job Number" value={projectDisplay(project.jobNo)} />
+            <Detail styles={styles} label="Location" value={projectDisplay(project.location)} />
+            <Detail styles={styles} label="Vessel / Site Name" value={projectDisplay(project.vesselOrSiteName)} />
+            <Detail styles={styles} label="Created Date" value={formatDate(project.createdDate)} />
           </View>
         </View>
 
-        <View style={styles.cardNarrow}>
+        <View testID="project-view-card" style={styles.cardNarrow}>
           <Text style={styles.cardTitle}>Assigned Team</Text>
-          <TeamMember role="Surveyor" name={project.assignedSurveyor} />
-          <TeamMember role="QC" name={project.assignedQc} />
-          <TeamMember role="Client" name={project.assignedClient} />
+          <TeamMember styles={styles} role="Surveyor" name={project.assignedSurveyor} />
+          <TeamMember styles={styles} role="QC" name={project.assignedQc} />
+          <TeamMember styles={styles} role="Client" name={project.assignedClient} />
         </View>
       </View>
 
       <View style={styles.accordions}>
-        <View style={styles.accordionSection}>
+        <View testID="project-view-card" style={styles.accordionSection}>
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityState={{expanded: areasExpanded}}
@@ -204,6 +225,9 @@ export default function SurveyorProjectDetailsScreen({
             <Text style={styles.sectionCount}>{areas.length}</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity accessibilityRole="button" onPress={()=>{setAreasExpanded(true);setManageAreas(true);}} style={{padding:10}}>
+            <Text style={{color:colors.cyan,fontWeight:'800'}}>+ Add Area</Text>
+          </TouchableOpacity>
           {areasExpanded && (
             <View style={styles.accordionContent}>
               {areas.length === 0 ? (
@@ -221,8 +245,11 @@ export default function SurveyorProjectDetailsScreen({
                         path={area.layoutImagePath}
                         style={styles.thumbnail}
                       />
+                      {(areaImages[area.areaId]?.length ?? 0)>1 && <ScrollView horizontal style={{maxHeight:66}}>
+                        {areaImages[area.areaId].map((path,index)=><AuthenticatedImage key={index} path={path} style={{width:84,height:60,marginRight:5}}/>)}
+                      </ScrollView>}
                       <View style={styles.areaBody}>
-                        <Text style={styles.areaName}>{area.areaName}</Text>
+                        <Text style={styles.areaName}>{projectDisplay(area.areaName)}</Text>
                         <Text style={styles.areaStats}>
                           {area.photoCount} photos   |   {area.equipmentCount} equipment
                         </Text>
@@ -241,7 +268,7 @@ export default function SurveyorProjectDetailsScreen({
           )}
         </View>
 
-        <View style={styles.accordionSection}>
+        <View testID="project-view-card" style={styles.accordionSection}>
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityState={{expanded: equipmentExpanded}}
@@ -274,7 +301,7 @@ export default function SurveyorProjectDetailsScreen({
                         style={styles.equipmentGroupHeader}>
                         <View style={styles.accordionHeading}>
                           <Text style={styles.smallChevron}>{areaOpen ? 'v' : '>'}</Text>
-                          <Text style={styles.equipmentAreaName}>{area.areaName}</Text>
+                          <Text style={styles.equipmentAreaName}>{projectDisplay(area.areaName)}</Text>
                         </View>
                         <Text style={styles.equipmentAreaCount}>{areaEquipment.length}</Text>
                       </TouchableOpacity>
@@ -293,7 +320,7 @@ export default function SurveyorProjectDetailsScreen({
                                   style={styles.equipmentCard}>
                                   <View style={styles.equipmentSequence}>
                                     <Text style={styles.equipmentSequenceText}>
-                                      {equipment.sequenceNo}
+                                      {equipment.markingNo ?? equipment.sequenceNo}
                                     </Text>
                                   </View>
                                   <View style={styles.equipmentCardBody}>
@@ -328,11 +355,16 @@ export default function SurveyorProjectDetailsScreen({
           )}
         </View>
       </View>
+      <View nativeID="ex-view-project-layouts">
+        <ProjectImageGallery key={projectId} projectId={projectId} editable />
+      </View>
+      {manageAreas && <HaerAreaManager project={{id:projectId,projectName:project.projectName,areas:areas.map(a=>({id:a.areaId,areaName:a.areaName}))}}
+        canEdit={false} colors={colors} onClose={()=>setManageAreas(false)} onAreaSaved={()=>{}} onSaved={()=>void loadProject(true)}/>}
     </ScrollView>
   );
 }
 
-function Detail({label, value}: {label: string; value?: string | null}) {
+function Detail({styles, label, value}: {styles: ReturnType<typeof makeStyles>; label: string; value?: string | null}) {
   return (
     <View style={styles.detailItem}>
       <Text style={styles.detailLabel}>{label}</Text>
@@ -341,7 +373,7 @@ function Detail({label, value}: {label: string; value?: string | null}) {
   );
 }
 
-function TeamMember({role, name}: {role: string; name?: string | null}) {
+function TeamMember({styles, role, name}: {styles: ReturnType<typeof makeStyles>; role: string; name?: string | null}) {
   return (
     <View style={styles.teamRow}>
       <View style={styles.avatar}>
@@ -355,7 +387,7 @@ function TeamMember({role, name}: {role: string; name?: string | null}) {
   );
 }
 
-function PageState({message}: {message: string}) {
+function PageState({styles, message}: {styles: ReturnType<typeof makeStyles>; message: string}) {
   return (
     <View style={styles.fullState}>
       <ActivityIndicator color="#8fa7f8" size="large" />
@@ -364,74 +396,76 @@ function PageState({message}: {message: string}) {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {flex: 1, backgroundColor: '#f7f9ff'},
-  content: {padding: 24, paddingBottom: 48, maxWidth: 1180, width: '100%', alignSelf: 'center'},
+const makeStyles = (c: Colors) => StyleSheet.create({
+  screen: {flex: 1, backgroundColor: c.bg},
+  content: {padding: 16, paddingBottom: 32, gap: 12, width: '100%', alignSelf: 'center'},
   backButton: {alignSelf: 'flex-start', paddingVertical: 8, marginBottom: 8},
-  backText: {color: '#8fa7f8', fontWeight: '800', fontSize: 13},
-  header: {backgroundColor: '#242d52', minHeight: 155, borderRadius: 16, padding: 24, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14},
-  headerMain: {flex: 1},
-  eyebrow: {fontSize: 10, color: '#b8a5f8', fontWeight: '800', letterSpacing: 1.1},
-  title: {color: '#fff', fontWeight: '800', fontSize: 25, marginTop: 8},
+  backText: {color: c.cyan, fontWeight: '800', fontSize: 13},
+  heroPhoto: {position: 'absolute', right: 0, width: '76%', height: '100%'},
+  nativeOverlay: {backgroundColor: '#03192C88'},
+  header: {overflow: 'hidden', borderWidth: 1, borderColor: '#126078', backgroundColor: '#03192C', minHeight: 128, borderRadius: 16, padding: 24, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14},
+  headerMain: {flex: 1, minWidth: 0},
+  eyebrow: {fontSize: 10, color: '#8ed8d2', fontWeight: '800', letterSpacing: 1.1},
+  title: {fontFamily: visual.display, color: '#fff', fontWeight: '900', fontSize: 30, marginTop: 8},
   headerMeta: {flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 15},
-  headerMetaText: {fontSize: 12, color: '#e3eaff', fontWeight: '600'},
+  headerMetaText: {fontSize: 12, color: '#dceef1', fontWeight: '600'},
   statusBadge: {borderRadius: 16, paddingHorizontal: 11, paddingVertical: 7},
   statusText: {fontSize: 11, fontWeight: '800'},
-  twoColumn: {flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 16},
-  cardWide: {flex: 2, minWidth: 290, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e9f6', padding: 20},
-  cardNarrow: {flex: 1, minWidth: 250, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e9f6', padding: 20},
-  cardTitle: {fontSize: 16, color: '#242d52', fontWeight: '800', marginBottom: 17},
+  twoColumn: {flexDirection: 'row', flexWrap: 'wrap', gap: 14},
+  cardWide: {flexGrow: 2, flexBasis: 310, backgroundColor: c.card, borderRadius: 8, borderWidth: 1, borderColor: c.border, padding: 20},
+  cardNarrow: {flexGrow: 1, flexBasis: 250, backgroundColor: c.card, borderRadius: 8, borderWidth: 1, borderColor: c.border, padding: 20},
+  cardTitle: {fontSize: 16, color: c.text, fontWeight: '800', marginBottom: 17},
   detailsGrid: {flexDirection: 'row', flexWrap: 'wrap', rowGap: 19},
   detailItem: {width: '50%', minWidth: 150, paddingRight: 15},
-  detailLabel: {fontSize: 10, fontWeight: '800', color: '#9296a6', textTransform: 'uppercase'},
-  detailValue: {fontSize: 13, fontWeight: '700', color: '#3b3f59', marginTop: 5},
-  teamRow: {flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#eef0f5'},
-  avatar: {width: 35, height: 35, borderRadius: 18, backgroundColor: '#f0eeff', alignItems: 'center', justifyContent: 'center'},
-  avatarText: {color: '#8fa7f8', fontWeight: '800', fontSize: 13},
+  detailLabel: {fontSize: 10, fontWeight: '800', color: c.secondary, textTransform: 'uppercase'},
+  detailValue: {fontSize: 13, fontWeight: '700', color: c.text, marginTop: 5},
+  teamRow: {flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: c.border},
+  avatar: {width: 35, height: 35, borderRadius: 18, backgroundColor: c.elevated, alignItems: 'center', justifyContent: 'center'},
+  avatarText: {color: c.cyan, fontWeight: '800', fontSize: 13},
   teamCopy: {flex: 1, marginLeft: 10},
-  teamRole: {fontSize: 9, fontWeight: '800', color: '#979baa', textTransform: 'uppercase'},
-  teamName: {fontSize: 13, color: '#343851', fontWeight: '700', marginTop: 3},
-  sectionTitle: {fontSize: 18, color: '#242d52', fontWeight: '800'},
-  accordions: {marginTop: 24, gap: 12},
-  accordionSection: {backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e9f6', borderRadius: 8, overflow: 'hidden'},
+  teamRole: {fontSize: 9, fontWeight: '800', color: c.secondary, textTransform: 'uppercase'},
+  teamName: {fontSize: 13, color: c.text, fontWeight: '700', marginTop: 3},
+  sectionTitle: {fontSize: 18, color: c.text, fontWeight: '800'},
+  accordions: {gap: 12},
+  accordionSection: {backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 8, overflow: 'hidden'},
   accordionHeader: {minHeight: 62, paddingHorizontal: 18, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12},
   accordionHeading: {flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10},
-  accordionContent: {borderTopWidth: 1, borderTopColor: '#eef0f5', padding: 16},
-  chevron: {width: 16, fontSize: 16, color: '#718be8', fontWeight: '800'},
-  smallChevron: {width: 14, fontSize: 13, color: '#718be8', fontWeight: '800'},
-  sectionCount: {minWidth: 28, textAlign: 'center', fontSize: 12, color: '#4d5577', fontWeight: '800', backgroundColor: '#f0eeff', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4},
+  accordionContent: {borderTopWidth: 1, borderTopColor: c.border, padding: 16},
+  chevron: {width: 16, fontSize: 16, color: c.cyan, fontWeight: '800'},
+  smallChevron: {width: 14, fontSize: 13, color: c.cyan, fontWeight: '800'},
+  sectionCount: {minWidth: 28, textAlign: 'center', fontSize: 12, color: c.text, fontWeight: '800', backgroundColor: c.elevated, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4},
   areaGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 14},
-  areaCard: {flexGrow: 1, flexBasis: 280, maxWidth: 380, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e9f6', borderRadius: 8, overflow: 'hidden'},
+  areaCard: {flexGrow: 1, flexBasis: 280, maxWidth: 380, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 8, overflow: 'hidden'},
   thumbnail: {width: '100%', height: 132},
   areaBody: {padding: 16},
-  areaName: {fontSize: 15, color: '#242d52', fontWeight: '800'},
-  areaStats: {fontSize: 11, color: '#818697', marginTop: 7},
-  viewAreaButton: {marginTop: 15, minHeight: 38, borderRadius: 10, backgroundColor: '#b8a5f8', alignItems: 'center', justifyContent: 'center'},
-  viewAreaText: {fontSize: 12, color: '#242d52', fontWeight: '800'},
-  emptyAreas: {minHeight: 170, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e9f6', alignItems: 'center', justifyContent: 'center', padding: 24},
-  equipmentGroups: {borderTopWidth: 1, borderTopColor: '#eef0f5'},
-  equipmentGroup: {borderBottomWidth: 1, borderBottomColor: '#eef0f5'},
-  equipmentGroupHeader: {minHeight: 52, paddingHorizontal: 18, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, backgroundColor: '#fafbff'},
-  equipmentAreaName: {fontSize: 13, color: '#343851', fontWeight: '800'},
-  equipmentAreaCount: {fontSize: 11, color: '#707589', fontWeight: '800'},
+  areaName: {fontSize: 15, color: c.text, fontWeight: '800'},
+  areaStats: {fontSize: 11, color: c.secondary, marginTop: 7},
+  viewAreaButton: {marginTop: 15, minHeight: 38, borderRadius: 10, backgroundColor: '#8ed8d2', alignItems: 'center', justifyContent: 'center'},
+  viewAreaText: {fontSize: 12, color: '#03192C', fontWeight: '800'},
+  emptyAreas: {minHeight: 170, backgroundColor: c.card, borderRadius: 8, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center', padding: 24},
+  equipmentGroups: {borderTopWidth: 1, borderTopColor: c.border},
+  equipmentGroup: {borderBottomWidth: 1, borderBottomColor: c.border},
+  equipmentGroupHeader: {minHeight: 52, paddingHorizontal: 18, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, backgroundColor: c.elevated},
+  equipmentAreaName: {fontSize: 13, color: c.text, fontWeight: '800'},
+  equipmentAreaCount: {fontSize: 11, color: c.secondary, fontWeight: '800'},
   equipmentList: {paddingHorizontal: 18, paddingBottom: 10},
   equipmentCardGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 12},
-  equipmentCard: {flexGrow: 1, flexBasis: 270, maxWidth: 360, minHeight: 150, borderWidth: 1, borderColor: '#e1e5f1', borderRadius: 8, padding: 14, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'flex-start', gap: 12},
-  equipmentSequence: {width: 38, height: 38, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0eeff'},
-  equipmentSequenceText: {fontSize: 15, color: '#566dbd', fontWeight: '900'},
+  equipmentCard: {flexGrow: 1, flexBasis: 270, maxWidth: 360, minHeight: 150, borderWidth: 1, borderColor: c.border, borderRadius: 8, padding: 14, backgroundColor: c.card, flexDirection: 'row', alignItems: 'flex-start', gap: 12},
+  equipmentSequence: {width: 38, height: 38, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: c.elevated},
+  equipmentSequenceText: {fontSize: 15, color: c.cyan, fontWeight: '900'},
   equipmentCardBody: {flex: 1},
-  equipmentTag: {fontSize: 15, color: '#242d52', fontWeight: '800'},
-  equipmentType: {fontSize: 12, color: '#566dbd', fontWeight: '700', marginTop: 4},
-  equipmentMeta: {fontSize: 10, color: '#7d8192', marginTop: 5},
-  inspectionStatus: {position: 'absolute', right: 10, bottom: 10, backgroundColor: '#f7f9ff', borderRadius: 11, paddingHorizontal: 8, paddingVertical: 4},
-  inspectionStatusText: {fontSize: 9, color: '#58617f', fontWeight: '800'},
-  emptyInline: {fontSize: 12, color: '#838798', paddingHorizontal: 18, paddingVertical: 18},
-  fullState: {flex: 1, minHeight: 400, backgroundColor: '#f7f9ff', alignItems: 'center', justifyContent: 'center', padding: 28},
-  stateTitle: {fontSize: 17, color: '#242d52', fontWeight: '800'},
-  stateMessage: {fontSize: 13, color: '#7d8192', lineHeight: 19, textAlign: 'center', marginTop: 10},
+  equipmentTag: {fontSize: 15, color: c.text, fontWeight: '800'},
+  equipmentType: {fontSize: 12, color: c.cyan, fontWeight: '700', marginTop: 4},
+  equipmentMeta: {fontSize: 10, color: c.secondary, marginTop: 5},
+  inspectionStatus: {position: 'absolute', right: 10, bottom: 10, backgroundColor: c.bg, borderRadius: 11, paddingHorizontal: 8, paddingVertical: 4},
+  inspectionStatusText: {fontSize: 9, color: c.secondary, fontWeight: '800'},
+  emptyInline: {fontSize: 12, color: c.secondary, paddingHorizontal: 18, paddingVertical: 18},
+  fullState: {flex: 1, minHeight: 400, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center', padding: 28},
+  stateTitle: {fontSize: 17, color: c.text, fontWeight: '800'},
+  stateMessage: {fontSize: 13, color: c.secondary, lineHeight: 19, textAlign: 'center', marginTop: 10},
   stateActions: {flexDirection: 'row', gap: 10, marginTop: 18},
-  primaryButton: {backgroundColor: '#b8a5f8', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10},
-  primaryButtonText: {fontSize: 12, color: '#242d52', fontWeight: '800'},
-  secondaryButton: {backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9dce8', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 7},
-  secondaryButtonText: {fontSize: 12, color: '#424760', fontWeight: '800'},
+  primaryButton: {backgroundColor: '#8ed8d2', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10},
+  primaryButtonText: {fontSize: 12, color: '#03192C', fontWeight: '800'},
+  secondaryButton: {backgroundColor: c.card, borderWidth: 1, borderColor: c.border, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 7},
+  secondaryButtonText: {fontSize: 12, color: c.text, fontWeight: '800'},
 });

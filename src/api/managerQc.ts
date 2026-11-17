@@ -20,13 +20,22 @@ export type ManagerQcHistory = {
   id: string; action: string; occurredAt: string; actorName: string | null; comments: string | null;
   severity: QcSeverity | null; qcStatus: QcReviewStatus | null; reviewStartedAt: string | null; reviewedAt: string | null;
 };
-export type ManagerQcInspection = {equipment: ManagerQcEquipment; inspection: QcEquipmentInspection | null; history: ManagerQcHistory[]};
+export type ManagerQcInspection = {equipment: ManagerQcEquipment; inspection: QcEquipmentInspection | null; history: ManagerQcHistory[];
+  inspectionType?: string | null; equipmentName?: string | null; description?: string | null;
+  itemNumber?: string | null; areaName?: string | null; rfidTagUid?: string | null};
 export type ReportingManager = {id: string; displayName: string};
 const root = '/manager/qc-review';
 export const getManagerQcDashboard = () => apiClient.get<ManagerQcCounts>(`${root}/dashboard`);
 export const getManagerQcProjects = () => apiClient.get<ManagerQcProject[]>(`${root}/projects`);
 export const getManagerQcProject = (id: string) => apiClient.get<ManagerQcProjectDetails>(`${root}/projects/${id}`);
 export const getManagerQcArea = (projectId: string, areaId: string) => apiClient.get<ManagerQcAreaDetails>(`${root}/projects/${projectId}/areas/${areaId}`);
-export const getManagerQcEquipment = (id: string) => apiClient.get<ManagerQcInspection>(`${root}/equipment/${id}`);
+export const getManagerQcEquipment = (id: string, inspectionId?: string) => apiClient.get<ManagerQcInspection>(`${root}/equipment/${id}`, inspectionId ? {params: {inspectionId}} : undefined);
+export type ManagerQcRecord = {
+  projectId: string; areaId: string; areaName: string; areaTotalEquipment: number; equipment: ManagerQcEquipment;
+  itemNumber: string | null; equipmentName: string | null; description: string | null; rfidTagUid: string | null;
+  inspectionDate: string | null; inspectionType: string | null; inspectorName: string | null;
+  submittedAt: string | null; hasReview: boolean; lastQcActivity: string | null;
+};
+export const getManagerQcRecords = (projectId: string) => apiClient.get<ManagerQcRecord[]>(`${root}/projects/${projectId}/records`);
 export const getReportingManagers = () => apiClient.get<ReportingManager[]>(`${root}/reporting-managers`);
 export const setQcReportingManager = (qcId: string, managerId: string | null) => apiClient.put(`${root}/users/${qcId}/manager`, {managerId});

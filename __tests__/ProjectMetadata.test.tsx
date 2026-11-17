@@ -17,9 +17,9 @@ test('metadata fields are optional and input handlers store actual uppercase val
   expect(fields[3].props.multiline).toBe(true);
   await Renderer.act(async () => renderer.unmount());
 });
-test('JSON writes trim uppercase optional metadata and keep assignment identifiers unchanged', () => {
+test('JSON creates trim optional metadata without changing case and keep assignment identifiers unchanged', () => {
   createProject({...request, uidNumber: ' uid ', documentNumber: ' doc/1 ', revision: ' rev a ', description: ' initial issue ', clientName: ' client '});
-  expect((apiClient.post as jest.Mock).mock.calls.at(-1)[1]).toMatchObject({projectName: 'PROJECT', jobNo: 'JOB', uidNumber: 'UID', documentNumber: 'DOC/1', revision: 'REV A', description: 'INITIAL ISSUE', clientName: 'CLIENT', assignedSurveyorId: 'surveyor-id', assignedQcId: 'qc-id', assignedClientId: null});
+  expect((apiClient.post as jest.Mock).mock.calls.at(-1)[1]).toMatchObject({projectName: 'project', jobNo: 'job', uidNumber: 'uid', documentNumber: 'doc/1', revision: 'rev a', description: 'initial issue', clientName: 'client', assignedSurveyorId: 'surveyor-id', assignedQcId: 'qc-id', assignedClientId: null});
   updateProject('project', {...request, status: 'Active', removeClientLogo: true});
   expect((apiClient.put as jest.Mock).mock.calls.at(-1)[1]).toMatchObject({removeClientLogo: true, clientName: null, revision: null});
 });
@@ -37,6 +37,6 @@ test('logo and hazardous plan share one multipart write without uppercasing orig
     const parts = (apiClient.post as jest.Mock).mock.calls.at(-1)[1].parts;
     expect(parts.clientLogo.name).toBe('OriginalCase.png');
     expect(parts.hazardousAreaPlan.name).toBe('PlanCase.pdf');
-    expect(parts.clientName).toBe('CLIENT');
+    expect(parts.clientName).toBe('client');
   } finally {(globalThis as any).FormData = originalFormData; Object.defineProperty(Platform, 'OS', {configurable: true, value: original});}
 });

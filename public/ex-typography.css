@@ -1,0 +1,84 @@
+/* One typography layer for all web workspaces, including React Native Web
+   text and portal dialogs. Keep colors and permission-driven layouts intact. */
+@font-face {
+  font-family: Montserrat;
+  src: url('./fonts/Montserrat-Variable.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: Montserrat;
+  src: url('./fonts/Montserrat-Italic-Variable.ttf') format('truetype');
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+}
+:root {
+  --font-primary: Montserrat, 'Segoe UI', sans-serif;
+  --ex-body: var(--font-primary);
+  --ex-page-size: clamp(30px, 2.4vw, 36px);
+  --ex-section-size: clamp(20px, 1.6vw, 24px);
+}
+body, button, input, select, textarea,
+#root [dir='auto'], [aria-modal='true'] [dir='auto'],
+.ex-landing, #ex-client-sidebar {
+  font-family: var(--font-primary) !important;
+}
+body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+/* Native Text uses dir=auto. Override only the family, not icon sizes, nested
+   text weights, truncation, or the deliberate density of individual tables. */
+:is(#ex-module-heading, #ex-operations-hero, #ex-surveyor-hero,
+    #ex-project-form-banner) [role='heading'] {
+  font-size: var(--ex-page-size);
+  font-weight: 800;
+  line-height: 1.22;
+  letter-spacing: -.025em;
+  overflow-wrap: anywhere;
+}
+:is(#ex-sidebar, #ex-client-sidebar) [role='button'] {
+  min-height: 44px;
+}
+:is(#ex-sidebar, #ex-client-sidebar) [aria-selected='true'] {
+  box-shadow: inset 3px 0 0 #00cfe3;
+}
+/* Semantic HTML tables used by HAER, registers and report previews. */
+#root th, #root [role='columnheader'] {
+  font-family: var(--font-primary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+#root td, #root [role='cell'] {
+  font-family: var(--font-primary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+#root :is(input:not([type='checkbox']):not([type='radio']):not([type='file']), textarea, select) {
+  font-size: 14px;
+  line-height: 1.5;
+}
+#root :is(button, [role='button']) { max-width: 100%; }
+#root :is(button, [role='button']):focus-visible {
+  outline: 2px solid var(--ex-focus, #00cfe3);
+  outline-offset: 3px;
+}
+#ex-operations-kpis > *, #ex-surveyor-kpis > *,
+[data-testid='qc-workspace-kpi'] { transition: border-color 160ms ease, box-shadow 160ms ease; }
+@media (hover: hover) {
+  #ex-workspace-dark :is(#ex-operations-kpis, #ex-surveyor-kpis) > *:hover,
+  #ex-workspace-dark [data-testid='qc-workspace-kpi']:hover {
+    box-shadow: inset 0 0 24px -16px #00d9ee, 0 4px 16px #00111d33;
+  }
+}
+@media (max-width: 600px) {
+  :root { --ex-page-size: 30px; }
+  /* Avoid mobile browser auto-zoom while entering form values. */
+  #root :is(input:not([type='checkbox']):not([type='radio']), textarea, select) { font-size: 16px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #ex-operations-kpis > *, #ex-surveyor-kpis > *,
+  [data-testid='qc-workspace-kpi'] { transition: none; }
+}

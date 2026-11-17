@@ -1,8 +1,10 @@
+import AppearanceSettings from '../src/components/AppearanceSettings';
 import ClientMobileDrawer from '../src/components/ClientMobileDrawer';
 import React from 'react';
 import Renderer from 'react-test-renderer';
 import {TextInput, TouchableOpacity} from 'react-native';
 import ClientWorkspace, {ClientRemarks} from '../src/screens/ClientWorkspace';
+import SearchableOptionPicker from '../src/components/SearchableOptionPicker';
 import * as api from '../src/api/clientDashboard';
 import * as activityApi from '../src/api/projects';
 import {generateReportPdf, downloadReportPdf} from '../src/reports/pdfFile';
@@ -17,6 +19,7 @@ jest.mock('../src/components/AuthenticatedImage', () => 'AuthenticatedImage');
 jest.mock('../src/components/ZoomableImageViewer', () => 'ZoomableImageViewer');
 jest.mock('../src/components/ReportPdfPreview', () => 'ReportPdfPreview');
 jest.mock('../src/components/NotificationBell', () => 'NotificationBell');
+jest.mock('../src/components/AppearanceSettings', () => 'AppearanceSettings');
 jest.mock('../src/reports/pdfFile', () => ({generateReportPdf: jest.fn(), downloadReportPdf: jest.fn()}));
 const text = (node: Renderer.ReactTestInstance): string => node.children.map(c => typeof c === 'string' ? c : text(c)).join('');
 let renderer: Renderer.ReactTestRenderer;
@@ -54,9 +57,10 @@ test('failed assigned-project request shows error without displaying private det
 });
 
 test('client sees an assigned activity defect and can accept its verified closure', async () => {
- (activityApi.getInspectionDefects as jest.Mock).mockResolvedValue({data: [{id: 'f1', actionId: 'ca1', project: 'Assigned Project', equipmentId: 'e1', checkpoint: 'Seal intact', faultCode: 'FC-1', observation: 'Seal damaged', severityCode: 'Proposed', actionStatus: 'Verified', reportedAt: new Date().toISOString()}]});
+ (activityApi.getInspectionDefects as jest.Mock).mockResolvedValue({data: [{id: 'f1', projectId:'p', actionId: 'ca1', project: 'Assigned Project', equipmentId: 'e1', checkpoint: 'Seal intact', faultCode: 'FC-1', observation: 'Seal damaged', severityCode: 'Proposed', actionStatus: 'Verified', reportedAt: new Date().toISOString()}]});
  await Renderer.act(async () => {renderer = Renderer.create(<ClientWorkspace userName="Client" userKey="Client:1" section="Defects" />); await Promise.resolve(); await Promise.resolve();});
  expect(text(renderer.root)).toContain('Seal damaged');
+ await press('View Defect');
  await press('Approve Closure');
  expect(activityApi.decideDefectClosure).toHaveBeenCalledWith('ca1', true, '');
 });
@@ -68,7 +72,8 @@ test('client sees an assigned activity defect and can accept its verified closur
  await press('Open client navigation');
  expect(renderer.root.findByType(ClientMobileDrawer).props.open).toBe(true);
  expect(renderer.root.findByType(ClientMobileDrawer).props.counts).toEqual({Defects: 3, Reports: 9, Notifications: 0});
- for (const label of ['Survey Progress', 'QC Status', 'Reports & Certificates', 'Notifications', 'Profile', 'My Projects', 'Dashboard']) {
+ expect(renderer.root.findAllByType(TouchableOpacity).some(n=>n.props.accessibilityLabel==='Inspection Progress')).toBe(false);
+ for (const label of ['QC Status', 'Reports & Certificates', 'Notifications', 'Profile', 'My Projects', 'Dashboard']) {
    await press(label);
    expect(renderer.root.findByType(ClientMobileDrawer).props.open).toBe(false);
    await press('Open client navigation');
@@ -78,6 +83,81 @@ test('client sees an assigned activity defect and can accept its verified closur
  await press('Open client navigation'); await press('Logout'); expect(logout).toHaveBeenCalledTimes(1);
  });
  test('Client drawer does not render for a technical role', async () => {
- await Renderer.act(async () => {renderer = Renderer.create(<ClientMobileDrawer role="Manager" open name="Manager" active="Dashboard" counts={{}} onNavigate={jest.fn()} onClose={jest.fn()} />);});
+ await Renderer.act(async () => {renderer = Renderer.create(<ClientMobileDrawer role="Manager" open active="Dashboard" counts={{}} onNavigate={jest.fn()} onClose={jest.fn()} onSettings={jest.fn()} />);});
  expect(renderer.toJSON()).toBeNull();
  });
+
+test('overview filters real project statuses and keeps shortcuts connected to existing sections', async () => {
+ await Renderer.act(async () => {renderer = Renderer.create(<ClientWorkspace userName="Client" userKey="Client:overview" />);});
+ expect(text(renderer.root)).toContain('Confidence at every stage.');
+ await Renderer.act(async () => {renderer.root.findAllByType(TextInput).find(n => n.props.accessibilityLabel === 'Search my projects')!.props.onChangeText('not-a-project');});
+ expect(text(renderer.root)).toContain('No matching projects');
+ await Renderer.act(async () => {renderer.root.findAllByType(TextInput).find(n => n.props.accessibilityLabel === 'Search my projects')!.props.onChangeText('JOB-1');});
+ expect(text(renderer.root)).toContain('Assigned Project');
+ const picker = renderer.root.findAllByType(SearchableOptionPicker).find(n => n.props.label === 'Project status')!;
+ expect(picker.props.options).toEqual([{label: 'All statuses', value: ''}, {label: 'Active', value: 'Active'}]);
+ await press('Track inspection progress'); expect(text(renderer.root)).toContain('Equipment Inspected');
+});
+
+test('unassigned overview has honest empty states and disables unavailable reports', async () => {
+ (api.getClientDashboard as jest.Mock).mockResolvedValue({data: {counts: {activeProjects: 0, surveysInProgress: 0, awaitingQc: 0, qcApproved: 0, openDefects: 0, reportsAvailable: 0}, projects: [], recentActivity: []}});
+ (api.getClientReports as jest.Mock).mockResolvedValue({data: []});
+ await Renderer.act(async () => {renderer = Renderer.create(<ClientWorkspace userName="Client" userKey="Client:empty" />);});
+ expect(text(renderer.root)).toContain('Your workspace is ready');
+ expect(text(renderer.root)).toContain('You are all caught up');
+ expect(text(renderer.root)).toContain('No project activity yet.');
+ expect(renderer.root.findAllByType(TouchableOpacity).find(n => n.props.accessibilityLabel === 'View reports')!.props.disabled).toBe(true);
+});
+
+test('attention uses actual unread notices and verified client decisions without triggering mutations', async () => {
+ (api.getClientNotifications as jest.Mock).mockResolvedValue({data: [{id: 'n1', projectId: 'p', title: 'Project update', message: 'Saved update', time: '2026-11-11T12:00:00Z'}]});
+ (activityApi.getInspectionDefects as jest.Mock).mockResolvedValue({data: [{id: 'f1', actionId: 'a1', actionStatus: 'Verified'}, {id: 'f2', actionId: 'a2', actionStatus: 'Proposed'}]});
+ await Renderer.act(async () => {renderer = Renderer.create(<ClientWorkspace userName="Client" userKey="Client:attention" />);});
+ expect(text(renderer.root)).toContain('1 verified defect awaiting your decision');
+ expect(text(renderer.root)).toContain('Saved update');
+ expect(activityApi.decideDefectClosure).not.toHaveBeenCalled();
+});
+
+test('redesigned project details refresh saved personal remarks without changing project or inspection data', async () => {
+ let saved = [{id:'old',remark:'Existing client remark',createdAt:'2026-11-10T12:00:00Z',equipmentId:null,againstReport:false}];
+ (api.getClientRemarks as jest.Mock).mockImplementation(async () => ({data:[...saved]}));
+ (api.addClientRemark as jest.Mock).mockImplementation(async (_context, remark) => {
+   const created = {id:'new',remark,createdAt:'2026-11-12T12:00:00Z',equipmentId:null,againstReport:false}; saved = [created,...saved]; return {data:created};
+ });
+ await Renderer.act(async () => {renderer = Renderer.create(<ClientWorkspace userName="Client" userKey="Client:details" section="Projects"/>);});
+ await press('View Project →');
+ expect(api.getClientProject).toHaveBeenCalledWith('p');
+ expect(text(renderer.root)).toContain('Existing client remark');
+ expect(text(renderer.root)).toContain('QC & Defect Status Overview');
+ expect(text(renderer.root)).toContain('No defects recorded for this project.');
+ await press('Add Project Remark');
+ await Renderer.act(async () => {renderer.root.findAllByType(TextInput).find(n => n.props.accessibilityLabel === 'Client remark')!.props.onChangeText('New private project note');});
+ await press('Add Remark');
+ expect(api.addClientRemark).toHaveBeenCalledWith({projectId:'p'},'New private project note');
+ await press('Close');
+ expect(text(renderer.root)).toContain('New private project note');
+ expect(text(renderer.root)).toContain('Existing client remark');
+ await press('View Area'); expect(api.getClientArea).toHaveBeenCalledWith('a');
+});
+
+test('inspection progress uses shared modern cards and preserves independent QC values and drill-down', async () => {
+ await Renderer.act(async () => {renderer = Renderer.create(<ClientWorkspace userName="Client" userKey="Client:progress" section="Progress" />);});
+ expect(text(renderer.root)).toContain('Inspection Progress');
+ expect(text(renderer.root)).toContain('Survey completion and QC approval are tracked separately.');
+ expect(text(renderer.root)).toContain('Survey Progress: 50%');
+ const qcBar = renderer.root.findAll(n => n.props.accessibilityRole === 'progressbar').find(n => n.props.accessibilityLabel === 'Assigned Project: QC Approved')!;
+ expect(qcBar.props.accessibilityValue.now).toBe(0);
+ await press('View Project →'); expect(api.getClientProject).toHaveBeenCalledWith('p');
+});
+
+
+test('client mobile settings forwards own profile updates and security sign-out', async () => {
+ const onProfileUpdated = jest.fn(); const onLogout = jest.fn();
+ await Renderer.act(async () => {renderer = Renderer.create(<ClientWorkspace userName="Client" userKey="Client:settings" showNavigation onProfileUpdated={onProfileUpdated} onLogout={onLogout} />);});
+ await Renderer.act(async () => {renderer.root.findByType(ClientMobileDrawer).props.onSettings();});
+ const settings = renderer.root.findByType(AppearanceSettings);
+ expect(settings.props.onProfileUpdated).toBe(onProfileUpdated);
+ expect(settings.props.onSessionEnd).toBe(onLogout);
+ await Renderer.act(async () => {settings.props.onClose();});
+ expect(renderer.root.findAllByType(AppearanceSettings)).toHaveLength(0);
+});

@@ -7,7 +7,7 @@ import * as api from '../src/api/managerQc';
 
 jest.mock('../src/api/managerQc', () => ({
   getManagerQcDashboard: jest.fn(), getManagerQcProjects: jest.fn(), getManagerQcProject: jest.fn(),
-  getManagerQcArea: jest.fn(), getManagerQcEquipment: jest.fn(),
+  getManagerQcArea: jest.fn(), getManagerQcEquipment: jest.fn(), getManagerQcRecords: jest.fn(),
 }));
 jest.mock('../src/components/AuthenticatedImage', () => 'AuthenticatedImage');
 jest.mock('../src/components/QcReportingManagers', () => 'QcReportingManagers');
@@ -20,7 +20,7 @@ const click = async (renderer: ReactTestRenderer.ReactTestRenderer, label: strin
   expect(button).toBeDefined();
   await ReactTestRenderer.act(async () => {button!.props.onPress();});
 };
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {jest.clearAllMocks(); (api.getManagerQcRecords as jest.Mock).mockResolvedValue({data: []});});
 
 test('manager drills through backend counts, areas, equipment, inspection and preserved history', async () => {
   const counts = {awaitingQcReview: 7, inReview: 4, changesRequested: 2, approved: 3, overdue: 1};
@@ -42,8 +42,8 @@ test('manager drills through backend counts, areas, equipment, inspection and pr
   let renderer!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {renderer = ReactTestRenderer.create(<ManagerQcReviewScreen userRole="Manager" />);});
   expect(textOf(renderer.root)).toContain('7Awaiting QC Review');
+  await click(renderer, 'View Project · Vessel One'); expect(api.getManagerQcProject).toHaveBeenCalledWith('p1');
   expect(textOf(renderer.root)).toContain('Sandra');
-  await click(renderer, 'View Project'); expect(api.getManagerQcProject).toHaveBeenCalledWith('p1');
   await click(renderer, 'View Area'); expect(api.getManagerQcArea).toHaveBeenCalledWith('p1', 'a1');
   await click(renderer, 'View Inspection'); expect(api.getManagerQcEquipment).toHaveBeenCalledWith('e1');
   const text = textOf(renderer.root);
@@ -57,7 +57,7 @@ test('manager drills through backend counts, areas, equipment, inspection and pr
 
 test.each(['Surveyor', 'Qc', 'Client'])('hides monitoring menu and prevents API loads for %s', async role => {
   let renderer!: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {renderer = ReactTestRenderer.create(<Sidebar active="Dashboard" userRole={role} userName="User" onNavigate={jest.fn()} onLogout={jest.fn()} />);});
+  await ReactTestRenderer.act(async () => {renderer = ReactTestRenderer.create(<Sidebar active="Dashboard" userRole={role} onSettings={jest.fn()} onNavigate={jest.fn()} onLogout={jest.fn()} />);});
   expect(textOf(renderer.root)).not.toContain('QC Review');
   if (role === 'Qc') expect(textOf(renderer.root)).toContain('QC Pending');
   else expect(textOf(renderer.root)).not.toContain('QC Pending');
@@ -69,7 +69,7 @@ test.each(['Surveyor', 'Qc', 'Client'])('hides monitoring menu and prevents API 
 
 test.each(['Manager', 'Admin'])('shows QC Review sidebar option for %s', async role => {
   let renderer!: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {renderer = ReactTestRenderer.create(<Sidebar active="ManagerQcReview" userRole={role} userName="User" onNavigate={jest.fn()} onLogout={jest.fn()} />);});
+  await ReactTestRenderer.act(async () => {renderer = ReactTestRenderer.create(<Sidebar active="ManagerQcReview" userRole={role} onSettings={jest.fn()} onNavigate={jest.fn()} onLogout={jest.fn()} />);});
   expect(textOf(renderer.root)).toContain('QC Review');
   expect(textOf(renderer.root)).toContain('QC Pending');
   await ReactTestRenderer.act(async () => renderer.unmount());

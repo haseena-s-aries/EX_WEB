@@ -6,6 +6,10 @@ import {
 } from '../api/equipmentIdentification';
 import {getApiErrorMessage} from '../api/errors';
 import {getProjects, ProjectSummary} from '../api/projects';
+import {equipmentOptions, equipmentTypes} from '../equipment/equipmentOptions';
+import {useThemeMode} from '../theme/useThemeMode';
+import SearchableOptionPicker from './SearchableOptionPicker';
+import {projectDisplay} from '../utils/projectDisplay';
 
 const FIELDS = [
   ['tagNumber', 'Equipment tag *'], ['equipmentCode', 'Item number'], ['equipmentName', 'Equipment name'],
@@ -35,18 +39,20 @@ function Picker({label, value, choices, onChange, disabled}: {
 function Button({label, onPress, disabled, secondary}: {
   label: string; onPress: () => void; disabled?: boolean; secondary?: boolean;
 }) {
-  return <TouchableOpacity accessibilityRole="button" disabled={disabled} onPress={onPress}
+  return <TouchableOpacity testID={secondary ? 'scan-secondary-action' : 'scan-primary-action'}
+    accessibilityRole="button" disabled={disabled} onPress={onPress}
     style={[styles.button, secondary && styles.secondary, disabled && styles.disabled]}>
     <Text style={[styles.buttonLabel, secondary && styles.secondaryLabel]}>{label}</Text>
   </TouchableOpacity>;
 }
 
-export default function EquipmentIdentificationWorkspace({children, online, canManage, scanNfc, onOpenInspection}: {
+export default function EquipmentIdentificationWorkspace({children, online, canManage, scanNfc, onOpenInspection, onViewEquipment}: {
   children: React.ReactNode;
   online: boolean;
   canManage: boolean;
   scanNfc?: () => Promise<string>;
-  onOpenInspection: (id: string) => void;
+  onOpenInspection: (id: string, context?: any) => void;
+  onViewEquipment?: (equipment: IdentifiedEquipment) => void;
 }) {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [projectError, setProjectError] = useState('');
@@ -57,6 +63,7 @@ export default function EquipmentIdentificationWorkspace({children, online, canM
   const [registrationError, setRegistrationError] = useState('');
   const [registrationLoading, setRegistrationLoading] = useState(false);
   const [rows, setRows] = useState<BulkEquipmentRow[]>([]);
+  const dark = useThemeMode() === 'dark';
   const [uidInput, setUidInput] = useState('');
   const [scanType, setScanType] = useState<RadioTechnology>('HF_RFID');
   const [busy, setBusy] = useState(false);
@@ -108,8 +115,8 @@ export default function EquipmentIdentificationWorkspace({children, online, canM
     return () => {current = false;};
   }, [online, filter, query, page, refresh]);
 
-  const projectChoices = projects.map(project => ({id: project.id, label: project.projectName}));
-  const registrationChoices = registrationProjects.map(project => ({id: project.id, label: project.projectName}));
+  const projectChoices = projects.map(project => ({id: project.id, label: projectDisplay(project.projectName)}));
+  const registrationChoices = registrationProjects.map(project => ({id: project.id, label: projectDisplay(project.projectName)}));
   const areas = registrationProjects.find(project => project.id === projectId)?.areas.map(area => ({id: area.id, label: area.areaName})) ?? [];
   const locked = busy || scanning;
   const addRow = () => setRows(current => current.length < 100 ? [...current, newRow()] : current);
@@ -169,11 +176,11 @@ export default function EquipmentIdentificationWorkspace({children, online, canM
 
   return <>
     {online && canManage && <>
-      <View style={styles.actions}>
+      <View nativeID="ex-scan-bulk-actions" style={styles.actions}>
         <Button label="+ Bulk Add Equipment by RFID" disabled={locked} onPress={() => setMode('rfid')} />
         <Button label="+ Bulk Add Equipment Manually" disabled={locked} onPress={() => {setMode('manual'); if (!rows.length) addRow();}} />
       </View>
-      {mode && <View style={styles.panel}>
+      {mode && <View testID="scan-panel" style={styles.panel}>
         <Text accessibilityRole="header" style={styles.title}>{mode === 'rfid' ? 'Bulk add by RFID' : 'Manual bulk equipment addition'}</Text>
         <View style={styles.actions}>
           <Picker label="Select project" value={projectId} choices={registrationChoices} disabled={locked || registrationLoading} onChange={id => {
@@ -207,7 +214,12 @@ export default function EquipmentIdentificationWorkspace({children, online, canM
               <Text style={styles.column}>RFID type</Text><Text style={styles.column}>Row result</Text>
             </View>
             {rows.map((row, index) => <View style={styles.tableRow} key={row.clientId}>
-              {FIELDS.map(([key, label]) => <TextInput key={key} accessibilityLabel={`Row ${index + 1} ${label}`} placeholder={label}
+              {FIELDS.map(([key, label]) => key === 'type' ? <View key={key} style={styles.column}>
+                <SearchableOptionPicker label={`Row ${index + 1} ${label}`} placeholder={label}
+                  value={row.type} options={equipmentOptions(equipmentTypes, rows.map(item => item.type), row.type)}
+                  customLabel="Add Custom Type" disabled={locked} dark={dark}
+                  onChange={type => patchRow(row.clientId, {type})} />
+              </View> : <TextInput key={key} accessibilityLabel={`Row ${index + 1} ${label}`} placeholder={label}
                 value={row[key]} editable={!locked} onChangeText={value => patchRow(row.clientId, {[key]: value})} style={[styles.input, styles.column]} />)}
               <TextInput accessibilityLabel={`Row ${index + 1} RFID UID`} placeholder="RFID UID" value={row.rfidUid}
                 editable={!locked} onChangeText={value => patchRow(row.clientId, {rfidUid: value})} style={[styles.input, styles.column]} />
@@ -230,7 +242,7 @@ export default function EquipmentIdentificationWorkspace({children, online, canM
       </View>}
     </>}
     {children}
-    {online && <View style={styles.panel}>
+    {online && <View nativeID="ex-scan-identified" testID="scan-panel" style={styles.panel}>
       <Text accessibilityRole="header" style={styles.title}>Identified Equipment</Text>
       <View style={styles.actions}>
         <Picker label="All projects" value={filter} choices={[{id:'',label:'All projects'}, ...projectChoices]} onChange={id => {setFilter(id); setPage(1);}} />
@@ -244,20 +256,20 @@ export default function EquipmentIdentificationWorkspace({children, online, canM
       {listLoading ? <Text>Loading identified equipment…</Text> : list && !listError && <>
         <ScrollView horizontal>
           <View>
-            <View style={styles.tableRow}>
+            <View testID="scan-table-heading" style={styles.tableRow}>
               {['Equipment tag / Item number','Equipment name / Description','RFID UID','RFID type','Project name','Identification date','Status','Actions'].map(label =>
                 <Text key={label} style={[styles.column, styles.columnHeading]}>{label}</Text>)}
             </View>
-            {list.items.map(item => <View key={item.equipmentId} style={styles.tableRow}>
+            {list.items.map(item => <View key={item.equipmentId} testID="scan-table-row" style={styles.tableRow}>
               <Text style={styles.column}>{[item.tagNumber, item.equipmentCode].filter(Boolean).join(' / ')}</Text>
               <Text style={styles.column}>{[item.equipmentName, item.description].filter(Boolean).join(' · ') || '—'}</Text>
               <Text style={styles.column}>{item.tags.map(tag => tag.uid).join('\n')}</Text>
-              <Text style={styles.column}>{item.tags.map(tag => tag.technology).join('\n')}</Text>
-              <Text style={styles.column}>{item.projectName}</Text>
+              <View style={styles.column}>{item.tags.map(tag => <Text key={tag.uid} testID="scan-tag-type">{tag.technology}</Text>)}</View>
+              <Text style={styles.column}>{projectDisplay(item.projectName)}</Text>
               <Text style={styles.column}>{item.tags.map(tag => new Date(tag.identifiedAt).toLocaleDateString()).join('\n')}</Text>
               <Text style={styles.column}>{item.status.replace(/([a-z])([A-Z])/g, '$1 $2')}</Text>
               <View style={styles.column}><View style={styles.actions}>
-                <Button label="View" onPress={() => show(item, false)} disabled={editBusy} secondary />
+                <Button label="View" onPress={() => onViewEquipment ? onViewEquipment(item) : show(item, false)} disabled={editBusy} secondary />
                 {canManage && <Button label="Edit" onPress={() => show(item, true)} disabled={editBusy} secondary />}
               </View></View>
             </View>)}
@@ -270,18 +282,22 @@ export default function EquipmentIdentificationWorkspace({children, online, canM
           <Button label="Next" onPress={() => setPage(list.page + 1)} disabled={list.page * list.pageSize >= list.total} secondary />
         </View>
       </>}
-      {selected && <View style={styles.panel}>
+      {selected && <View testID="scan-panel" style={styles.panel}>
         <Text style={styles.title}>{edit ? 'Edit equipment' : 'Equipment details'} · {selected.tagNumber}</Text>
-        <Text>{selected.projectName} · {selected.status}</Text>
+        <Text>{projectDisplay(selected.projectName)} · {selected.status}</Text>
         {selected.tags.map(tag => <Text key={tag.uid}>{tag.technology} · {tag.uid} · {new Date(tag.identifiedAt).toLocaleDateString()}</Text>)}
         {FIELDS.map(([key, label]) => edit
-          ? <TextInput key={key} accessibilityLabel={label} placeholder={label} value={edit[key]} editable={!editBusy}
+          ? key === 'type' ? <SearchableOptionPicker key={key} label={label} placeholder={label} value={edit.type}
+              options={equipmentOptions(equipmentTypes, [selected.type], edit.type)}
+              customLabel="Add Custom Type" disabled={editBusy} dark={dark}
+              onChange={type => setEdit(current => current ? {...current, type} : undefined)} />
+          : <TextInput key={key} accessibilityLabel={label} placeholder={label} value={edit[key]} editable={!editBusy}
               onChangeText={value => setEdit(current => current ? {...current, [key]: value} : undefined)} style={styles.input} />
           : <Text key={key}>{label.replace(' *', '')} · {selected[key] || '—'}</Text>)}
         {!!editError && <Text accessibilityRole="alert" style={styles.error}>{editError}</Text>}
         <View style={styles.actions}>
           {edit ? <Button label="Save equipment details" disabled={editBusy} onPress={() => void saveEdit()} />
-            : <Button label="Open inspection history" onPress={() => onOpenInspection(selected.equipmentId)} />}
+            : <Button label="Open inspection history" onPress={() => onOpenInspection(selected.equipmentId, selected)} />}
           <Button label="Close details" disabled={editBusy} secondary onPress={() => {setSelected(undefined); setEdit(undefined);}} />
         </View>
       </View>}

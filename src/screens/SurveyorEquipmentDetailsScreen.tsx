@@ -1,10 +1,13 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {
   ActivityIndicator,
+  Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {getApiErrorMessage} from '../api/errors';
@@ -12,7 +15,9 @@ import {
   getSurveyorEquipmentDetails,
   SurveyorEquipmentDetails,
 } from '../api/projects';
-import EquipmentReferenceDocumentsPanel from '../components/EquipmentReferenceDocumentsPanel';
+import {useThemeMode} from '../theme/useThemeMode';
+import {OPERATIONS_DARK} from '../theme/operationsPalette';
+import {LIGHT} from '../theme/palette';
 
 type Props = {
   projectId: string;
@@ -44,6 +49,12 @@ export default function SurveyorEquipmentDetailsScreen({
   refreshVersion,
   userRole,
 }: Props) {
+  const dark = useThemeMode() === 'dark';
+  const colors = dark ? OPERATIONS_DARK : LIGHT;
+  const styles = dark ? darkStyles : lightStyles;
+  const {width} = useWindowDimensions();
+  const compact = width < 620;
+  const detailWidth = compact ? '100%' : width >= 1180 ? '33.333%' : '50%';
   const [equipment, setEquipment] = useState<SurveyorEquipmentDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -68,7 +79,7 @@ export default function SurveyorEquipmentDetailsScreen({
   if (loading) {
     return (
       <View style={styles.state}>
-        <ActivityIndicator color="#8fa7f8" size="large" />
+        <ActivityIndicator color={colors.cyan} size="large" />
         <Text style={styles.stateText}>Loading equipment...</Text>
       </View>
     );
@@ -95,48 +106,61 @@ export default function SurveyorEquipmentDetailsScreen({
     ? 'Start Inspection'
     : equipment.inspectionStatus === 'QcApproved'
       ? 'View Inspection'
-      : equipment.inspectionStatus === 'Completed'
+      : equipment.inspectionStatus === 'Completed' || equipment.inspectionStatus === 'PendingQcReview'
         ? 'View Inspection'
         : 'Continue Inspection';
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <TouchableOpacity onPress={onBack} style={styles.backButton}>
-        <Text style={styles.backText}>&lt; Back to area</Text>
+    <ScrollView nativeID="ex-equipment-details" style={styles.screen} contentContainerStyle={styles.content}>
+      <TouchableOpacity accessibilityRole="button" onPress={onBack} style={styles.backButton}>
+        <Text style={styles.backText}>← Back to area</Text>
       </TouchableOpacity>
 
       <View style={styles.header}>
-        <View style={styles.sequenceBox}>
-          <Text style={styles.sequence}>{equipment.sequenceNo}</Text>
-        </View>
-        <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>EQUIPMENT DETAILS</Text>
-          <Text style={styles.title}>{equipment.tagNumber}</Text>
-          <Text style={styles.subtitle}>{equipment.type} | {equipment.areaName}</Text>
+        <Image accessible={false} source={require('../assets/landing/industry-3.jpg')} resizeMode="cover" style={styles.heroPhoto} />
+        <View pointerEvents="none" nativeID="ex-operations-hero-overlay" style={StyleSheet.absoluteFill} />
+        <View style={styles.heroRow}>
+          <View style={styles.sequenceBox}><Text style={styles.sequence}>{equipment.markingNo ?? equipment.sequenceNo}</Text></View>
+          <View style={styles.headerCopy}>
+            <Text style={styles.eyebrow}>EQUIPMENT DETAILS</Text>
+            <Text accessibilityRole="header" style={styles.title}>{equipment.tagNumber}</Text>
+            <Text style={styles.subtitle}>{[equipment.type, equipment.areaName].filter(Boolean).join(' · ')}</Text>
+          </View>
         </View>
         <View style={styles.statusBadge}>
           <Text style={styles.statusText}>{statusLabel(equipment.inspectionStatus)}</Text>
         </View>
       </View>
 
-      <View style={styles.detailsPanel}>
-        <Text style={styles.panelTitle}>Equipment Information</Text>
+      <View testID="equipment-detail-panel" style={styles.detailsPanel}>
+        <Text accessibilityRole="header" style={styles.panelTitle}>Equipment Information</Text>
         <View style={styles.detailsGrid}>
-          <Detail label="Sequence No" value={String(equipment.sequenceNo)} />
-          <Detail label="Tag Number" value={equipment.tagNumber} />
-          <Detail label="Equipment ID" value={equipment.equipmentId} />
-          <Detail label="RFID Tag UID" value={equipment.rfidTagUid} />
-          <Detail label="Type" value={equipment.type} />
-          <Detail label="Circuit ID" value={equipment.circuitId} />
-          <Detail label="Location" value={equipment.location} />
-          <Detail label="Manufacturer" value={equipment.manufacturer} />
-          <Detail label="Protection Details" value={equipment.protectionDetails} />
-          <Detail label="Certificate Number" value={equipment.certificateNumber} />
-          <Detail label="Area Name" value={equipment.areaName} />
-          <Detail label="Created Date" value={formatDate(equipment.createdAt)} />
-          <Detail label="Inspection Status" value={statusLabel(equipment.inspectionStatus)} />
+          {([
+            ['Area Marking No', String(equipment.markingNo ?? equipment.sequenceNo)],
+            ['HAER Sl. No', String(equipment.sequenceNo)],
+            ['Tag Number', equipment.tagNumber],
+            ['Equipment ID', equipment.equipmentId],
+            ['RFID Tag UID', equipment.rfidTagUid],
+            ['Type', equipment.type],
+            ['Circuit ID', equipment.circuitId],
+            ['Location', equipment.location],
+            ['Manufacturer', equipment.manufacturer],
+            ['Protection Details', equipment.protectionDetails],
+            ['Certificate Number', equipment.certificateNumber],
+            ['Area Name', equipment.areaName],
+            ['Created Date', formatDate(equipment.createdAt)],
+            ['Inspection Status', statusLabel(equipment.inspectionStatus)],
+          ] as const).map(([label, value]) => (
+            <View key={label} style={[styles.detailItem, {width: detailWidth}]}>
+              <Text style={styles.detailLabel}>{label}</Text>
+              <Text style={styles.detailValue}>{value || 'Not set'}</Text>
+            </View>
+          ))}
         </View>
+      </View>
 
+      <View testID="equipment-detail-panel" style={styles.detailsPanel}>
+        <Text accessibilityRole="header" style={styles.panelTitle}>Inspection</Text>
         {equipment.qcComments ? (
           <View style={styles.qcNotice}>
             <Text style={styles.qcNoticeTitle}>QC requested changes</Text>
@@ -147,57 +171,58 @@ export default function SurveyorEquipmentDetailsScreen({
           </View>
         ) : null}
 
-        <TouchableOpacity onPress={onInspect} style={styles.inspectButton}>
-          <Text style={styles.inspectButtonText}>{actionLabel}</Text>
-        </TouchableOpacity>
-        {onStartActivity ? <TouchableOpacity onPress={onStartActivity} style={[styles.inspectButton, {marginTop: 10, backgroundColor: '#e9edff'}]}><Text style={[styles.inspectButtonText, {color: '#2e3c7a'}]}>Inspection history / new repeat</Text></TouchableOpacity> : null}
-        <EquipmentReferenceDocumentsPanel projectId={projectId} areaId={areaId} equipmentId={equipmentId} role={userRole} />
+        <View style={styles.inspectionActions}>
+          <TouchableOpacity accessibilityRole="button" onPress={onInspect} style={styles.primaryButton}>
+            <Text style={styles.primaryText}>{actionLabel}</Text>
+          </TouchableOpacity>
+          {onStartActivity && <TouchableOpacity accessibilityRole="button" onPress={onStartActivity} style={styles.secondaryButton}>
+            <Text style={styles.secondaryText}>Inspection history / new repeat</Text>
+          </TouchableOpacity>}
+        </View>
       </View>
     </ScrollView>
   );
 }
 
-function Detail({label, value}: {label: string; value?: string | null}) {
-  return (
-    <View style={styles.detailItem}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value || 'Not set'}</Text>
-    </View>
-  );
+function createStyles(dark: boolean) {
+  const c = dark ? OPERATIONS_DARK : LIGHT;
+  return StyleSheet.create({
+    screen: {flex: 1, backgroundColor: c.bg},
+    content: {padding: 16, paddingBottom: 48, gap: 14, maxWidth: 1600, width: '100%', alignSelf: 'center'},
+    backButton: {alignSelf: 'flex-start', justifyContent: 'center', minHeight: 40},
+    backText: {color: dark ? c.cyan : c.indigo, fontWeight: '800', fontSize: 14},
+    header: {minHeight: 150, backgroundColor: '#052337', borderWidth: 1, borderColor: '#158ba3', borderRadius: 16, padding: 20, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, overflow: 'hidden'},
+    heroPhoto: {position: 'absolute', right: 0, width: '72%', height: '100%', opacity: Platform.OS === 'web' ? 1 : 0.28},
+    heroRow: {flexDirection: 'row', flexGrow: 1, flexShrink: 1, alignItems: 'center', gap: 14, minWidth: 210},
+    sequenceBox: {minWidth: 48, paddingHorizontal: 8, height: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#74edf5'},
+    sequence: {fontSize: 20, color: '#092331', fontWeight: '900'},
+    headerCopy: {flex: 1},
+    eyebrow: {fontSize: 11, color: '#64edf7', fontWeight: '800', letterSpacing: 1.4},
+    title: {fontSize: 32, color: '#fff', fontWeight: '900', marginTop: 3},
+    subtitle: {fontSize: 14, color: '#e0f1fa', marginTop: 4},
+    statusBadge: {backgroundColor: '#0a3148', borderWidth: 1, borderColor: '#4bc8de', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7},
+    statusText: {fontSize: 12, color: '#c5f9ff', fontWeight: '800'},
+    detailsPanel: {backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 15, padding: 18, gap: 12},
+    panelTitle: {fontSize: 20, color: c.text, fontWeight: '800'},
+    detailsGrid: {flexDirection: 'row', flexWrap: 'wrap'},
+    detailItem: {paddingVertical: 11, paddingRight: 14, borderTopWidth: 1, borderTopColor: c.border},
+    detailLabel: {fontSize: 11, color: c.secondary, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4},
+    detailValue: {fontSize: 15, color: c.text, fontWeight: '700', marginTop: 4},
+    qcNotice: {borderLeftWidth: 3, borderLeftColor: c.critical, backgroundColor: dark ? '#392335' : '#fff4f1', borderRadius: 6, padding: 14},
+    qcNoticeTitle: {fontSize: 14, color: c.critical, fontWeight: '800'},
+    qcNoticeText: {fontSize: 14, color: c.text, lineHeight: 20, marginTop: 5},
+    qcSeverity: {fontSize: 12, color: c.critical, fontWeight: '700', marginTop: 7},
+    inspectionActions: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
+    state: {flex: 1, minHeight: 350, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center', padding: 24},
+    stateTitle: {fontSize: 20, color: c.text, fontWeight: '800'},
+    stateText: {fontSize: 14, color: c.secondary, textAlign: 'center', marginTop: 10},
+    stateActions: {flexDirection: 'row', gap: 10, marginTop: 18},
+    primaryButton: {minHeight: 44, justifyContent: 'center', backgroundColor: '#58e7f2', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 9},
+    primaryText: {fontSize: 14, color: '#092331', fontWeight: '800'},
+    secondaryButton: {minHeight: 44, justifyContent: 'center', backgroundColor: c.elevated, borderWidth: 1, borderColor: c.borderActive, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 9},
+    secondaryText: {fontSize: 14, color: c.text, fontWeight: '800'},
+  });
 }
 
-const styles = StyleSheet.create({
-  screen: {flex: 1, backgroundColor: '#f7f9ff'},
-  content: {padding: 24, paddingBottom: 48, maxWidth: 1050, width: '100%', alignSelf: 'center'},
-  backButton: {alignSelf: 'flex-start', paddingVertical: 8, marginBottom: 8},
-  backText: {color: '#8fa7f8', fontWeight: '800', fontSize: 13},
-  header: {minHeight: 140, backgroundColor: '#242d52', borderRadius: 8, padding: 22, flexDirection: 'row', alignItems: 'center', gap: 16},
-  sequenceBox: {width: 54, height: 54, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#b8a5f8'},
-  sequence: {fontSize: 22, color: '#242d52', fontWeight: '900'},
-  headerCopy: {flex: 1},
-  eyebrow: {fontSize: 10, color: '#b8a5f8', fontWeight: '800'},
-  title: {fontSize: 25, color: '#fff', fontWeight: '800', marginTop: 5},
-  subtitle: {fontSize: 12, color: '#dfe6ff', marginTop: 6},
-  statusBadge: {backgroundColor: '#f0eeff', borderRadius: 14, paddingHorizontal: 11, paddingVertical: 7},
-  statusText: {fontSize: 11, color: '#566dbd', fontWeight: '800'},
-  detailsPanel: {marginTop: 16, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e9f6', borderRadius: 8, padding: 22},
-  panelTitle: {fontSize: 16, color: '#242d52', fontWeight: '800', marginBottom: 18},
-  detailsGrid: {flexDirection: 'row', flexWrap: 'wrap', rowGap: 20},
-  detailItem: {width: '50%', minWidth: 170, paddingRight: 16},
-  detailLabel: {fontSize: 10, color: '#9296a6', fontWeight: '800', textTransform: 'uppercase'},
-  detailValue: {fontSize: 13, color: '#343851', fontWeight: '700', marginTop: 5},
-  qcNotice: {marginTop: 22, borderLeftWidth: 3, borderLeftColor: '#ba4e3c', backgroundColor: '#fff4f1', padding: 14},
-  qcNoticeTitle: {fontSize: 12, color: '#9b3d30', fontWeight: '800'},
-  qcNoticeText: {fontSize: 12, color: '#5c4c49', lineHeight: 18, marginTop: 5},
-  qcSeverity: {fontSize: 11, color: '#9b3d30', fontWeight: '700', marginTop: 7},
-  inspectButton: {alignSelf: 'flex-start', minHeight: 44, marginTop: 22, paddingHorizontal: 20, borderRadius: 7, backgroundColor: '#b8a5f8', alignItems: 'center', justifyContent: 'center'},
-  inspectButtonText: {fontSize: 13, color: '#242d52', fontWeight: '800'},
-  state: {flex: 1, minHeight: 400, backgroundColor: '#f7f9ff', alignItems: 'center', justifyContent: 'center', padding: 28},
-  stateTitle: {fontSize: 17, color: '#242d52', fontWeight: '800'},
-  stateText: {fontSize: 13, color: '#7d8192', textAlign: 'center', marginTop: 10},
-  stateActions: {flexDirection: 'row', gap: 10, marginTop: 18},
-  primaryButton: {backgroundColor: '#b8a5f8', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 7},
-  primaryText: {fontSize: 12, color: '#242d52', fontWeight: '800'},
-  secondaryButton: {backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9dce8', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 7},
-  secondaryText: {fontSize: 12, color: '#424760', fontWeight: '800'},
-});
+const darkStyles = createStyles(true);
+const lightStyles = createStyles(false);

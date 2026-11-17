@@ -2,6 +2,7 @@ import {useEffect, useState} from 'react';
 import {Platform, useColorScheme} from 'react-native';
 
 export type ThemeMode = 'light' | 'dark';
+export const DEFAULT_THEME_MODE: ThemeMode = 'dark';
 
 /** Same key App.tsx uses for the rest of the web app. */
 export const THEME_STORAGE_KEY = 'exsurvey-theme';
@@ -43,7 +44,7 @@ export function setThemeMode(mode: ThemeMode) {
 
 /**
  * Resolves the active theme: the person's choice (toggle) wins, then an
- * explicit `preferred` mode, then the device / browser setting.
+ * explicit `preferred` mode, then the default. System mode is opt-in.
  */
 export function useThemeMode(preferred?: ThemeMode | 'system'): ThemeMode {
   const system = useColorScheme();
@@ -64,5 +65,5 @@ export function useThemeMode(preferred?: ThemeMode | 'system'): ThemeMode {
   if (preferred === 'light' || preferred === 'dark') {
     return preferred;
   }
-  return system === 'dark' ? 'dark' : 'light';
+  return preferred === 'system' ? (system === 'dark' ? 'dark' : 'light') : DEFAULT_THEME_MODE;
 }

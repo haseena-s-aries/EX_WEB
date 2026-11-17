@@ -243,7 +243,8 @@
 
 
 
-import React, {useEffect, useState} from 'react';
+import React, {useEffect} from 'react';
+import {useThemeMode} from './src/theme/useThemeMode';
 import {Platform, StyleSheet, View} from 'react-native';
 import AppNavigator from './src/navigation/AppNavigator';
 
@@ -420,20 +421,8 @@ function collectDarkRules(): string {
   return rules.join('\n');
 }
 
-function getInitialTheme(): ThemeMode {
-  if (Platform.OS !== 'web' || typeof window === 'undefined') return 'light';
-  try {
-    return window.localStorage.getItem('exsurvey-theme') === 'dark' ? 'dark' : 'light';
-  } catch {
-    return 'light';
-  }
-}
-
 export default function App() {
-  // The theme is switched from the sun/moon button on the login screen
-  // (LoginScreen writes 'exsurvey-theme', sets the data attribute and fires
-  // 'exsurvey-theme-change'); this component only keeps the dark CSS in sync.
-  const [theme] = useState<ThemeMode>(getInitialTheme);
+  const theme = useThemeMode();
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;

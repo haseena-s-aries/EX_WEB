@@ -1,4 +1,7 @@
 {
   "name": "ExSurveyApp",
-  "displayName": "ExSurveyApp"
+  "displayName": "ExSurveyApp",
+  "android": {
+    "package": "com.anonymous.exsurveyapp"
+  }
 }

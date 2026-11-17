@@ -1,6 +1,19 @@
+import {onProjectChanged} from '../api/projectChanges';
+import ProjectCompanyLogo from '../components/ProjectCompanyLogo';
+import {typography} from '../theme/typography';
+import AuthenticatedImage from '../components/AuthenticatedImage';
+import {OPERATIONS_DARK} from '../theme/operationsPalette';
+import {visual} from '../theme/visual';
+import {projectDisplay} from '../utils/projectDisplay';
+import EquipmentInspectionScreen from './EquipmentInspectionScreen';
+import CategoryInspectionEntryScreen from './CategoryInspectionEntryScreen';
+import InspectionActivityScreen from './InspectionActivityScreen';
+import {getAssignedInspectionDrafts, AssignedInspectionDraft, getAssignedInspectionTasks, AssignedInspectionTask} from '../api/projects';
+import useNativeNavigation from '../navigation/useNativeNavigation';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
+  Image,
   Platform,
   RefreshControl,
   ScrollView,
@@ -14,15 +27,18 @@ import {
 import {getApiErrorMessage} from '../api/errors';
 import {
   getSurveyorDashboard,
+  getSurveyorProject,
   getSurveyorProjects,
   projectStatusLabel,
   SurveyorDashboard,
   SurveyorProjectSummary,
   SurveyorQcFeedback,
 } from '../api/projects';
-import ThemeToggle from '../components/ThemeToggle';
 import {useThemeMode} from '../theme/useThemeMode';
-import {Colors, DARK, LIGHT, tint} from '../theme/palette';
+import {Colors, LIGHT, tint} from '../theme/palette';
+
+const SURVEYOR_HERO = require('../assets/landing/industry-9.jpg');
+const OFFSHORE_ART = require('../assets/landing/industry-3.jpg');
 
 const web = (style: object) => Platform.select({web: style, default: {}}) as object;
 
@@ -31,6 +47,7 @@ type Props = {
   onProjectPress: (projectId: string) => void;
   onFeedbackPress: (feedback: SurveyorQcFeedback) => void;
   refreshVersion?: number;
+  accessory?: React.ReactNode;
 };
 
 const VISIBLE_PROJECTS = 6;
@@ -59,14 +76,21 @@ export default function SurveyorDashboardScreen({
   onProjectPress,
   onFeedbackPress,
   refreshVersion,
+  accessory,
 }: Props) {
+  const navigation = useNativeNavigation();
   const mode = useThemeMode();
   const dark = mode === 'dark';
-  const c = dark ? DARK : LIGHT;
+  const c = dark ? OPERATIONS_DARK : LIGHT;
   const s = useMemo(() => makeStyles(c), [c]);
   const {width} = useWindowDimensions();
   const isWide = width >= 900;
 
+  const [drafts, setDrafts] = useState<AssignedInspectionDraft[]>([]);
+  const [pendingTasks, setPendingTasks] = useState<AssignedInspectionTask[]>([]);
+  const [draftError, setDraftError] = useState('');
+  const [activeDraft, setActiveDraft] = useState<AssignedInspectionDraft>();
+  const [legacyDraft, setLegacyDraft] = useState(false);
   const [projects, setProjects] = useState<SurveyorProjectSummary[]>([]);
   const [dashboard, setDashboard] = useState<SurveyorDashboard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,6 +110,13 @@ export default function SurveyorDashboardScreen({
       ]);
       setProjects(projectsResponse.data);
       setDashboard(dashboardResponse.data);
+      setDraftError('');
+      try {
+        const [draftResponse, taskResponse] = await Promise.all([getAssignedInspectionDrafts(), getAssignedInspectionTasks()]);
+        setDrafts(draftResponse.data);
+        setPendingTasks(taskResponse.data);
+      }
+      catch (e) {setDraftError(getApiErrorMessage(e, 'Could not load assigned project drafts.'));}
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, 'Could not load assigned projects.'));
     } finally {
@@ -94,9 +125,11 @@ export default function SurveyorDashboardScreen({
     }
   }, []);
 
+  useEffect(() => onProjectChanged(() => {void loadProjects(true);}), [loadProjects]);
   useEffect(() => {
     loadProjects();
   }, [loadProjects, refreshVersion]);
+  useEffect(() => navigation?.addListener('focus', () => void loadProjects(true)), [navigation, loadProjects]);
 
   // ---- derived view state -------------------------------------------------
   const statusCounts = useMemo(() => {
@@ -114,7 +147,7 @@ export default function SurveyorDashboardScreen({
     return projects.filter(p => {
       if (statusFilter !== 'All' && projectStatus(p) !== statusFilter) return false;
       if (!q) return true;
-      return [p.projectName, p.location, p.jobNo, p.sector, p.vesselOrSiteName]
+      return [p.projectName, p.location, p.jobNo, p.vesselOrSiteName]
         .filter(Boolean)
         .some(v => String(v).toLowerCase().includes(q));
     });
@@ -132,18 +165,29 @@ export default function SurveyorDashboardScreen({
       ]
     : [];
 
+  if (activeDraft) {
+    const back = () => {setActiveDraft(undefined); setLegacyDraft(false); void loadProjects(true);};
+    if (activeDraft.isLegacy) return <EquipmentInspectionScreen projectId={activeDraft.projectId} equipmentId={activeDraft.equipmentId}
+      onBack={back} onSaved={() => void loadProjects(true)} />;
+    if (activeDraft.grade || legacyDraft) return <InspectionActivityScreen equipmentId={activeDraft.equipmentId}
+      activityId={activeDraft.grade ? activeDraft.id : undefined} role="Surveyor" onBack={back} />;
+    return <CategoryInspectionEntryScreen project={activeDraft.projectId} item={activeDraft.equipmentId}
+      initialDraft={activeDraft} onBack={back} onSaved={() => void loadProjects(true)} onLegacy={() => setLegacyDraft(true)} />;
+  }
   return (
-    <ScrollView
+    <ScrollView nativeID="ex-surveyor-operations"
       style={s.screen}
       contentContainerStyle={[s.content, isWide && s.contentWide]}
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadProjects(true)} tintColor={c.amber} />}>
-      {/* top row: theme toggle only, same as the admin dashboard */}
-      <View style={s.profileRow}>
-        <View style={{flex: 1}} />
-        <ThemeToggle floating={false} size={34} />
+      {!!accessory && <View style={{alignItems: 'flex-end'}}>{accessory}</View>}
+      <View nativeID="ex-surveyor-hero" style={s.hero}>
+        <Image nativeID="ex-surveyor-hero-photo" source={SURVEYOR_HERO} resizeMode="cover" style={s.heroPhoto} accessible={false} />
+        <View nativeID="ex-operations-hero-overlay" pointerEvents="none" style={[StyleSheet.absoluteFill, Platform.OS !== 'web' && {backgroundColor: '#03192C88'}]} />
+        <Text style={s.heroKicker}>FIELD DESK  /  SURVEYOR</Text>
+        <Text accessibilityRole="header" style={s.heroTitle}>Survey <Text style={s.heroAccent}>Workspace</Text></Text>
+        <Text style={s.heroDescription}>Assigned projects, saved inspection drafts and quality review feedback.</Text>
       </View>
-
       {loading ? (
         <View style={s.loadingBox}>
           <ActivityIndicator color={c.amber} />
@@ -159,10 +203,36 @@ export default function SurveyorDashboardScreen({
         </View>
       ) : (
         <>
+          <View nativeID="ex-surveyor-drafts" style={s.panel}>
+            <Text accessibilityRole="header" style={s.sectionTitle}><Text style={s.sectionIcon}>▱  </Text>Assigned Project Drafts</Text>
+            {!!draftError && <Text accessibilityRole="alert" style={{color: c.critical}}>{draftError}</Text>}
+            {!draftError && drafts.length === 0 && <Text style={s.stateText}>No saved drafts for your assigned projects.</Text>}
+            {drafts.map(draft => <View key={draft.id} style={s.draftRow}>
+              <View style={s.draftDetails}>
+                <ProjectCompanyLogo projectId={draft.projectId} version={draft} style={s.thumbnail} />
+                <View style={s.flexText}>
+                  <Text style={s.projectName}>{projectDisplay(draft.projectName)} · {draft.tagNumber}</Text>
+                  <Text style={s.projectLoc}>{draft.reviewStatus} · {draft.answered}/{draft.total} checkpoints · {new Date(draft.updatedAt).toLocaleString()} · {draft.lastUpdatedBy || 'Unknown'}</Text>
+                </View>
+              </View>
+              <TouchableOpacity accessibilityRole="button" style={s.primaryBtn} onPress={() => setActiveDraft(draft)}>
+                <Text style={s.primaryBtnText}>Continue Inspection</Text>
+                <Text style={s.primaryBtnText} accessible={false}>›</Text>
+              </TouchableOpacity>
+            </View>)}
+          </View>
+          {pendingTasks.length > 0 && <View style={s.panel}>
+            <Text accessibilityRole="header" style={s.stateTitle}>Pending Inspection Tasks</Text>
+            {pendingTasks.map(task => <TouchableOpacity key={task.id} accessibilityRole="button" onPress={() => onProjectPress?.(task.projectId)}
+              style={{backgroundColor: c.elevated, padding: 10}}>
+              <Text style={{color: c.text, fontWeight: '700'}}>{projectDisplay(task.projectName)} · {task.tagNumber}</Text>
+              <Text style={{color: c.muted}}>{task.plannedGrade || 'Inspection'} · {task.statusCode}{task.scheduledAt ? ` · ${new Date(task.scheduledAt).toLocaleDateString()}` : ''}</Text>
+            </TouchableOpacity>)}
+          </View>}
           {/* KPI cards */}
           {dashboard ? (
-            <View style={s.kpiGrid}>
-              <View style={[s.kpiCard, isWide ? s.kpiCardWide : s.kpiCardNarrow]}>
+            <View nativeID="ex-surveyor-kpis" style={s.kpiGrid}>
+              <View style={[s.kpiCard, isWide ? s.kpiCardWide : s.kpiCardNarrow, {borderColor: tint(c.cyan, '80')}]}>
                 <View style={[s.iconBox, {backgroundColor: tint(c.cyan, '1F')}]}>
                   <Text style={[s.iconGlyph, {color: c.cyan}]}>▤</Text>
                 </View>
@@ -173,7 +243,7 @@ export default function SurveyorDashboardScreen({
                 </View>
               </View>
 
-              <View style={[s.kpiCard, isWide ? s.kpiCardWide : s.kpiCardNarrow, actionRequired > 0 && {backgroundColor: tint(c.critical, '14'), borderColor: tint(c.critical, '44')}]}>
+              <View style={[s.kpiCard, isWide ? s.kpiCardWide : s.kpiCardNarrow, {borderColor: tint(c.critical, '80')}]}>
                 <View style={[s.iconBox, {backgroundColor: tint(c.critical, '24')}]}>
                   <Text style={[s.iconGlyph, {color: c.critical}]}>⚠</Text>
                 </View>
@@ -184,7 +254,7 @@ export default function SurveyorDashboardScreen({
                 </View>
               </View>
 
-              <View style={[s.kpiCard, isWide ? s.kpiCardWide : s.kpiCardNarrow]}>
+              <View style={[s.kpiCard, isWide ? s.kpiCardWide : s.kpiCardNarrow, {borderColor: tint(c.amber, '80')}]}>
                 <View style={[s.iconBox, {backgroundColor: tint(c.amber, '22')}]}>
                   <Text style={[s.iconGlyph, {color: c.amber}]}>◷</Text>
                 </View>
@@ -195,7 +265,7 @@ export default function SurveyorDashboardScreen({
                 </View>
               </View>
 
-              <View style={[s.kpiCard, isWide ? s.kpiCardWide : s.kpiCardNarrow]}>
+              <View style={[s.kpiCard, isWide ? s.kpiCardWide : s.kpiCardNarrow, {borderColor: tint(c.success, '80')}]}>
                 <View style={[s.iconBox, {backgroundColor: tint(c.success, '22')}]}>
                   <Text style={[s.iconGlyph, {color: c.success}]}>✓</Text>
                 </View>
@@ -210,22 +280,21 @@ export default function SurveyorDashboardScreen({
 
           {/* QC feedback */}
           {dashboard ? (
-            <>
-              <View style={s.sectionHeading}>
-                <View style={{flex: 1}}>
-                  <Text style={s.sectionTitle}>QC feedback</Text>
+            <View nativeID="ex-surveyor-feedback" style={s.panel}>
+              <View style={feedback.length === 0 ? s.feedbackSummary : undefined}>
+                <View style={s.flexText}>
+                  <Text accessibilityRole="header" style={s.sectionTitle}><Text style={s.sectionIcon}>▣  </Text>QC Feedback</Text>
                   <Text style={s.sectionHint}>
                     {feedback.length ? `${feedback.length} ${feedback.length === 1 ? 'item' : 'items'} returned for correction` : 'Equipment returned for correction'}
                   </Text>
                 </View>
-              </View>
               {feedback.length === 0 ? (
                 <View style={s.clearNote}>
                   <View style={[s.chipDot, {backgroundColor: c.success}]} />
                   <Text style={s.clearNoteText}>Nothing to correct. QC feedback that needs action will show here.</Text>
                 </View>
               ) : (
-                <View style={[s.cardGrid, isWide && s.cardGridWide, s.sectionGap]}>
+                <View style={[s.cardGrid, isWide && s.cardGridWide]}>
                   {feedback.map(f => {
                     const sev = severityColor(c, f.severity);
                     return (
@@ -247,7 +316,7 @@ export default function SurveyorDashboardScreen({
                             </View>
                           </View>
                           <Text style={s.projectLoc} numberOfLines={1}>
-                            {[f.projectName, f.areaName, f.type].filter(Boolean).join('  •  ')}
+                            {[projectDisplay(f.projectName), projectDisplay(f.areaName), f.type].filter(Boolean).join('  •  ')}
                           </Text>
                           <Text style={s.comment} numberOfLines={3}>{f.qcComments || 'QC requested changes.'}</Text>
                           <View style={s.feedbackFoot}>
@@ -260,13 +329,15 @@ export default function SurveyorDashboardScreen({
                   })}
                 </View>
               )}
-            </>
+              </View>
+            </View>
           ) : null}
 
           {/* projects */}
+          <View style={s.panel}>
           <View style={s.sectionHeading}>
             <View style={{flex: 1}}>
-              <Text style={s.sectionTitle}>Active Site Operations</Text>
+              <Text accessibilityRole="header" style={s.sectionTitle}><Text style={s.sectionIcon}>▱  </Text>Active Site Operations</Text>
               <Text style={s.sectionHint}>
                 {filtered.length === projects.length ? `${projects.length} total` : `${filtered.length} of ${projects.length} projects`}
               </Text>
@@ -278,6 +349,7 @@ export default function SurveyorDashboardScreen({
               <View style={[s.search, isWide && {width: 300}]}>
                 <Text style={s.searchIcon}>⌕</Text>
                 <TextInput
+                  accessibilityLabel="Search assigned projects"
                   value={query}
                   onChangeText={setQuery}
                   placeholder="Search project, location or job no."
@@ -301,10 +373,10 @@ export default function SurveyorDashboardScreen({
                       accessibilityRole="button"
                       accessibilityState={{selected: on}}
                       onPress={() => {setStatusFilter(f); setShowAll(false);}}
-                      style={[s.chip, on && {backgroundColor: c.text, borderColor: c.text}]}>
+                      style={[s.chip, on && s.selectedChip]}>
                       {f !== 'All' ? <View style={[s.chipDot, {backgroundColor: statusColor(c, f)}]} /> : null}
-                      <Text style={[s.chipText, on && {color: c.bg}]}>{f}</Text>
-                      <Text style={[s.chipCount, on && {color: c.bg, opacity: 0.7}]}>{n}</Text>
+                      <Text style={[s.chipText, on && s.selectedChipText]}>{f}</Text>
+                      <Text style={[s.chipCount, on && s.selectedChipText]}>{n}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -336,27 +408,25 @@ export default function SurveyorDashboardScreen({
                     <TouchableOpacity
                       key={project.projectId}
                       accessibilityRole="button"
-                      accessibilityLabel={`Open ${project.projectName}`}
+                      accessibilityLabel={`Open ${project.projectName}${project.isTransferred ? ' · Transferred' : ''}`}
                       onPress={() => onProjectPress(project.projectId)}
                       activeOpacity={0.75}
                       style={[s.projectCard, isWide && s.cardWide, web({cursor: 'pointer'})]}>
+                      <ProjectCompanyLogo projectId={project.projectId} version={project} style={s.thumbnail} />
                       <View style={{flex: 1, minWidth: 0}}>
-                        <Text style={s.projectName} numberOfLines={2}>{project.projectName}</Text>
+                        <Text style={s.projectName} numberOfLines={2}>{projectDisplay(project.projectName)}{project.isTransferred ? ' · Transferred' : ''}</Text>
                         <Text style={s.projectLoc} numberOfLines={1}>
-                          {[project.location, project.vesselOrSiteName].filter(Boolean).join('  •  ') || 'Location not set'}
+                          {[projectDisplay(project.location), projectDisplay(project.vesselOrSiteName)].filter(Boolean).join('  •  ') || 'Location not set'}
                         </Text>
+                        <Text style={s.projectLoc}>Report: {project.reportStatus || 'Ongoing'}</Text>
+                        {!!project.schedule && <Text style={[s.projectLoc, {color: project.schedule.status === 'Overdue' ? c.critical : project.schedule.status === 'Delay Expected' ? c.amber : project.schedule.status === 'On Track' ? c.success : c.secondary}]}>{project.schedule.status}{project.schedule.delayDays > 0 ? ` · ${project.schedule.delayDays} calendar days` : ''}</Text>}
                         <View style={s.badgeRow}>
                           <View style={[s.badge, {backgroundColor: tint(sc, '26')}]}>
                             <Text style={[s.badgeText, {color: sc}]}>{status.toUpperCase()}</Text>
                           </View>
-                          {project.sector ? (
-                            <View style={[s.badge, {backgroundColor: c.elevated}]}>
-                              <Text style={[s.badgeText, {color: c.secondary}]}>{project.sector}</Text>
-                            </View>
-                          ) : null}
                           {project.jobNo ? (
                             <View style={[s.badge, {backgroundColor: c.elevated}]}>
-                              <Text style={[s.badgeText, {color: c.secondary}]}>{project.jobNo}</Text>
+                              <Text style={[s.badgeText, {color: c.secondary}]}>{projectDisplay(project.jobNo)}</Text>
                             </View>
                           ) : null}
                         </View>
@@ -377,6 +447,7 @@ export default function SurveyorDashboardScreen({
               ) : null}
             </View>
           )}
+          </View>
         </>
       )}
     </ScrollView>
@@ -393,12 +464,24 @@ function makeStyles(c: Colors) {
   const radius = 16;
   return StyleSheet.create({
     screen: {flex: 1, backgroundColor: c.bg},
-    content: {padding: 16, paddingBottom: 40, width: '100%', alignSelf: 'stretch'},
-    contentWide: {padding: 32, paddingBottom: 48},
-
-    profileRow: {flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16},
-
-    kpiGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16},
+    content: {padding: 14, paddingBottom: 32, width: '100%', alignSelf: 'stretch', gap: 14},
+    contentWide: {paddingHorizontal: 22},
+    hero: {minHeight: 165, padding: 22, borderRadius: 18, borderWidth: 1, borderColor: '#137E98',
+      backgroundColor: '#03192C', overflow: 'hidden', justifyContent: 'center', gap: 6},
+    heroPhoto: {position: 'absolute', width: '83%', height: '100%', right: 0},
+    heroKicker: {color: '#00D9EE', fontFamily: visual.mono, fontSize: 11, fontWeight: '800', letterSpacing: 2},
+    heroTitle: {...typography.page, color: '#F5FAFF', fontStyle: 'italic', },
+    heroAccent: {color: '#00D9EE'},
+    heroDescription: {color: '#F5FAFF', fontSize: 14, lineHeight: 21, maxWidth: 490},
+    panel: {padding: 16, gap: 10, borderWidth: 1, borderColor: c.border, borderRadius: radius, backgroundColor: c.card, minWidth: 0},
+    sectionIcon: {color: c.cyan, fontSize: 22},
+    draftRow: {flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: 10,
+      borderWidth: 1, borderColor: c.border, borderRadius: 13, backgroundColor: c.elevated},
+    draftDetails: {flexDirection: 'row', flexGrow: 1, flexShrink: 1, flexBasis: 350, minWidth: 0, alignItems: 'center', gap: 14},
+    flexText: {flex: 1, minWidth: 0},
+    thumbnail: {width: 72, height: 62, borderRadius: 9},
+    feedbackSummary: {flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12},
+    kpiGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 12},
     kpiCard: {flexGrow: 1, flexBasis: '46%', flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 14, padding: 14, minHeight: 104, ...web({boxShadow: c.shadow})},
     kpiCardWide: {flexGrow: 1, flexShrink: 1, flexBasis: 220},
     // phone: stack the icon above the text so labels and footers get the full card width
@@ -407,18 +490,18 @@ function makeStyles(c: Colors) {
     iconGlyph: {fontSize: 24},
     kpiBody: {alignSelf: 'stretch', flexShrink: 1, minWidth: 0},
     kpiLabel: {color: c.text, fontSize: 13, fontWeight: '700'},
-    kpiValue: {color: c.text, fontSize: 30, fontWeight: '900', marginTop: 2},
+    kpiValue: {...typography.kpi, color: c.text, marginTop: 2},
     kpiFoot: {color: c.secondary, fontSize: 12, marginTop: 2},
 
     cardGrid: {gap: 12},
     cardGridWide: {flexDirection: 'row', flexWrap: 'wrap'},
-    cardWide: {flexGrow: 1, flexShrink: 1, flexBasis: 460},
-    projectCard: {flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 14, padding: 16, ...web({boxShadow: c.shadow})},
+    cardWide: {flexGrow: 1, flexShrink: 1, flexBasis: 375},
+    projectCard: {flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.elevated, borderWidth: 1, borderColor: c.border, borderRadius: 14, padding: 12, ...web({boxShadow: c.shadow})},
     feedbackCard: {alignItems: 'flex-start', borderLeftWidth: 3, borderLeftColor: c.critical},
-    projectLoc: {color: c.secondary, fontSize: 12.5, marginTop: 4},
+    projectLoc: {color: c.secondary, fontSize: 13, lineHeight: 19, marginTop: 4},
     badgeRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10},
     badge: {borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4},
-    badgeText: {fontSize: 10.5, fontWeight: '800', letterSpacing: 0.3},
+    badgeText: {...typography.badge, },
     projectRight: {alignItems: 'flex-end'},
     areaCount: {color: c.text, fontSize: 22, fontWeight: '900'},
     areaLabel: {color: c.muted, fontSize: 9.5, fontWeight: '800', letterSpacing: 1},
@@ -427,13 +510,14 @@ function makeStyles(c: Colors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
-      backgroundColor: c.amber,
-      borderRadius: 10,
-      height: 42,
+      backgroundColor: c.cyan,
+      borderRadius: 22,
+      minHeight: 44,
+      justifyContent: 'center',
       paddingHorizontal: 18,
-      ...web({cursor: 'pointer', boxShadow: `0 6px 18px ${tint(c.amber, '40')}`}),
+      ...web({cursor: 'pointer', boxShadow: '0 0 16px #00D9EE38'}),
     },
-    primaryBtnText: {color: c.onAmber, fontSize: 14, fontWeight: '800'},
+    primaryBtnText: {color: c.bg === LIGHT.bg ? '#FFFFFF' : '#03192C', fontSize: 14, fontWeight: '800'},
     ghostBtn: {marginTop: 16, borderWidth: 1, borderColor: c.borderActive, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9},
     ghostBtnText: {color: c.text, fontSize: 13, fontWeight: '700'},
 
@@ -457,16 +541,15 @@ function makeStyles(c: Colors) {
     metricNarrow: {width: '50%'},
     dividerLeft: {borderLeftWidth: 1, borderLeftColor: c.border},
     dividerBottom: {borderBottomWidth: 1, borderBottomColor: c.border},
-    metricLabel: {color: c.secondary, fontSize: 12.5, fontWeight: '700'},
-    metricValue: {color: c.text, fontSize: 34, fontWeight: '800', letterSpacing: -1, marginTop: 6, fontVariant: ['tabular-nums']},
+    metricLabel: {...typography.label, color: c.secondary, },
+    metricValue: {...typography.kpi, color: c.text, marginTop: 6, },
     metricFoot: {color: c.muted, fontSize: 12, lineHeight: 16, marginTop: 6},
     track: {flexDirection: 'row', height: 5, borderRadius: 3, overflow: 'hidden', backgroundColor: c.elevated, marginTop: 10, gap: 2},
 
     // sections
-    sectionHeading: {flexDirection: 'row', alignItems: 'flex-end', marginBottom: 14, gap: 12},
-    sectionTitle: {color: c.text, fontSize: 20, fontWeight: '800'},
+    sectionHeading: {flexDirection: 'row', alignItems: 'flex-end', gap: 12},
+    sectionTitle: {...typography.section, color: c.text, },
     sectionHint: {color: c.muted, fontSize: 12.5, fontWeight: '600', marginTop: 3},
-    sectionGap: {marginBottom: 30},
     clearNote: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -476,13 +559,14 @@ function makeStyles(c: Colors) {
       borderRadius: 12,
       borderWidth: 1,
       borderColor: c.border,
-      backgroundColor: c.card,
-      marginBottom: 30,
+      backgroundColor: c.elevated,
+      flexGrow: 1,
+      flexBasis: 360,
     },
     clearNoteText: {flex: 1, color: c.secondary, fontSize: 13},
 
     // toolbar
-    toolbar: {gap: 10, marginBottom: 14},
+    toolbar: {gap: 10},
     toolbarWide: {flexDirection: 'row', alignItems: 'center', gap: 14},
     search: {
       flexDirection: 'row',
@@ -512,6 +596,8 @@ function makeStyles(c: Colors) {
       ...web({cursor: 'pointer'}),
     },
     chipDot: {width: 7, height: 7, borderRadius: 4},
+    selectedChip: {backgroundColor: c.cyan, borderColor: c.cyan},
+    selectedChipText: {color: c.bg === LIGHT.bg ? '#FFFFFF' : '#03192C'},
     chipText: {color: c.text, fontSize: 12.5, fontWeight: '700'},
     chipCount: {color: c.muted, fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums']},
 
@@ -523,7 +609,7 @@ function makeStyles(c: Colors) {
     feedbackRow: {alignItems: 'flex-start', paddingVertical: 16},
     rowDivider: {borderTopWidth: 1, borderTopColor: c.border},
     rail: {position: 'absolute', left: 0, top: 14, bottom: 14, width: 3, borderTopRightRadius: 3, borderBottomRightRadius: 3},
-    projectName: {color: c.text, fontSize: 16, fontWeight: '800', flexShrink: 1},
+    projectName: {...typography.card, color: c.text, flexShrink: 1},
     projectMeta: {color: c.secondary, fontSize: 12.5, marginTop: 3},
     seq: {color: c.muted, fontWeight: '600'},
     feedbackTop: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12},
@@ -546,7 +632,7 @@ function makeStyles(c: Colors) {
     areasLabel: {color: c.muted, fontSize: 11, fontWeight: '600'},
     chevron: {color: c.muted, fontSize: 24},
     showMore: {alignItems: 'center', paddingVertical: 14},
-    link: {color: c.amber, fontSize: 13, fontWeight: '800'},
+    link: {color: c.cyan, fontSize: 13, fontWeight: '800'},
 
     stateBox: {minHeight: 220, backgroundColor: c.card, borderRadius: radius, alignItems: 'center', justifyContent: 'center', padding: 32, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed'},
     stateTitle: {color: c.text, fontSize: 17, fontWeight: '800'},

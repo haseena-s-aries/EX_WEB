@@ -49,7 +49,8 @@ module.exports = {
               stage: webpack.Compilation.PROCESS_ASSETS_STAGE_ADDITIONAL,
             },
             () => {
-              for (const filename of ['config.js', 'web.config']) {
+              for (const filename of ['config.js', 'web.config', 'ex-survey.css', 'ex-landing.css', 'ex-typography.css', 'ex-fieldwork.css', 'manifest.webmanifest', 'fieldwork-icon.svg',
+                'fonts/Montserrat-Variable.ttf', 'fonts/Montserrat-Italic-Variable.ttf', 'fonts/OFL-Montserrat.txt']) {
                 compilation.fileDependencies.add(path.resolve(__dirname, 'public', filename));
                 compilation.emitAsset(filename, new webpack.sources.RawSource(
                   fs.readFileSync(path.resolve(__dirname, 'public', filename)),
@@ -57,6 +58,19 @@ module.exports = {
               }
             },
           );
+        });
+      },
+    },
+    {
+      apply(compiler) {
+        compiler.hooks.thisCompilation.tap('FieldworkOfflineShell', compilation => {
+          compilation.hooks.processAssets.tap({name:'FieldworkOfflineShell',stage:webpack.Compilation.PROCESS_ASSETS_STAGE_REPORT}, () => {
+            if(compiler.options.mode !== 'production') return;
+            const assets = Object.keys(compilation.assets).filter(name => !name.endsWith('.map') && name !== 'web.config');
+            const revision = require('crypto').createHash('sha256').update(assets.map(name => compilation.assets[name].source()).join('')).digest('hex').slice(0,16);
+            const worker = fs.readFileSync(path.resolve(__dirname,'public/fieldwork-worker.js'),'utf8').replace('__REVISION__',revision).replace('__ASSETS__',JSON.stringify(assets));
+            compilation.emitAsset('fieldwork-worker.js',new webpack.sources.RawSource(worker));
+          });
         });
       },
     },

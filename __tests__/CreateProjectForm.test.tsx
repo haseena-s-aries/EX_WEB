@@ -1,6 +1,7 @@
 import React from 'react';
 import Renderer from 'react-test-renderer';
 import { TextInput, TouchableOpacity } from 'react-native';
+import ProjectDateField from '../src/components/ProjectDateField';
 import NewProjectModal from '../src/components/NewProjectModal';
 import { qcAssignmentLabel } from '../src/components/projectAssignmentLabels';
 import { createProject } from '../src/api/projects';
@@ -26,7 +27,7 @@ test('QC label preserves actual names and includes role and reporting Manager', 
     'John — QC — Manager: Not Assigned',
   );
 });
-test('create form uppercases inputs and submits without Client using selected QC id', async () => {
+test('create form preserves input case and submits without Client using selected QC id', async () => {
   const onCreate = jest.fn();
   let renderer!: Renderer.ReactTestRenderer;
   await Renderer.act(async () => {
@@ -63,7 +64,6 @@ test('create form uppercases inputs and submits without Client using selected QC
       'e.g. MV Resolute Annual Inspection',
       'mv resolute annual inspection',
     );
-    input('JOB-2026-0453', 'd343h');
     input('e.g. Rotterdam, Netherlands', 'Australia');
     input('e.g. MV Resolute', 'rig34323');
     input('e.g. Pipe Rack Deck', 'Deck');
@@ -71,19 +71,40 @@ test('create form uppercases inputs and submits without Client using selected QC
     press('Select QC');
   });
   expect(textOf(renderer.root)).toContain('Sumeet — QC — Manager: Marcus');
-  expect(textOf(renderer.root)).toContain('Assign Client (Optional)');
+  expect(textOf(renderer.root)).toContain('Assign Client ID');
+  for (const missingJobNumber of ['', '   ']) {
+    await Renderer.act(async () => {
+      input('JOB-2026-0453', missingJobNumber);
+      press('Create Project');
+    });
+    expect(textOf(renderer.root)).toContain('Job Number is required.');
+    expect(onCreate).not.toHaveBeenCalled();
+  }
+  await Renderer.act(async () => {input('JOB-2026-0453', ' d343h ');});
+  await Renderer.act(async () => {press('Create Project');});
+  expect(textOf(renderer.root)).toContain('Target Date is required.');
+  expect(onCreate).not.toHaveBeenCalled();
+  await Renderer.act(async () => {renderer.root.findByType(ProjectDateField).props.onChange('2026-12-15');});
+
+
   await Renderer.act(async () => {
     press('Create Project');
   });
+  expect(onCreate).not.toHaveBeenCalled();
+  expect(textOf(renderer.root)).toContain('Client Company Name is required.');
+  await Renderer.act(async () => {input('Enter Client Company Name / Details', 'Example Client Company');});
+  await Renderer.act(async () => {press('Create Project');});
   expect(onCreate).toHaveBeenCalledWith(
     expect.objectContaining({
-      projectName: 'MV RESOLUTE ANNUAL INSPECTION',
-      jobNumber: 'D343H',
-      location: 'AUSTRALIA',
-      vesselName: 'RIG34323',
+      projectName: 'mv resolute annual inspection',
+      jobNumber: 'd343h',
+      targetDate: '2026-12-15',
+      location: 'Australia',
+      vesselName: 'rig34323',
       surveyorId: 'surveyor',
       qcId: 'qc-user',
       clientId: '',
+      clientName: 'Example Client Company',
     }),
   );
   expect(onCreate.mock.calls[0][0].qcId).not.toBe('manager-user');
@@ -106,7 +127,7 @@ test('API sends null Client without uppercasing user IDs or filenames', () => {
     '/projects',
     expect.objectContaining({
       assignedClientId: null,
-      projectName: 'SITE',
+      projectName: 'site',
       sector: 'Oil & Gas',
       assignedSurveyorId: 'SurveyorId',
       assignedQcId: 'QcId',

@@ -7,9 +7,11 @@ import { PlanViewerProps } from './hazardousAreaPlan';
 export default function HazardousAreaPlanViewer({
   title,
   path,
+  local,
   fileName,
   contentType,
   onClose,
+  onDownload,
 }: PlanViewerProps) {
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
@@ -21,6 +23,10 @@ export default function HazardousAreaPlanViewer({
     contentType === 'application/pdf' ||
     fileName?.toLowerCase().endsWith('.pdf');
   useEffect(() => {
+    if (local) {
+      setUrl(path);
+      return;
+    }
     const abort = new AbortController();
     let objectUrl = '';
     apiClient
@@ -36,14 +42,14 @@ export default function HazardousAreaPlanViewer({
       .catch(requestError => {
         if (!abort.signal.aborted)
           setError(
-            getApiErrorMessage(requestError, 'Could not load the plan.'),
+            getApiErrorMessage(requestError, 'Could not load the file.'),
           );
       });
     return () => {
       abort.abort();
       if (objectUrl) (globalThis as any).URL.revokeObjectURL(objectUrl);
     };
-  }, [path]);
+  }, [path, local]);
   useEffect(() => {
     const element = viewport.current;
     if (!element) return;
@@ -112,6 +118,7 @@ export default function HazardousAreaPlanViewer({
           !pdf && button('Fit to screen', () => setZoom(1)),
           !pdf && button('100% original size', () => setZoom(1 / fit)),
           !pdf && h('span', null, `${Math.round(scale * 100)}%`),
+          onDownload && button('Download', onDownload),
           button('Close', onClose),
         ),
         !url &&

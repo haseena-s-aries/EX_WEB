@@ -34,7 +34,9 @@ export type PlanUploadProps = {
 export type PlanViewerProps = {
   title?: string;
   path: string;
+  local?: boolean;
   fileName?: string | null;
   contentType?: string | null;
   onClose: () => void;
+  onDownload?: () => void;
 };

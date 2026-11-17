@@ -4,7 +4,7 @@ import {Platform, TextInput, TouchableOpacity} from 'react-native';
 import SurveyorAreaDetailsScreen from '../src/screens/SurveyorAreaDetailsScreen';
 import {createSurveyorEquipment, getProjectAreaPhotos, getSurveyorArea, getSurveyorEquipment, updateSurveyorEquipment} from '../src/api/projects';
 
-jest.mock('../src/api/projects', () => ({getSurveyorArea: jest.fn(), getSurveyorEquipment: jest.fn(), getSurveyorEquipmentPhotos: jest.fn().mockResolvedValue({data: []}), getProjectAreaPhotos: jest.fn(), createSurveyorEquipment: jest.fn(), updateSurveyorEquipment: jest.fn(), deleteSurveyorEquipment: jest.fn()}));
+jest.mock('../src/api/projects', () => ({getCommonLayouts: jest.fn().mockResolvedValue({data: []}),getSurveyorArea: jest.fn(), getSurveyorEquipment: jest.fn(), getSurveyorEquipmentPhotos: jest.fn().mockResolvedValue({data: []}), getProjectAreaPhotos: jest.fn(), createSurveyorEquipment: jest.fn(), updateSurveyorEquipment: jest.fn(), deleteSurveyorEquipment: jest.fn()}));
 jest.mock('../src/components/AuthenticatedImage', () => 'AuthenticatedImage');
 jest.mock('../src/components/ZoomableImageViewer', () => 'LayoutViewer');
 jest.mock('../src/components/InspectionPhotoPicker', () => 'InspectionPhotoPicker');
@@ -32,7 +32,7 @@ async function press(text: string) {
   await Renderer.act(async () => {renderer.root.findAllByType(TouchableOpacity).find(node => textOf(node) === text)!.props.onPress({stopPropagation: jest.fn()});});
 }
 async function select(value: string) {
-  await Renderer.act(async () => {renderer.root.findByType('select' as any).props.onChange({target: {value}});});
+  await press('Select equipment type ▾'); await press(value);
 }
 async function add() {
   await press('+ Add Equipment');
@@ -43,9 +43,11 @@ async function add() {
 }
 test('Add requires Type, offers the exact options, and preserves pin coordinates when saving', async () => {
   await open(); await add();
-  const dropdown = renderer.root.findByType('select' as any);
-  expect(dropdown.props.value).toBe('');
-  expect(dropdown.findAllByType('option' as any).map(node => textOf(node))).toEqual(['Select equipment type', 'Transformer', 'Switchgear', 'Circuit Breaker', 'Motor', 'Generator', 'Panel', 'Cable', 'Lighting', 'Outlet', 'Other']);
+  await press('Select equipment type ▾');
+  for (const type of ['Transformer', 'Switchgear', 'Circuit Breaker', 'Motor', 'Generator', 'Panel', 'Cable', 'Lighting', 'Outlet', 'Junction Box', 'Smoke Detector', 'Heat Detector', 'Manual Call Point', 'Temperature Sensor', 'Pressure Transmitter', 'Temperature Transmitter', 'Level Switch', 'Beacons', 'Other']) {
+    expect(renderer.root.findAllByType(TouchableOpacity).some(node => textOf(node) === type)).toBe(true);
+  }
+  await press('Select equipment type ▾');
   await press('Add Equipment');
   expect(createSurveyorEquipment).not.toHaveBeenCalled();
   await select('Transformer'); await press('Add Equipment');
@@ -62,16 +64,14 @@ test('Other requires a custom value and saves it into type', async () => {
 test.each(['Motor', 'UPS System', 'Other'])('Edit restores and retains saved type %s and other equipment fields', async type => {
   (getSurveyorEquipment as jest.Mock).mockResolvedValue({data: [{...equipment, type}]});
   await open(); await press('Edit');
-  expect(renderer.root.findByType('select' as any).props.value).toBe(type === 'UPS System' ? 'Other' : type);
-  if (type !== 'Motor') expect(renderer.root.findAllByType(TextInput).find(node => node.props.placeholder === 'Enter equipment type')!.props.value).toBe(type);
+  expect(textOf(renderer.root)).toContain(type + ' ▾');
   await press('Save Changes');
   expect(updateSurveyorEquipment).toHaveBeenCalledWith('project', 'area', 'equipment', expect.objectContaining({type, tagNumber: equipment.tagNumber, equipmentId: equipment.equipmentId, circuitId: equipment.circuitId, location: equipment.location, manufacturer: equipment.manufacturer, protectionDetails: equipment.protectionDetails, certificateNumber: equipment.certificateNumber, xPercent: 25, yPercent: 50}));
 });
 test('Native dropdown selects a type and saves through the same edit API', async () => {
   Object.defineProperty(Platform, 'OS', {configurable: true, value: 'android'});
   await open(); await press('Edit');
-  await Renderer.act(async () => {renderer.root.findAllByType(TouchableOpacity).find(node => node.props.accessibilityLabel === 'Select equipment type')!.props.onPress();});
-  await Renderer.act(async () => {renderer.root.findAllByType(TouchableOpacity).find(node => node.props.accessibilityLabel === 'Generator')!.props.onPress();});
+  await press('Motor ▾'); await press('Generator');
   await press('Save Changes');
   expect(updateSurveyorEquipment).toHaveBeenCalledWith('project', 'area', 'equipment', expect.objectContaining({type: 'Generator'}));
 });
@@ -84,4 +84,27 @@ test('Registers equipment in an assigned area without a layout pin', async () =>
   await select('Transformer');
   await press('Add Equipment');
   expect(createSurveyorEquipment).toHaveBeenCalledWith('project', 'area', expect.objectContaining({tagNumber: 'NEW-100', type: 'Transformer', isPlacedOnLayout: false, xPercent: 0, yPercent: 0}));
+});
+
+test('Searches and saves custom type and zone, and restores the saved zone in edit', async () => {
+  await open(); await add();
+  await press('Select equipment type ▾');
+  await Renderer.act(async () => {
+    renderer.root.findAllByType(TextInput).find(node => node.props.accessibilityLabel === 'Search Select equipment type')!.props.onChangeText('  custom   sensor  ');
+  });
+  await press('Add Custom Type “custom sensor”');
+  await press('Select or enter verified zone ▾');
+  for (const zone of ['Zone 0', 'Zone 1', 'Zone 2', 'Non Hazardous Area']) {
+    expect(renderer.root.findAllByType(TouchableOpacity).some(node => textOf(node) === zone)).toBe(true);
+  }
+  await Renderer.act(async () => {
+    renderer.root.findAllByType(TextInput).find(node => node.props.accessibilityLabel === 'Search Hazardous Area Zone')!.props.onChangeText('Zone 21');
+  });
+  await press('Add Custom Zone “Zone 21”');
+  await press('Add Equipment');
+  expect(createSurveyorEquipment).toHaveBeenCalledWith('project', 'area', expect.objectContaining({type: 'custom sensor', hazardousAreaZone: 'Zone 21'}));
+  (getSurveyorEquipment as jest.Mock).mockResolvedValue({data: [{...equipment, hazardousAreaZone: 'Zone 21'}]});
+  await Renderer.act(async () => {renderer.unmount();});
+  await open(); await press('Edit');
+  expect(textOf(renderer.root)).toContain('Zone 21 ▾');
 });

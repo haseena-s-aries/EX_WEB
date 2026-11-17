@@ -79,7 +79,7 @@ test('project API keeps JSON without plan and sends multipart only for explicit 
   createProject(data);
   expect(apiClient.post).toHaveBeenLastCalledWith('/projects', {
     ...data,
-    projectName: 'TEST', location: 'DUBAI', vesselOrSiteName: 'SITE',
+    projectName: 'Test', location: 'Dubai', vesselOrSiteName: 'Site',
     status: 'Pending',
     uidNumber: null, documentNumber: null, revision: null, description: null, clientName: null,
   });

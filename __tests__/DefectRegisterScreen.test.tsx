@@ -5,6 +5,11 @@ import DefectRegisterScreen from '../src/screens/DefectRegisterScreen';
 import * as api from '../src/api/projects';
 
 jest.mock('../src/api/projects', () => ({getInspectionDefects: jest.fn(), reportCorrectiveActionRectification: jest.fn(), submitCorrectiveActionVerification: jest.fn(), uploadCorrectiveActionPhoto: jest.fn(), verifyCorrectiveAction: jest.fn()}));
+jest.mock('../src/api/defects', () => ({
+  getRegisterProjects: jest.fn().mockResolvedValue({data:[{id:'assigned',name:'Synthetic'}]}),
+  getRegisterEquipment: jest.fn().mockResolvedValue({data:[]}),
+  getDefects: jest.fn().mockResolvedValue({data:{items:[]}}),
+}));
 jest.mock('../src/components/InspectionPhotoPicker', () => 'InspectionPhotoPicker');
 jest.mock('../src/components/AuthenticatedImage', () => 'AuthenticatedImage');
 const content = (node: Renderer.ReactTestInstance): string => node.children.map(x => typeof x === 'string' ? x : content(x)).join('');
@@ -17,6 +22,7 @@ test('QC reviews a submitted rectification from the defect register', async () =
   (api.verifyCorrectiveAction as jest.Mock).mockResolvedValue({data: {}});
   await Renderer.act(async () => {renderer = Renderer.create(<DefectRegisterScreen role="Qc"/>); await Promise.resolve(); await Promise.resolve();});
   expect(content(renderer.root)).toContain('Seal damaged');
+  await Renderer.act(async () => {renderer.root.findAll(n => n.props.accessibilityRole === 'button' && typeof n.props.onPress === 'function').find(n => content(n) === 'Workflow')!.props.onPress();});
   await Renderer.act(async () => {renderer.root.findAllByType(TouchableOpacity).find(x => content(x) === 'Verify correction')!.props.onPress(); await Promise.resolve(); await Promise.resolve();});
   expect(api.verifyCorrectiveAction).toHaveBeenCalledWith('a1', true, '');
 });

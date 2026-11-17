@@ -4,6 +4,7 @@ import {DefectsResponse, DefectSummary, getDefects} from '../api/defects';
 import {getApiErrorMessage} from '../api/errors';
 import {Colors} from '../theme/palette';
 import ZoomableImageViewer from './ZoomableImageViewer';
+import {projectDisplay} from '../utils/projectDisplay';
 
 const statuses: Record<string, string> = {Open: 'Open', RectificationSubmitted: 'Rectification Submitted', Verified: 'Verified', Closed: 'Closed'};
 const dateLabel = (value?: string | null) => value ? new Date(value).toLocaleString() : 'Not set';
@@ -37,7 +38,7 @@ export default function DefectsModal({onClose, onSummary, c}: {onClose: () => vo
       </View>
       <ScrollView contentContainerStyle={{padding: 20, gap: 12}}>
         {loading ? <ActivityIndicator color={c.indigo} /> : error ? <Text accessibilityRole="alert" style={{color: c.critical}}>{error}</Text> : !data?.items.length ? <Text style={{color: c.muted}}>{openOnly ? 'No open defects' : 'No recorded defects'}</Text> : data.items.map(item => <View key={item.id} style={[styles.finding, {borderColor: c.border}]}>
-          <Text style={{color: c.text, fontSize: 15, fontWeight: '800'}}>{item.projectName} · {item.areaName} · {item.tagNumber}</Text>
+          <Text style={{color: c.text, fontSize: 15, fontWeight: '800'}}>{projectDisplay(item.projectName)} · {projectDisplay(item.areaName)} · {item.tagNumber}</Text>
           <View style={{flexDirection: 'row', gap: 8, marginVertical: 8, flexWrap: 'wrap'}}><Text style={{color: item.severity === 'High' ? c.critical : item.severity === 'Medium' ? c.yellow : c.muted, fontWeight: '700'}}>{item.severity} severity</Text><Text style={{color: c.indigo, fontWeight: '700'}}>{statuses[item.status] || item.status}</Text></View>
           <Text style={{color: c.text, fontSize: 13}}>{item.observation}</Text>
           {!!item.recommendation && <Text style={{color: c.muted, marginTop: 7}}>Recommendation: {item.recommendation}</Text>}

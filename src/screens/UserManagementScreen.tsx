@@ -1,6 +1,13 @@
+import {useSessionProfile} from '../api/profileState';
+import {useUserAccessCounts,refreshUserAccess,subscribeUserAccess} from '../api/userAccess';
+import RoleRequestReview from '../components/RoleRequestReview';
+import AccessDecisionDialog from '../components/AccessDecisionDialog';
+import {getApiErrorMessage} from '../api/errors';
+import {visual} from '../theme/visual';
 import React, {useEffect, useState, useCallback} from 'react';
 import {
   View,
+  Image,
   Text,
   StyleSheet,
   ScrollView,
@@ -19,12 +26,15 @@ import {
   deleteUser,
 } from '../api/auth';
 
+const OFFSHORE_ART = require('../assets/landing/industry-3.jpg');
+
 type UserRow = {
   id: string;
   displayName?: string;
   name?: string;
   email: string;
   role: string;
+  registeredAt?: string;
 };
 
 const ROLE_OPTIONS = ['Admin', 'Surveyor', 'QC', 'Manager', 'Client'];
@@ -33,7 +43,7 @@ const ROLE_COLORS: Record<string, {bg: string; text: string}> = {
   Admin: {bg: '#f1eaf3', text: '#8053a6'},
   Surveyor: {bg: '#e5eef7', text: '#3b68aa'},
   QC: {bg: '#fff0d7', text: '#a75a0b'},
-  Manager: {bg: '#f0eeff', text: '#718be8'},
+  Manager: {bg: '#e3eff1', text: '#718be8'},
   Client: {bg: '#f0f1f6', text: '#5b6178'},
 };
 const roleStyle = (role: string) => ROLE_COLORS[role] ?? ROLE_COLORS.Client;
@@ -51,11 +61,20 @@ function confirmAction(message: string, confirmLabel: string, onConfirm: () => v
 
 type Props = {
   onBack: () => void;
+  userRole?: string;
+  focusUserId?: string;
+  focusRequestId?: string;
   /** When set, a Log out button is shown at the bottom (used by the phone tab layout). */
   onLogout?: () => void;
 };
 
-export default function UserManagementScreen({onBack, onLogout}: Props) {
+export default function UserManagementScreen({onBack, onLogout, userRole, focusUserId, focusRequestId}: Props) {
+  const session=useSessionProfile(); const role=userRole || session?.role || '';
+  const admin=role.toLowerCase()==='admin'; const manager=role.toLowerCase()==='manager';
+  const counts=useUserAccessCounts(admin||manager);
+  const [tab,setTab]=useState<'registrations'|'roles'>(focusRequestId && admin?'roles':'registrations');
+  const [rejecting,setRejecting]=useState<UserRow|null>(null); const [decisionError,setDecisionError]=useState('');
+  useEffect(()=>{setTab(focusRequestId&&admin?'roles':'registrations');},[focusRequestId,focusUserId,admin]);
   const {width} = useWindowDimensions();
   const isMobile = width < 1100;
   const [pending, setPending] = useState<UserRow[]>([]);
@@ -65,8 +84,8 @@ export default function UserManagementScreen({onBack, onLogout}: Props) {
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [roleChangingId, setRoleChangingId] = useState<string | null>(null);
 
-  const loadAll = useCallback(async () => {
-    setLoading(true);
+  const loadAll = useCallback(async (showLoading=false) => {
+    if(showLoading)setLoading(true);
     try {
       const [pendingRes, approvedRes, rejectedRes] = await Promise.all([
         getPendingApprovals(),
@@ -85,7 +104,9 @@ export default function UserManagementScreen({onBack, onLogout}: Props) {
   }, []);
 
   useEffect(() => {
-    loadAll();
+    void loadAll(true);
+    const stop=subscribeUserAccess(()=>void loadAll()); const timer=setInterval(()=>void loadAll(),20000);
+    return()=>{stop();clearInterval(timer);};
   }, [loadAll]);
 
   const name = (u: UserRow) => u.displayName || u.name || u.email;
@@ -96,6 +117,7 @@ export default function UserManagementScreen({onBack, onLogout}: Props) {
       await approveUser(user.id);
       setPending(prev => prev.filter(u => u.id !== user.id));
       setApproved(prev => [...prev, user]);
+      refreshUserAccess();
     } catch (err: any) {
       console.error(err?.response?.data || err.message);
       Alert.alert('Error', 'Could not approve user');
@@ -104,19 +126,19 @@ export default function UserManagementScreen({onBack, onLogout}: Props) {
     }
   };
 
-  const handleReject = async (user: UserRow, from: 'pending' | 'approved') => {
+  const handleReject = async (user: UserRow, from: 'pending' | 'approved', reason: string) => {
     setActioningId(user.id);
     try {
-      await rejectUser(user.id);
+      await rejectUser(user.id, reason);
       if (from === 'pending') {
         setPending(prev => prev.filter(u => u.id !== user.id));
       } else {
         setApproved(prev => prev.filter(u => u.id !== user.id));
       }
-      setRejected(prev => [...prev, user]);
+      setRejected(prev => [...prev, user]); setRejecting(null); refreshUserAccess();
     } catch (err: any) {
       console.error(err?.response?.data || err.message);
-      Alert.alert('Error', 'Could not reject user');
+      setDecisionError(getApiErrorMessage(err, 'Could not reject user'));
     } finally {
       setActioningId(null);
     }
@@ -188,69 +210,75 @@ export default function UserManagementScreen({onBack, onLogout}: Props) {
 
   if (loading) {
     return (
-      <View style={styles.loadingScreen}>
+      <View nativeID="ex-user-management-loading" style={styles.loadingScreen}>
         <ActivityIndicator color="#718be8" size="large" />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, isMobile && styles.contentMobile]}>
-      <View style={[styles.header, isMobile && styles.headerMobile]}>
-        <View>
-          <Text style={[styles.title, isMobile && styles.titleMobile]}>Manage User Registrations</Text>
-          <Text style={styles.subtitle}>Approve, reject, and manage roles for app users</Text>
+    <ScrollView nativeID="ex-user-management" style={styles.screen} contentContainerStyle={[styles.content, isMobile && styles.contentMobile]}>
+      <View nativeID="ex-user-management-hero" style={styles.hero}>
+        <Image source={OFFSHORE_ART} resizeMode="cover" style={styles.heroPhoto} accessible={false} />
+        <View nativeID="ex-operations-hero-overlay" pointerEvents="none" style={[StyleSheet.absoluteFill, Platform.OS !== 'web' && styles.heroShade]} />
+        <View style={styles.heroCopy}>
+          <Text style={styles.heroEyebrow}>WORKSPACE ACCESS  /  USERS</Text>
+          <Text accessibilityRole="header" style={styles.heroTitle}>User <Text style={styles.heroAccent}>Management</Text></Text>
+          <Text style={styles.heroDescription}>Approve, reject, and manage roles for app users.</Text>
         </View>
-        <TouchableOpacity onPress={onBack} style={[styles.backBtn, isMobile && styles.backBtnMobile]}>
+        <TouchableOpacity accessibilityRole="button" onPress={onBack} style={[styles.backBtn, isMobile && styles.backBtnMobile]}>
           <Text style={styles.backBtnText}>← Back to Home</Text>
         </TouchableOpacity>
       </View>
 
+      <View style={{flexDirection:'row',gap:16,paddingVertical:12,flexWrap:'wrap'}}><TouchableOpacity accessibilityRole="tab" accessibilityState={{selected:tab==='registrations'}} onPress={()=>setTab('registrations')}><Text style={{color:'#00D9EE',fontWeight:'800'}}>Pending Registrations ({pending.length})</Text></TouchableOpacity>{admin&&<TouchableOpacity accessibilityRole="tab" accessibilityState={{selected:tab==='roles'}} onPress={()=>setTab('roles')}><Text style={{color:'#00D9EE',fontWeight:'800'}}>Role Change Requests ({counts.pendingRoleChanges})</Text></TouchableOpacity>}<TouchableOpacity accessibilityRole="button" onPress={()=>void loadAll()}><Text style={{color:'#00D9EE'}}>Refresh</Text></TouchableOpacity></View>
+      {admin&&tab==='roles'?<RoleRequestReview focusId={focusRequestId}/>:<>
       <UserTable
-        title="Pending Approvals"
+        title="Pending Registrations"
         countBadge={pending.length}
-        columns={['Username', 'Email', 'Requested Role', 'Action']}
+        columns={['Full Name', 'Email', 'Requested Role', 'Registration Date', 'Status', 'Actions']}
         emptyText="No pending approvals"
         rows={pending}
         isMobile={isMobile}
         renderMobileRow={user => (
           <MobileUserCard user={user} name={name(user)}>
-            <RoleChip role={user.role} />
+            <RoleChip role={user.role} /><Text style={{color:'#B2D5E4'}}>Pending Approval · {user.registeredAt ? new Date(user.registeredAt).toLocaleString() : 'Date not recorded'}</Text>
             <View style={styles.mobileActions}>
               <PillButton
                 label="Approve"
                 variant="approve"
                 loading={actioningId === user.id}
-                onPress={() => handleApprove(user)}
+                onPress={() => confirmAction(`Approve ${name(user)}?`, 'Approve', () => void handleApprove(user))}
               />
               <PillButton
                 label="Reject"
                 variant="reject"
                 disabled={actioningId === user.id}
-                onPress={() => handleReject(user, 'pending')}
+                onPress={() => {setDecisionError('');setRejecting(user);}}
               />
             </View>
           </MobileUserCard>
         )}
         renderRow={user => (
           <>
-            <Cell flex={1.1} bold>{name(user)}</Cell>
+            <Cell flex={1.1} bold>{user.id===focusUserId?'→ ':''}{name(user)}</Cell>
             <Cell flex={1.6} muted>{user.email}</Cell>
             <Cell flex={1.3}>
               <RoleChip role={user.role} />
             </Cell>
+            <Cell flex={1.1} muted>{user.registeredAt ? new Date(user.registeredAt).toLocaleString() : '—'}</Cell><Cell flex={1} muted>Pending Approval</Cell>
             <View style={[styles.colAction, styles.actionCell]}>
               <PillButton
                 label="Approve"
                 variant="approve"
                 loading={actioningId === user.id}
-                onPress={() => handleApprove(user)}
+                onPress={() => confirmAction(`Approve ${name(user)}?`, 'Approve', () => void handleApprove(user))}
               />
               <PillButton
                 label="Reject"
                 variant="reject"
                 disabled={actioningId === user.id}
-                onPress={() => handleReject(user, 'pending')}
+                onPress={() => {setDecisionError('');setRejecting(user);}}
               />
             </View>
           </>
@@ -269,7 +297,7 @@ export default function UserManagementScreen({onBack, onLogout}: Props) {
           <MobileUserCard user={user} name={name(user)}>
             <View style={styles.mobileRoleActions}>
               <RoleChip role={user.role} />
-              <RoleDropdown
+              <RoleDropdown options={manager ? ROLE_OPTIONS.filter(r=>!['Admin','Manager'].includes(r)) : ROLE_OPTIONS}
                 value={user.role}
                 disabled={roleChangingId === user.id}
                 onChange={role => handleRoleChange(user, role)}
@@ -295,7 +323,7 @@ export default function UserManagementScreen({onBack, onLogout}: Props) {
               <RoleChip role={user.role} />
             </Cell>
             <View style={[styles.colChangeRole, styles.actionCell]}>
-              <RoleDropdown
+              <RoleDropdown options={manager ? ROLE_OPTIONS.filter(r=>!['Admin','Manager'].includes(r)) : ROLE_OPTIONS}
                 value={user.role}
                 disabled={roleChangingId === user.id}
                 onChange={role => handleRoleChange(user, role)}
@@ -327,13 +355,6 @@ export default function UserManagementScreen({onBack, onLogout}: Props) {
             <RoleChip role={user.role} />
             <View style={styles.mobileActions}>
               <PillButton
-                label="Approve"
-                variant="approve"
-                disabled={actioningId === user.id}
-                loading={actioningId === user.id}
-                onPress={() => handleReapprove(user)}
-              />
-              <PillButton
                 label="Delete"
                 variant="reject"
                 disabled={actioningId === user.id}
@@ -352,13 +373,6 @@ export default function UserManagementScreen({onBack, onLogout}: Props) {
             </Cell>
             <View style={[styles.colAction, styles.actionCell]}>
               <PillButton
-                label="Approve"
-                variant="approve"
-                disabled={actioningId === user.id}
-                loading={actioningId === user.id}
-                onPress={() => handleReapprove(user)}
-              />
-              <PillButton
                 label="Delete"
                 variant="reject"
                 disabled={actioningId === user.id}
@@ -369,6 +383,8 @@ export default function UserManagementScreen({onBack, onLogout}: Props) {
           </>
         )}
       />
+      </>}
+      {rejecting&&<AccessDecisionDialog title={`Reject ${name(rejecting)}`} busy={!!actioningId} error={decisionError} onCancel={()=>setRejecting(null)} onConfirm={reason=>void handleReject(rejecting,'pending',reason)}/>}
       {onLogout ? (
         <TouchableOpacity accessibilityRole="button" onPress={onLogout} style={styles.logoutBtn}>
           <Text style={styles.logoutBtnText}>Log out</Text>
@@ -401,22 +417,23 @@ function UserTable({
   wideAction?: boolean;
 }) {
   return (
-    <View style={styles.section}>
+    <View testID="user-management-section" style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text>
         <View style={styles.countBadge}>
           <Text style={styles.countBadgeText}>{countBadge}</Text>
         </View>
       </View>
 
-      <View style={[styles.table, isMobile && styles.tableMobile]}>
+      <View testID={isMobile ? undefined : 'user-management-table'} style={[styles.table, isMobile && styles.tableMobile]}>
         {!isMobile && (
-          <View style={styles.headerRow}>
+          <View testID="user-management-table-header" style={styles.headerRow}>
             <Text style={[styles.th, styles.colUsername]}>{columns[0]}</Text>
             <Text style={[styles.th, styles.colEmail]}>{columns[1]}</Text>
             <Text style={[styles.th, styles.colRole]}>{columns[2]}</Text>
+            {columns.length===6&&<><Text style={[styles.th,{flex:1.1}]}>Registration Date</Text><Text style={[styles.th,{flex:1}]}>Status</Text></>}
             <Text style={[styles.th, wideAction ? styles.colChangeRole : styles.colAction]}>
-              {columns[3]}
+              {columns[columns.length-1]}
             </Text>
           </View>
         )}
@@ -431,7 +448,7 @@ function UserTable({
               {renderMobileRow ? renderMobileRow(user) : renderRow(user)}
             </View>
           ) : (
-            <View key={user.id} style={[styles.row, idx % 2 === 1 && styles.rowAlt]}>
+            <View key={user.id} testID="user-management-row" style={[styles.row, idx % 2 === 1 && styles.rowAlt]}>
               {renderRow(user)}
             </View>
           ))
@@ -451,7 +468,7 @@ function MobileUserCard({
   children: React.ReactNode;
 }) {
   return (
-    <View style={styles.mobileUserCard}>
+    <View testID="user-management-mobile-card" style={styles.mobileUserCard}>
       <View style={styles.mobileIdentity}>
         <View style={styles.mobileAvatar}>
           <Text style={styles.mobileAvatarText}>{name.charAt(0).toUpperCase()}</Text>
@@ -494,7 +511,7 @@ function Cell({
 function RoleChip({role}: {role: string}) {
   const c = roleStyle(role);
   return (
-    <View style={[styles.chip, {backgroundColor: c.bg}]}>
+    <View testID="user-management-role-chip" style={[styles.chip, {backgroundColor: c.bg}]}>
       <Text style={[styles.chipText, {color: c.text}]}>{role}</Text>
     </View>
   );
@@ -515,6 +532,8 @@ function PillButton({
 }) {
   return (
     <TouchableOpacity
+      testID={variant === 'approve' ? 'user-management-approve' : 'user-management-reject'}
+      accessibilityRole="button"
       style={[
         styles.pillBtn,
         variant === 'approve' ? styles.approveBtn : styles.rejectBtn,
@@ -531,9 +550,9 @@ function PillButton({
   );
 }
 
-function RoleDropdown({value, onChange, disabled}: {value: string; onChange: (r: string) => void; disabled?: boolean}) {
+function RoleDropdown({value, onChange, disabled, options=ROLE_OPTIONS}: {value: string; onChange: (r: string) => void; disabled?: boolean; options?:string[]}) {
   const matchedOption =
-    ROLE_OPTIONS.find(r => r.toLowerCase() === value.toLowerCase()) || ROLE_OPTIONS[0];
+    options.find(r => r.toLowerCase() === value.toLowerCase()) || options[0];
 
   if (Platform.OS === 'web') {
     return (
@@ -543,7 +562,7 @@ function RoleDropdown({value, onChange, disabled}: {value: string; onChange: (r:
         disabled={disabled}
         onChange={(e: any) => onChange(e.target.value)}
         style={selectStyleWeb}>
-        {ROLE_OPTIONS.map(role => (
+        {options.map(role => (
           <option key={role} value={role}>
             {role}
           </option>
@@ -557,7 +576,7 @@ function RoleDropdown({value, onChange, disabled}: {value: string; onChange: (r:
       disabled={disabled}
       onPress={() => {
         const next =
-          ROLE_OPTIONS[(ROLE_OPTIONS.indexOf(matchedOption) + 1) % ROLE_OPTIONS.length];
+          options[(options.indexOf(matchedOption) + 1) % options.length];
         onChange(next);
       }}>
       <Text style={styles.nativeDropdownText}>{matchedOption} ▾</Text>
@@ -571,7 +590,7 @@ const selectStyleWeb: any = {
   border: '1.5px solid #dce5dd',
   fontSize: 13,
   fontWeight: 600,
-  color: '#252f50',
+  color: '#102e3b',
   backgroundColor: '#f8f9fc',
   maxWidth: '100%',
   marginRight: 0,
@@ -581,46 +600,50 @@ const selectStyleWeb: any = {
 // ---------- Styles (matching DashboardScreen / Sidebar design language) ----------
 
 const styles = StyleSheet.create({
-  screen: {flex: 1, backgroundColor: '#f7f9ff'},
-  loadingScreen: {flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f7f9ff'},
-  content: {padding: 28, minHeight: '100%' as any},
+  screen: {flex: 1, backgroundColor: '#f0f6f8'},
+  loadingScreen: {flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f6f8'},
+  content: {padding: 16, paddingBottom: 32, minHeight: '100%'},
   contentMobile: {padding: 14, paddingBottom: 28},
 
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 28,
-  },
-  headerMobile: {flexDirection: 'column', alignItems: 'stretch', gap: 14, marginBottom: 22},
+  hero: {minHeight: 148, padding: 20, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12,
+    marginBottom: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#126078', borderRadius: 17, backgroundColor: '#03192C'},
+  heroPhoto: {position: 'absolute', right: 0, width: '76%', height: '100%'},
+  heroShade: {backgroundColor: '#03192C88'},
+  heroCopy: {flexGrow: 1, flexBasis: 270, minWidth: 0, gap: 5},
+  heroEyebrow: {color: '#00D9EE', fontFamily: visual.mono, fontSize: 11, fontWeight: '800', letterSpacing: 1.6},
+  heroTitle: {color: '#F5FAFF', fontFamily: visual.display, fontSize: 34, fontStyle: 'italic', fontWeight: '900'},
+  heroAccent: {color: '#00D9EE'},
+  heroDescription: {color: '#F5FAFF', fontSize: 14},
   logoutBtn: {marginTop: 24, marginBottom: 90, minHeight: 50, borderRadius: 12, borderWidth: 1, borderColor: '#efcdd1', backgroundColor: '#fdf0f1', alignItems: 'center', justifyContent: 'center'},
   logoutBtnText: {fontSize: 14.5, fontWeight: '800', color: '#b43242'},
-  title: {fontSize: 22, fontWeight: '800', color: '#252f50'},
+  title: {fontSize: 22, fontWeight: '800', color: '#102e3b'},
   titleMobile: {fontSize: 20, lineHeight: 26},
   subtitle: {fontSize: 13, color: '#8a8fa3', marginTop: 4},
   backBtn: {
-    backgroundColor: '#f0eeff',
+    backgroundColor: '#0A3148',
+    borderWidth: 1,
+    borderColor: '#126078',
     borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
   backBtnMobile: {alignSelf: 'flex-start', paddingHorizontal: 13, paddingVertical: 9},
-  backBtnText: {color: '#8fa7f8', fontSize: 13, fontWeight: '700'},
+  backBtnText: {color: '#76EAF5', fontSize: 13, fontWeight: '800'},
 
-  section: {marginBottom: 26},
+  section: {marginBottom: 16, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#d3e1e6'},
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     marginBottom: 12,
   },
-  sectionTitle: {fontSize: 16, fontWeight: '800', color: '#252f50'},
+  sectionTitle: {fontSize: 16, fontWeight: '800', color: '#102e3b'},
   countBadge: {
     minWidth: 22,
     height: 22,
     borderRadius: 11,
     paddingHorizontal: 6,
-    backgroundColor: '#f0eeff',
+    backgroundColor: '#e3eff1',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -644,11 +667,11 @@ const styles = StyleSheet.create({
   tableMobile: {backgroundColor: 'transparent', borderRadius: 0, overflow: 'visible', boxShadow: 'none' as any, elevation: 0},
   headerRow: {
     flexDirection: 'row',
-    backgroundColor: '#f8f9fc',
+    backgroundColor: visual.rail,
     paddingVertical: 12,
     paddingHorizontal: 18,
   },
-  th: {fontSize: 12, fontWeight: '700', color: '#5b6178', letterSpacing: 0.3},
+  th: {fontFamily: visual.mono, fontSize: 11, fontWeight: '700', color: '#e8f6f8', letterSpacing: .6},
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -661,23 +684,23 @@ const styles = StyleSheet.create({
   mobileUserCard: {
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#e5e9f6',
+    borderColor: '#d3e1e6',
     borderRadius: 13,
     padding: 14,
     marginBottom: 10,
     ...Platform.select({web: {boxShadow: '0 3px 12px rgba(36, 45, 82, 0.05)'}, default: {elevation: 1}}),
   },
   mobileIdentity: {flexDirection: 'row', alignItems: 'center', gap: 10},
-  mobileAvatar: {width: 38, height: 38, borderRadius: 19, backgroundColor: '#f0eeff', alignItems: 'center', justifyContent: 'center'},
+  mobileAvatar: {width: 38, height: 38, borderRadius: 19, backgroundColor: '#e3eff1', alignItems: 'center', justifyContent: 'center'},
   mobileAvatarText: {fontSize: 15, fontWeight: '800', color: '#718be8'},
   mobileUserCopy: {flex: 1, minWidth: 0},
-  mobileUserName: {fontSize: 14, color: '#252f50', fontWeight: '800'},
+  mobileUserName: {fontSize: 14, color: '#102e3b', fontWeight: '800'},
   mobileUserEmail: {fontSize: 11, color: '#8a8fa3', marginTop: 3},
   mobileCardControls: {borderTopWidth: 1, borderTopColor: '#f0f1f6', marginTop: 12, paddingTop: 11, gap: 10},
   mobileRoleActions: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap'},
   mobileActions: {flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap'},
   td: {fontSize: 13.5, color: '#2a2d3b'},
-  tdBold: {fontWeight: '700', color: '#252f50'},
+  tdBold: {fontWeight: '700', color: '#102e3b'},
   tdMuted: {color: '#8a8fa3'},
   colUsername: {flex: 1.1},
   colEmail: {flex: 1.6},
@@ -719,5 +742,5 @@ const styles = StyleSheet.create({
     marginRight: 8,
     backgroundColor: '#f8f9fc',
   },
-  nativeDropdownText: {fontSize: 13, fontWeight: '600', color: '#252f50'},
+  nativeDropdownText: {fontSize: 13, fontWeight: '600', color: '#102e3b'},
 });

@@ -1,8 +1,11 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
-import {QcDashboardLayout, QcProjectCard, QcProjectMetadata} from '../components/QcDashboardLayout';
+import {QcDashboardLayout, QcProjectCard, QcProjectMetadata, useQcStyles} from '../components/QcDashboardLayout';
+import QcWorkspaceOverview from '../components/QcWorkspaceOverview';
 import {getApiErrorMessage} from '../api/errors';
-import {getQcActivityQueue, getQcDashboard, getQcProjects} from '../api/projects';
+import {getQcActivityQueue, getQcDashboard, getQcProject, getQcProjects} from '../api/projects';
+import {projectDisplay} from '../utils/projectDisplay';
+
 
 type Props = {userName: string; onProjectPress: (id: string, project?: any) => void; onActivityPress?: (id: string) => void; projectsOnly?: boolean; refreshVersion?: number; pendingWorkspace?: boolean};
 const value = (obj: any, ...keys: string[]) => {
@@ -22,6 +25,8 @@ export default function QcDashboardScreen({userName, onProjectPress, onActivityP
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [activities, setActivities] = useState<any[]>([]);
+  const [projectDetails, setProjectDetails] = useState<Record<string, any>>({});
+  const [refreshedAt, setRefreshedAt] = useState<string>();
   const load = useCallback(async (refresh = false) => {
     refresh ? setRefreshing(true) : setLoading(true);
     setError('');
@@ -33,11 +38,30 @@ export default function QcDashboardScreen({userName, onProjectPress, onActivityP
       setSummary(dash.data);
       setProjects(list.data);
       setActivities(activityQueue.data);
+      if (!pendingWorkspace && typeof getQcProject === 'function') {
+        const details: Record<string, any> = {};
+        // Reuse authorized QC details without flooding the server for large assignments.
+        for (let start = 0; start < list.data.length; start += 4) {
+          await Promise.all(list.data.slice(start, start + 4).map(async (project: any) => {
+            const id = value(project, 'projectId', 'id');
+            if (!id) return;
+            try { details[id] = (await getQcProject(String(id))).data; }
+            catch { details[id] = {detailsUnavailable: true}; }
+          }));
+        }
+        setProjectDetails(details);
+      }
+      setRefreshedAt(new Date().toISOString());
     } catch (err) {
       setError(getApiErrorMessage(err, 'Could not load QC assignments.'));
     } finally { setLoading(false); setRefreshing(false); }
   }, [pendingWorkspace]);
   useEffect(() => { load(); }, [load, refreshVersion]);
+  useEffect(() => {
+    if (typeof getQcActivityQueue !== 'function') return;
+    const timer = setInterval(() => {getQcActivityQueue().then(result => setActivities(result.data || [])).catch(() => {});}, 15000);
+    return () => clearInterval(timer);
+  }, []);
   const counts = useMemo(() => {
     if (pendingWorkspace) return [
       ['Awaiting QC Review', Number(summary.awaitingQcReview) || 0, 'amber'],
@@ -62,7 +86,21 @@ export default function QcDashboardScreen({userName, onProjectPress, onActivityP
       ['Overdue', count(['overdue'], overdue), 'indigo'],
     ] as const;
   }, [projects, summary, pendingWorkspace]);
-  return <QcDashboardLayout eyebrow={projectsOnly ? 'QC PROJECTS' : 'QC WORKSPACE'}
+  if (!pendingWorkspace) return <QcWorkspaceOverview userName={userName} projectsOnly={projectsOnly}
+    kpis={projectsOnly ? undefined : counts.map(([label, count, tone]) => ({label, count, tone}))}
+    loading={loading} refreshing={refreshing} error={error} refreshedAt={refreshedAt} onRefresh={() => load(true)}
+    projects={projects.map((p, i) => {
+      const id = value(p, 'projectId', 'id');
+      const detail = projectDetails[id] || {};
+      return {id: String(id || i), name: value(p, 'projectName', 'name') || 'Project', jobNo: value(p, 'jobNo', 'jobNumber'),
+        location: p.location, status: statusOf(p), overdue: isOverdue(p), equipmentCount: detail.equipmentCount,
+        approvedCount: detail.approvedCount, changesRequestedCount: detail.changesRequestedCount,
+        detailsUnavailable: detail.detailsUnavailable, lastQcActivity: p.lastQcActivity, updatedAt: p.updatedAt,
+        submissionDate: p.submissionDate, onPress: () => id && onProjectPress(String(id), p)};
+    })}>
+    {onActivityPress && activities.length > 0 && <QcActivityLinks activities={activities} onPress={onActivityPress} />}
+  </QcWorkspaceOverview>;
+  return <QcDashboardLayout operations={pendingWorkspace} eyebrow={projectsOnly ? 'QC PROJECTS' : 'QC WORKSPACE'}
     title={pendingWorkspace ? 'QC Pending' : projectsOnly ? 'Assigned Projects' : `Welcome, ${userName.split(' ')[0]}`}
     subtitle={pendingWorkspace ? 'QC assignments and inspection review status' : projectsOnly ? 'Projects assigned to you for quality review' : 'Assigned projects and inspection review status'}
     kpis={projectsOnly ? undefined : counts.map(([label, count, tone]) => ({label, count, tone}))}
@@ -70,16 +108,27 @@ export default function QcDashboardScreen({userName, onProjectPress, onActivityP
     refreshing={refreshing} onRefresh={() => load(true)} onReload={() => load()}>
     {projects.map((p, i) => {
       const id = value(p, 'projectId', 'id');
-      return <QcProjectCard key={String(id || i)} name={value(p, 'projectName', 'name') || 'Project'}
+      return <QcProjectCard projectId={String(id || "")} key={String(id || i)} name={value(p, 'projectName', 'name') || 'Project'}
+        showLogo={pendingWorkspace} logoVersion={p}
         jobNo={value(p, 'jobNo', 'jobNumber')} location={value(p, 'location')}
         status={statusOf(p)} overdue={isOverdue(p)} onPress={() => id && onProjectPress(String(id), p)}>
-        {pendingWorkspace && <QcProjectMetadata fields={[
+        {pendingWorkspace && <QcProjectMetadata operations fields={[
           ['Surveyor', value(p, 'surveyorName') || 'Not assigned'],
           ['Assigned QC', value(p, 'assignedQcName') || 'Not assigned'],
           ['QC Status', statusOf(p)],
         ]} />}
       </QcProjectCard>;
     })}
-    {onActivityPress && activities.length > 0 && <View style={{marginTop: 18, gap: 8}}><Text style={{fontSize: 18, fontWeight: '800', color: '#242d52'}}>New inspection activities</Text>{activities.map(item => <TouchableOpacity key={item.id} onPress={() => onActivityPress(item.id)} style={{backgroundColor: '#fff', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#e5e9f6'}}><Text style={{fontWeight: '700', color: '#252f50'}}>{item.grade} · {item.projectName}</Text><Text style={{color: '#707589', marginTop: 4}}>{String(item.reviewStatus).replace(/([A-Z])/g, ' $1').trim()} · {item.inspectorNameSnapshot}</Text></TouchableOpacity>)}</View>}
+    {onActivityPress && activities.length > 0 && <View style={{marginTop: 18, gap: 8}}><Text style={{fontSize: 18, fontWeight: '800', color: '#242d52'}}>New inspection activities</Text>{activities.map(item => <TouchableOpacity key={item.id} onPress={() => onActivityPress(item.id)} style={{backgroundColor: '#fff', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#e5e9f6'}}><Text style={{fontWeight: '700', color: '#252f50'}}>{item.grade || 'Category inspection'} · {item.projectName}</Text><Text style={{color: '#707589', marginTop: 4}}>{String(item.reviewStatus).replace(/([A-Z])/g, ' $1').trim()} · {item.inspectorName || item.inspectorNameSnapshot} · {item.areaName || 'Area'} / {item.tagNumber || 'Equipment'}</Text></TouchableOpacity>)}</View>}
   </QcDashboardLayout>;
+}
+
+function QcActivityLinks({activities, onPress}: {activities: any[]; onPress: (id: string) => void}) {
+  const {c} = useQcStyles(true);
+  return <View style={{gap: 10}}><Text accessibilityRole="header" style={{fontSize: 20, fontWeight: '800', color: c.text}}>New inspection activities</Text>
+    {activities.map(item => <TouchableOpacity key={item.id} accessibilityRole="button" onPress={() => onPress(item.id)} style={{backgroundColor: c.card, padding: 18, borderRadius: 12, borderWidth: 1, borderColor: c.border, minHeight: 44}}>
+      <Text style={{fontWeight: '700', fontSize: 15, color: c.text}}>{item.grade || 'Category inspection'} · {projectDisplay(item.projectName)}</Text>
+      <Text style={{color: c.secondary, marginTop: 6}}>{String(item.reviewStatus).replace(/([A-Z])/g, ' $1').trim()} · {item.inspectorName || item.inspectorNameSnapshot} · {item.areaName || 'Area'} / {item.tagNumber || 'Equipment'}</Text>
+    </TouchableOpacity>)}
+  </View>;
 }

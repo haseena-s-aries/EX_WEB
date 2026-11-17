@@ -1,3 +1,4 @@
+import {isPdfFile} from '../utils/isPdfFile';
 import {ClientLogoFile, validateClientLogo} from '../components/clientLogo';
 import {Company} from './companies';
 import {HazardousAreaPlanFile, validateHazardousAreaPlan} from '../components/hazardousAreaPlan';
@@ -53,7 +54,12 @@ export type ProjectAssignableUser = {
   managerName?: string | null;
 };
 
+export type ProjectScheduleSummary = {status: string; expectedCompletion?: string | null; delayDays: number; latestDelayReason?: string | null};
+
 export type ProjectSummary = {
+  reportStatus?: 'Ongoing' | 'Hold' | 'Submitted';
+  targetDate?: string | null;
+  schedule?: ProjectScheduleSummary;
   id: string;
   projectName: string;
   sector: string;
@@ -64,6 +70,8 @@ export type ProjectSummary = {
   assignedSurveyorId: string;
   assignedQcId: string;
   assignedClientId?: string | null;
+  assignedClientIds?: string[];
+  assignedClients?: {id: string; displayName: string; email?: string}[];
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
@@ -73,9 +81,11 @@ export type ProjectSummary = {
 export type ProjectAreaEquipment = {
   id: string;
   sequenceNo: number;
+  markingNo?: number | null;
   xPercent: number;
   yPercent: number;
   isPlacedOnLayout?: boolean;
+  layoutImageKey?: string | null;
   tagNumber: string;
   equipmentCode?: string | null;
   rfidTagUid?: string | null;
@@ -111,6 +121,7 @@ export type ProjectArea = {
 };
 
 export type ProjectDetails = Omit<ProjectSummary, 'areaCount'> & {
+  additionalQcId?: string | null;
   ourCompanyId?: string | null; ourCompany?: Company | null;
   uidNumber?: string | null; documentNumber?: string | null; revision?: string | null; description?: string | null; clientName?: string | null; clientLogoPath?: string | null;
   areas: ProjectArea[];
@@ -120,17 +131,23 @@ export type ProjectDetails = Omit<ProjectSummary, 'areaCount'> & {
 };
 
 export type ProjectWriteRequest = {
+  targetDate?: string;
   ourCompanyId?: string | null;
   uidNumber?: string | null; documentNumber?: string | null; revision?: string | null; description?: string | null; clientName?: string | null; clientLogo?: ClientLogoFile | null; removeClientLogo?: boolean;
   hazardousAreaPlan?: HazardousAreaPlanFile | null;
   projectName: string;
-  sector: string;
+  sector?: string;
+  preserveSurveyorAssignment?: boolean;
+  additionalQcId?: string | null;
+  updateAdditionalQcAssignment?: boolean;
   jobNo: string;
   location: string;
   vesselOrSiteName: string;
   assignedSurveyorId: string;
   assignedQcId: string;
   assignedClientId?: string | null;
+  assignedClientIds?: string[];
+  assignedClients?: {id: string; displayName: string; email?: string}[];
   status?: ProjectStatus | string;
 };
 
@@ -144,19 +161,20 @@ export const deleteProject = (projectId: string) => apiClient.delete(`/projects/
 export const getProject = (projectId: string) =>
   apiClient.get<ProjectDetails>(`/projects/${projectId}`);
 
-const projectWriteBody = (data: ProjectWriteRequest) => {
+const projectWriteBody = (data: ProjectWriteRequest, preserveCase = false) => {
+  const text = (value: string) => preserveCase ? value.trim() : value.trim().toUpperCase();
   const {hazardousAreaPlan, clientLogo, ...fields} = data;
   const payload = {...fields, assignedClientId: fields.assignedClientId || null,
-    projectName: fields.projectName.trim().toUpperCase(), jobNo: fields.jobNo.trim().toUpperCase(),
-    location: fields.location.trim().toUpperCase(), vesselOrSiteName: fields.vesselOrSiteName.trim().toUpperCase(),
-    uidNumber: fields.uidNumber?.trim().toUpperCase() || null, documentNumber: fields.documentNumber?.trim().toUpperCase() || null,
-    revision: fields.revision?.trim().toUpperCase() || null, description: fields.description?.trim().toUpperCase() || null, clientName: fields.clientName?.trim().toUpperCase() || null,
+    projectName: text(fields.projectName), jobNo: text(fields.jobNo),
+    location: text(fields.location), vesselOrSiteName: text(fields.vesselOrSiteName),
+    uidNumber: (fields.uidNumber == null ? null : text(fields.uidNumber)) || null, documentNumber: (fields.documentNumber == null ? null : text(fields.documentNumber)) || null,
+    revision: (fields.revision == null ? null : text(fields.revision)) || null, description: (fields.description == null ? null : text(fields.description)) || null, clientName: (fields.clientName == null ? null : text(fields.clientName)) || null,
     status: normalizeProjectStatus(data.status)};
   if (!hazardousAreaPlan && !clientLogo) return payload;
   const error = (hazardousAreaPlan ? validateHazardousAreaPlan(hazardousAreaPlan) : '') || (clientLogo ? validateClientLogo(clientLogo) : '');
   if (error) throw new Error(error);
   const form = new FormData();
-  Object.entries(payload).forEach(([key, value]) => {if (value != null) form.append(key, String(value));});
+  Object.entries(payload).forEach(([key, value]) => {if (Array.isArray(value)) {value.forEach(id => form.append(key, String(id))); if (!value.length && key === 'assignedClientIds') form.append('clearClientAssignments', 'true');} else if (value != null) form.append(key, String(value));});
   if (clientLogo) form.append('clientLogo', (Platform.OS === 'web' ? clientLogo.webFile : {uri: clientLogo.uri, name: clientLogo.name, type: clientLogo.type}) as any);
   if (hazardousAreaPlan) form.append('hazardousAreaPlan', (Platform.OS === 'web'
     ? hazardousAreaPlan.webFile
@@ -165,7 +183,7 @@ const projectWriteBody = (data: ProjectWriteRequest) => {
 };
 
 export const createProject = (data: ProjectWriteRequest) =>
-  apiClient.post<ProjectDetails>('/projects', projectWriteBody(data));
+  apiClient.post<ProjectDetails>('/projects', projectWriteBody(data, true));
 
 export const updateProject = (
   projectId: string,
@@ -184,8 +202,8 @@ export const addProjectArea = (projectId: string, name: string, file: any) => {
           response.data.id,
           file,
         );
-        response.data.layoutImagePath =
-          photoResponse.data?.[0]?.downloadUrl || photoResponse.data?.[0]?.filePath;
+        const layout = photoResponse.data?.find(photo => !isPdfFile(photo.fileName));
+        if (layout) response.data.layoutImagePath = layout.downloadUrl || layout.filePath;
       } catch (error: any) {
         // Area creation is already committed. Preserve its ID so callers can
         // retry the image upload without trying to create a duplicate area.
@@ -209,8 +227,8 @@ export const updateProjectArea = (
   return request.then(async response => {
     if (file) {
       const photoResponse = await uploadProjectAreaPhoto(projectId, areaId, file);
-      response.data.layoutImagePath =
-        photoResponse.data?.[0]?.downloadUrl || photoResponse.data?.[0]?.filePath;
+      const layout = photoResponse.data?.find(photo => !isPdfFile(photo.fileName));
+      if (layout) response.data.layoutImagePath = layout.downloadUrl || layout.filePath;
     }
     return response;
   });
@@ -229,15 +247,30 @@ export const uploadProjectAreaPhoto = (
   );  
 };
 
-export const uploadProjectAreaPhotos = (projectId: string, areaId: string, photos: InspectionPhotoFile[]) => {
+const projectPhotosForm = (photos: InspectionPhotoFile[]) => {
   const form = new FormData();
   for (const photo of photos) {
     form.append('Files', photo.webFile ?? ({
       uri: photo.uri, type: photo.type || 'image/jpeg', name: photo.fileName || photo.name || 'area.jpg',
     } as any));
   }
-  return apiClient.post<ProjectAreaPhoto[]>(`/projects/${projectId}/areas/${areaId}/photos`, form);
+  return form;
 };
+
+export const uploadProjectAreaPhotos = (projectId: string, areaId: string, photos: InspectionPhotoFile[]) =>
+  apiClient.post<ProjectAreaPhoto[]>(`/projects/${projectId}/areas/${areaId}/photos`, projectPhotosForm(photos));
+
+export const getCommonLayouts = (projectId: string) =>
+  apiClient.get<ProjectAreaPhoto[]>(`/projects/${projectId}/common-layouts`);
+
+export const uploadCommonLayouts = (projectId: string, photos: InspectionPhotoFile[]) =>
+  apiClient.post<ProjectAreaPhoto[]>(`/projects/${projectId}/common-layouts`, projectPhotosForm(photos));
+
+export const deleteCommonLayout = (projectId: string, photoId: string) =>
+  apiClient.delete(`/projects/${projectId}/common-layouts/${photoId}`);
+
+export const deleteProjectAreaPhoto = (projectId: string, areaId: string, photoId: string) =>
+  apiClient.delete(`/projects/${projectId}/areas/${areaId}/photos/${photoId}`);
 
 export const getProjectAreaPhotos = (projectId: string, areaId: string) =>
   apiClient.get<ProjectAreaPhoto[]>(
@@ -249,6 +282,8 @@ export const deleteProjectArea = (projectId: string, areaId: string) =>
   apiClient.delete(`/projects/${projectId}/areas/${areaId}`);
 
 export type SurveyorProjectSummary = {
+  schedule?: ProjectScheduleSummary;
+  reportStatus?: 'Ongoing' | 'Hold' | 'Submitted';
   projectId: string;
   projectName: string;
   sector: string;
@@ -258,6 +293,7 @@ export type SurveyorProjectSummary = {
   createdDate: string;
   areaCount: number;
   status: string;
+  isTransferred?: boolean;
 };
 
 export type SurveyorQcFeedback = {
@@ -267,6 +303,7 @@ export type SurveyorQcFeedback = {
   projectName: string;
   areaName: string;
   sequenceNo: number;
+  markingNo?: number | null;
   tagNumber: string;
   type: string;
   qcComments: string;
@@ -305,9 +342,11 @@ export type AreaEquipment = {
   projectId: string;
   areaId: string;
   sequenceNo: number;
+  markingNo?: number | null;
   xPercent: number;
   yPercent: number;
   isPlacedOnLayout?: boolean;
+  layoutImageKey?: string | null;
   tagNumber: string;
   equipmentId?: string | null;
   type: string;
@@ -343,7 +382,9 @@ export type AreaEquipment = {
 export type EquipmentInspectionStatus =
   | 'NotStarted'
   | 'InProgress'
+  | 'Hold'
   | 'Completed'
+  | 'PendingQcReview'
   | 'ChangesRequested'
   | 'QcApproved';
 
@@ -357,60 +398,6 @@ export type SurveyorEquipmentDetails = Omit<
 };
 
 export type InspectionType = 'Visual' | 'Close' | 'Detailed';
-
-export type SurveyorChecklistItem = {
-  checklistItemId: string;
-  inspectionType: InspectionType;
-  text: string;
-  sortOrder: number;
-  isRequired: boolean;
-  sectionCode?: string | null;
-  applicableProtectionTypes?: string | null;
-  sourceItemNumber?: number | null;
-  sourceItemReference?: string | null;
-  applicableGrades?: string | null;
-  subChecksJson?: string | null;
-};
-
-export type SurveyorInspectionAnswer = SurveyorChecklistItem & {
-  isChecked: boolean;
-  remarks?: string | null;
-};
-
-export type SurveyorInspectionPhoto = {
-  id: string;
-  fileName: string;
-  photoPath: string;
-  uploadedAt: string;
-};
-
-export type SurveyorEquipmentInspection = {
-  inspectionId: string;
-  equipmentId: string;
-  inspectionDate: string;
-  inspectorName: string;
-  comments?: string | null;
-  status: EquipmentInspectionStatus;
-  isEditable: boolean;
-  createdAt: string;
-  updatedAt: string;
-  answers: SurveyorInspectionAnswer[];
-  photos: SurveyorInspectionPhoto[];
-  qcComments?: string | null;
-  qcSeverity?: string | null;
-};
-
-export type SaveEquipmentInspectionRequest = {
-  inspectionDate: string;
-  inspectorName: string;
-  comments?: string | null;
-  isCompleted: boolean;
-  answers: Array<{
-    checklistItemId: string;
-    isChecked: boolean;
-    remarks?: string | null;
-  }>;
-};
 
 export type InspectionPhotoFile = {
   uri?: string;
@@ -451,6 +438,7 @@ export type SaveAreaEquipmentRequest = {
   xPercent?: number;
   yPercent?: number;
   isPlacedOnLayout?: boolean;
+  layoutImageKey?: string | null;
   tagNumber: string;
   equipmentId?: string | null;
   rfidTagUid?: string | null;
@@ -543,14 +531,6 @@ export const getSurveyorEquipmentByRfid = (rfidTagUid: string) =>
     `/surveyor/equipment/by-rfid/${encodeURIComponent(rfidTagUid)}`,
   );
 
-export const getSurveyorEquipmentInspection = (equipmentId: string) =>
-  apiClient.get<SurveyorEquipmentInspection>(
-    `/surveyor/equipment/${equipmentId}/inspection`,
-  );
-
-export const getSurveyorChecklist = () =>
-  apiClient.get<SurveyorChecklistItem[]>('/surveyor/checklist');
-
 // Additive repeat-inspection activity API. Existing SurveySession endpoints remain unchanged.
 export const getInspectionActivityHistory = (equipmentId: string, categoryOnly?: boolean) =>
   apiClient.get<any[]>(`/v1/inspection-activities/equipment/${equipmentId}`, categoryOnly ? {params:{categoryOnly}} : undefined);
@@ -589,50 +569,6 @@ export const uploadActivityPhoto = (activityId: string, photo: InspectionPhotoFi
 };
 export const reviewActivityCheckpoint = (activityId: string, checkpointResponseRevisionId: string, decision: 'Accepted' | 'ChangesRequested', comments: string) =>
   apiClient.post<any>(`/v1/inspection-activities/${activityId}/checkpoint-review`, {checkpointResponseRevisionId, decision, comments});
-
-export const createSurveyorInspection = (
-  equipmentId: string,
-  data: SaveEquipmentInspectionRequest,
-) =>
-  apiClient.post<SurveyorEquipmentInspection>(
-    `/surveyor/equipment/${equipmentId}/inspection`,
-    data,
-  );
-
-export const updateSurveyorInspection = (
-  inspectionId: string,
-  data: SaveEquipmentInspectionRequest,
-) =>
-  apiClient.put<SurveyorEquipmentInspection>(
-    `/surveyor/inspections/${inspectionId}`,
-    data,
-  );
-
-export const uploadSurveyorInspectionPhotos = (
-  inspectionId: string,
-  files: InspectionPhotoFile[],
-) => {
-  const formData = new FormData();
-  files.forEach(file => {
-    const value = Platform.OS === 'web'
-      ? file.webFile
-      : {
-          uri: file.uri,
-          type: file.type || 'image/jpeg',
-          name: file.fileName || file.name || 'inspection-photo.jpg',
-        };
-    formData.append('Files', value as any);
-  });
-  return apiClient.post<SurveyorInspectionPhoto[]>(
-    `/surveyor/inspections/${inspectionId}/photos`,
-    formData,
-  );
-};
-
-export const deleteSurveyorInspectionPhoto = (
-  inspectionId: string,
-  photoId: string,
-) => apiClient.delete(`/surveyor/inspections/${inspectionId}/photos/${photoId}`);
 
 export type QcSeverity = 'Low' | 'Medium' | 'High' | 'Critical';
 export type QcReviewStatus =
@@ -811,10 +747,37 @@ export const updateQcComments = (inspectionId: string, comments: string) =>
     comments,
   });
 
-export type SurveyorChecklistPreview = {
-  sourceRevision: string;
-  pointCount: number;
-  isPublished: boolean;
-  items: SurveyorChecklistItem[];
+export type AssignedInspectionDraft = {
+  id: string; projectId: string; projectName: string; equipmentId: string; tagNumber: string;
+  grade: string | null; reviewStatus: string; updatedAt: string; startedAt: string;
+  answered: number; total: number; lastUpdatedBy?: string | null; isLegacy?: boolean;
 };
-export const getSurveyorChecklistPreview = () => apiClient.get<SurveyorChecklistPreview>('/surveyor/checklist/sample-preview');
+export const getAssignedInspectionDrafts = () => apiClient.get<AssignedInspectionDraft[]>('/surveyor/drafts');
+
+export type AssignedInspectionTask = {
+  id: string; projectId: string; projectName: string; tagNumber: string; statusCode: string;
+  plannedGrade?: string | null; scheduledAt?: string | null;
+};
+export const getAssignedInspectionTasks = () => apiClient.get<AssignedInspectionTask[]>('/surveyor/pending-tasks');
+
+export type ProjectScheduleEntry = {
+  id: string; kind: 'Target' | 'Schedule' | 'Overdue'; actorId?: string | null;
+  targetDate?: string | null; previousTargetDate?: string | null; workStartDate?: string | null;
+  expectedWorkEndDate?: string | null; delayReason?: string | null; delayDays: number; occurredAt: string;
+};
+export type ProjectWorkSchedule = {
+  targetDate?: string | null; today: string; summary: ProjectScheduleSummary;
+  mine?: ProjectScheduleEntry | null; reasonRequired: boolean;
+  history: {entry: ProjectScheduleEntry; submittedBy?: string | null; emailStatuses: string[]}[];
+};
+export type ProjectDelayAlert = {
+  id: string; projectId: string; projectName: string; jobNo: string; kind: string;
+  targetDate: string; expectedWorkEndDate?: string | null; delayDays: number;
+  delayReason?: string | null; occurredAt: string; surveyorName?: string | null; emailStatus: string;
+};
+export const getProjectWorkSchedule = (id: string) => apiClient.get<ProjectWorkSchedule>(`/projects/${id}/work-schedule`);
+export const saveProjectWorkSchedule = (id: string, data: {requestId: string; workStartDate: string; expectedWorkEndDate: string; delayReason?: string}) =>
+  apiClient.put(`/projects/${id}/work-schedule`, data);
+export const getProjectDelayAlerts = () => apiClient.get<ProjectDelayAlert[]>('/projects/delay-alerts');
+
+export const deleteEquipmentEvidencePhoto=(projectId:string,areaId:string,equipmentId:string,photoId:string)=>apiClient.delete(`${surveyorEquipmentUrl(projectId,areaId)}/${equipmentId}/photos/${photoId}`);

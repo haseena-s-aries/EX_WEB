@@ -1,0 +1,20 @@
+import React from 'react';
+import Renderer, {act} from 'react-test-renderer';
+import {TextInput, TouchableOpacity} from 'react-native';
+import ClientAssignmentPicker from '../src/components/ClientAssignmentPicker';
+const text = (n: Renderer.ReactTestInstance): string => n.children.map(c => typeof c === 'string' ? c : text(c)).join('');
+test('Client multi-select searches email and ID, prevents duplicates and removes chips', async () => {
+  const onChange = jest.fn(); const options = [{id: 'c1', displayName: 'Alice', email: 'alice@company.test'}, {id: 'c2', displayName: 'Bob', email: 'bob@company.test'}];
+  let ui!: Renderer.ReactTestRenderer;
+  await act(async () => {ui = Renderer.create(<ClientAssignmentPicker value={['c1', 'c1']} options={options} onChange={onChange} />);});
+  expect(text(ui.root)).toContain('1 Client selected');
+  await act(async () => {ui.root.findByProps({accessibilityLabel: 'Assign Client ID'}).props.onPress();});
+  await act(async () => {ui.root.findByType(TextInput).props.onChangeText('bob@company');});
+  const bob = ui.root.findAllByType(TouchableOpacity).find(n => n.props.accessibilityRole === 'checkbox')!;
+  expect(text(bob)).toContain('Bob');
+  await act(async () => bob.props.onPress()); expect(onChange).toHaveBeenLastCalledWith(['c1', 'c2']);
+  await act(async () => {ui.root.findByType(TextInput).props.onChangeText('c1');});
+  await act(async () => {ui.root.findByProps({accessibilityLabel: 'Remove Client Alice'}).props.onPress();});
+  expect(onChange).toHaveBeenLastCalledWith([]);
+  await act(async () => ui.unmount());
+});

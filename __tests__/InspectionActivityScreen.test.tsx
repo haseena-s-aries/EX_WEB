@@ -24,3 +24,15 @@ test('shows the immutable approved checklist snapshot and controlled source', as
   expect(textOf(renderer.root)).toContain('Ex protection type: Ex d');
   await Renderer.act(async () => renderer.unmount());
 });
+
+
+test('history displays equipment context and opens saved results without starting another inspection', async()=>{
+ const api=require('../src/api/projects');api.getInspectionActivityHistory.mockResolvedValue({data:[{id:'saved',grade:'Visual',startedAt:'2026-11-11T10:00:00Z',reviewStatus:'Accepted',inspectorNameSnapshot:'Recorded Inspector',completedAt:'2026-11-11T11:00:00Z'}]});
+ api.getInspectionActivity.mockResolvedValue({data:{id:'saved',grade:'Visual',reviewStatus:'Accepted',checkpoints:[],responses:[],findings:[],evidence:[],reviewHistory:[]}});
+ let renderer!:Renderer.ReactTestRenderer;const back=jest.fn();
+ await Renderer.act(async()=>{renderer=Renderer.create(<InspectionActivityScreen equipmentId="eq-1" role="Admin" backLabel="Back to Equipment Identification" equipmentContext={{tagNumber:'TAG-001',rfidTagUid:'04AB1234',projectName:'Actual project',description:'Recorded motor'}} onBack={back}/>);});
+ expect(textOf(renderer.root)).toContain('Equipment Inspection History');expect(textOf(renderer.root)).toContain('04AB1234');expect(textOf(renderer.root)).toContain('Recorded Inspector');
+ const row=renderer.root.findAllByType(require('react-native').TouchableOpacity).find(n=>textOf(n).includes('Open saved checklist'))!;
+ await Renderer.act(async()=>row.props.onPress());expect(api.getInspectionActivity).toHaveBeenCalledWith('saved');
+ await Renderer.act(async()=>renderer.unmount());
+});

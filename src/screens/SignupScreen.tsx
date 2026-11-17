@@ -1,3 +1,5 @@
+import AuthReferenceLayout from '../components/AuthReferenceLayout';
+import {visual} from '../theme/visual';
 import React, {useMemo, useState} from 'react';
 import {
   View,
@@ -35,6 +37,7 @@ type Props = {
     password: string;
   }) => void;
   onGoToLogin: () => void;
+  onBackToHome?: () => void;
   loading?: boolean;
   /** Starting theme; a choice saved from the login screen's toggle wins. */
   theme?: ThemeMode | 'system';
@@ -64,11 +67,11 @@ const DARK = {
   chipBorder: '#232B36',
   chipTextActive: '#F59E0B',
   border: '#232B36',
-  amber: '#F59E0B',
-  amberHover: '#D97706',
-  link: '#F59E0B',
+  amber: '#7be0cd',
+  amberHover: '#65c8b9',
+  link: '#7be0cd',
   eyebrow: '#F59E0B',
-  heroAccent: '#F59E0B',
+  heroAccent: '#7be0cd',
   text: '#F8FAFC',
   secondary: '#94A3B8',
   muted: '#64748B',
@@ -92,21 +95,21 @@ const LIGHT: typeof DARK = {
   inputFocusBg: '#FFFFFF',
   inputBorder: '#CBD5E1',
   chip: '#FFFFFF',
-  chipActive: '#FEF3C7',
+  chipActive: '#dceff0',
   chipBorder: '#CBD5E1',
-  chipTextActive: '#B45309',
+  chipTextActive: '#095264',
   border: '#E2E8F0',
-  amber: '#F59E0B',
-  amberHover: '#D97706',
-  link: '#B45309', // spec's #D97706 is only ~3:1 on white
+  amber: '#0b596a',
+  amberHover: '#084756',
+  link: '#0b596a', // spec's #D97706 is only ~3:1 on white
   eyebrow: '#B45309',
-  heroAccent: '#D97706',
+  heroAccent: '#7be0cd',
   text: '#0F172A',
   secondary: '#475569',
   muted: '#64748B',
   placeholder: '#64748B',
   icon: '#94A3B8',
-  onAccent: '#0F172A',
+  onAccent: '#ffffff',
   error: '#DC2626',
   headerBg: '#FFFFFF',
   heroRgb: '248,250,252',
@@ -116,6 +119,10 @@ const LIGHT: typeof DARK = {
   focusGlow: 'rgba(245,158,11,0.20)',
   elevation: 4,
 };
+
+const REFERENCE_COLORS = {...DARK, input: '#153d58', inputFocusBg: '#153d58', inputBorder: '#2c5671',
+  chip: '#123b56', chipBorder: '#2c5671', chipActive: '#00e5f5', chipTextActive: '#042338',
+  amber: '#00e5f5', amberHover: '#20f1fc', link: '#b9f8ff', onAccent: '#042338', placeholder: '#e3f2ff'};
 
 type Colors = typeof DARK;
 
@@ -352,11 +359,12 @@ function SignupThemed({
   mode,
   onRegister,
   onGoToLogin,
+  onBackToHome,
   loading,
   heroImage,
 }: Props & {mode: ThemeMode}) {
-  const isDark = mode === 'dark';
-  const c = isDark ? DARK : LIGHT;
+  const isDark = Platform.OS === 'web' || mode === 'dark';
+  const c = Platform.OS === 'web' ? REFERENCE_COLORS : isDark ? DARK : LIGHT;
   const s = useMemo(() => makeStyles(c, isDark), [c, isDark]);
 
   const {width, height: winHeight} = useWindowDimensions();
@@ -507,7 +515,7 @@ function SignupThemed({
             {loading ? (
               <ActivityIndicator color={c.onAccent} />
             ) : (
-              <Text style={[s.ctaText, FONT]}>Create Account</Text>
+              <Text style={[s.ctaText, FONT]}>Create Account{Platform.OS === 'web' ? ' →' : ''}</Text>
             )}
           </View>
         )}
@@ -522,13 +530,17 @@ function SignupThemed({
     </>
   );
 
+  if (Platform.OS === 'web') {
+    return <AuthReferenceLayout mode="register" onSwitch={onGoToLogin} onBackToHome={onBackToHome} photo={heroImage}>{formBody}</AuthReferenceLayout>;
+  }
+
   const photo = heroImage === undefined ? (isDark ? DARK_PHOTO : LIGHT_PHOTO) : heroImage;
   const MOBILE_HERO_H = 280;
 
   /* ---------------- mobile ---------------- */
   if (isMobile) {
     return (
-      <KeyboardAvoidingView
+      <KeyboardAvoidingView nativeID="ex-register"
         style={[s.screen, {minHeight: winHeight}]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
@@ -555,7 +567,7 @@ function SignupThemed({
           </View>
 
           <View style={s.mobileBody}>
-            <Text style={[s.title, {fontSize: 22, textAlign: 'center'}]}>Create Your Account</Text>
+            <Text style={[s.title, {fontSize: 22, textAlign: 'center'}]}>Register for Ex-Survey</Text>
             <Text style={[s.subtitle, {textAlign: 'center', marginBottom: 20}]}>
               Get started with a safer, smarter way to manage inspections.
             </Text>
@@ -579,7 +591,7 @@ function SignupThemed({
         <View style={s.eyebrowDash} />
         <Text style={[s.eyebrow, FONT]}>JOIN EX-SURVEY</Text>
       </View>
-      <Text style={[s.title, {fontSize: 28, lineHeight: 36}]}>Create Your Account</Text>
+      <Text style={[s.title, {fontSize: 28, lineHeight: 36}]}>Register for Ex-Survey</Text>
       <Text style={[s.subtitle, {marginBottom: 22}]}>
         Get started with a safer, smarter way to manage inspections.
       </Text>
@@ -588,7 +600,7 @@ function SignupThemed({
   );
 
   return (
-    <KeyboardAvoidingView style={[s.screen, {minHeight: winHeight}]}>
+    <KeyboardAvoidingView nativeID="ex-register" style={[s.screen, {minHeight: winHeight}]}>
       <View style={s.header}>
         <Brand size={20} c={c} s={s} />
         <View style={s.headerRight}>
@@ -606,42 +618,31 @@ function SignupThemed({
         keyboardShouldPersistTaps="handled">
         <View style={[s.body, {minHeight: winHeight - 64}]}>
           {isSplit ? (
-            <View style={s.hero}>
+            <View nativeID="ex-cover-panel" style={s.hero}>
               {photo ? (
                 <>
                   <Image
                     source={photo}
                     resizeMode="cover"
                     accessibilityIgnoresInvertColors
-                    style={StyleSheet.absoluteFill}
+                    style={[StyleSheet.absoluteFill, {width: '100%', height: '100%'}]}
                   />
-                  {isDark ? (
-                    <>
-                      <View style={[StyleSheet.absoluteFill, {backgroundColor: `rgba(${c.heroRgb},0.25)`}]} />
-                      <Scrim rgb={c.heroRgb} from={0} to={0.94} style={{top: '35%'}} />
-                    </>
-                  ) : (
-                    <>
-                      <View style={[StyleSheet.absoluteFill, {backgroundColor: `rgba(${c.heroRgb},0.06)`}]} />
-                      <Scrim rgb={c.heroRgb} from={0} to={0.95} style={{top: '38%'}} />
-                    </>
-                  )}
+                  <View pointerEvents="none" style={[StyleSheet.absoluteFill, {backgroundColor: 'rgba(6,24,36,.8)'}]} />
                 </>
               ) : null}
 
               <View style={s.heroContent}>
-                <Text style={[s.heroTitle, FONT]}>GREATER{'\n'}INSIGHTS</Text>
-                <Text style={[s.heroTitle, {color: c.heroAccent}, FONT]}>SAFER{'\n'}OPERATIONS</Text>
+                <Text style={[s.heroTitle, FONT]}>Join the inspection</Text>
+                <Text style={[s.heroTitle, {color: c.heroAccent}, FONT]}>workspace.</Text>
                 <View style={s.heroRule} />
                 <Text style={[s.heroBody, FONT]}>
-                  Digital inspection and survey management for a more compliant, resilient
-                  tomorrow.
+                  Request a workspace account for surveys, equipment, quality review and reporting.
                 </Text>
                 <View style={s.valueRow}>
                   {VALUES.map(({label, Icon}) => (
                     <View key={label} style={s.valueItem}>
-                      <Icon color={c.amber} />
-                      <Text style={[s.valueText, FONT]}>{label.toUpperCase()}</Text>
+                      <Icon color={visual.signal} />
+                      <Text style={[s.valueText, FONT, {color: '#c7e2e8'}]}>{label.toUpperCase()}</Text>
                     </View>
                   ))}
                 </View>
@@ -649,7 +650,7 @@ function SignupThemed({
             </View>
           ) : null}
 
-          <View style={s.formPane}>{card}</View>
+          <View nativeID="ex-entry-form" style={s.formPane}>{card}</View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -683,17 +684,17 @@ function makeStyles(c: Colors, isDark: boolean) {
     headerLink: {fontSize: 14, fontWeight: '700', color: c.link},
 
     body: {flex: 1, flexDirection: 'row'},
-    hero: {width: '46%', overflow: 'hidden', justifyContent: 'flex-end', backgroundColor: c.canvas},
+    hero: {width: '46%', overflow: 'hidden', justifyContent: 'flex-end', backgroundColor: visual.deep},
     heroContent: {paddingHorizontal: 56, paddingBottom: 56, paddingTop: 56},
     heroTitle: {
       fontSize: 40,
       lineHeight: 44,
       fontWeight: '800',
-      color: c.text,
+      color: "#f3fbfd",
       letterSpacing: -0.5,
     },
     heroRule: {width: 44, height: 3, backgroundColor: c.amber, marginTop: 20, marginBottom: 16},
-    heroBody: {fontSize: 15, lineHeight: 22, color: c.secondary, maxWidth: 380},
+    heroBody: {fontSize: 15, lineHeight: 22, color: "#c7e2e8", maxWidth: 380},
     valueRow: {flexDirection: 'row', gap: 28, marginTop: 32},
     valueItem: {gap: 8, alignItems: 'flex-start'},
     valueText: {fontSize: 10, lineHeight: 14, letterSpacing: 1.2, fontWeight: '600', color: c.text},
