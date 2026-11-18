@@ -52,3 +52,29 @@ describe('browser fieldwork rollout switch',()=>{
     expect(browserFieldworkEnabled({browserFieldworkEnabled:'true'},'139.5.189.155')).toBe(false);
   });
 });
+
+describe('inspection conflict resolution',()=>{
+  const pts=[p('A/1','Is the enclosure intact?'),p('A/2','Are cable glands tight?'),p('A/3','Is the label legible?')];
+  const local={answers:{'A/1':{grades:{V:'Pass'},remarks:'ok'},'A/2':{grades:{V:'Fail'},remarks:'loose'}},comments:'local',hold:false,points:pts};
+  const server={answers:{'A/1':{grades:{V:'Fail',C:null},remarks:'cracked'},'A/3':{grades:{V:'Pass'},remarks:''}},comments:'local',hold:false,points:pts};
+  it('lists only checkpoints answered on this device that differ from the server',()=>
+    expect(conflictFields('inspection',local,server).map(f=>f.key)).toEqual(['answer:A/1']));
+  it('treats blank grades as equal',()=>
+    expect(conflictFields('inspection',{...local,answers:{'A/1':{grades:{V:'Fail'},remarks:'cracked'}}},server)).toEqual([]));
+  it('applies per-checkpoint choices',()=>{
+    expect(applyConflictChoices('inspection',local,server,{'answer:A/1':'server'}).answers['A/1'].remarks).toBe('cracked');
+    expect(applyConflictChoices('inspection',local,server,{'answer:A/1':'local'}).answers['A/1'].remarks).toBe('ok');
+  });
+  it('requires accepting the server wording of an opened inspection and keeps answers to removed checkpoints on the device',()=>{
+    const reworded={...local,points:[p('A/1','Enclosure intact incl. viewing window?'),pts[1],pts[2]]};
+    const serverRemoved={answers:{},comments:'local',hold:false,points:[pts[0],pts[2]]};
+    const f=conflictFields('inspection',reworded,serverRemoved);
+    expect(f.map(x=>x.key)).toEqual(['checkpointWording']);
+    expect(f[0].serverOnly).toBe(true);
+    expect(()=>applyConflictChoices('inspection',reworded,serverRemoved,{checkpointWording:'local'})).toThrow(/only take the server value/);
+    const next=applyConflictChoices('inspection',reworded,serverRemoved,{checkpointWording:'server'});
+    expect(next.points[0].text).toBe('Is the enclosure intact?');
+    expect(Object.keys(next.answers)).toEqual(['A/1']);
+    expect(next.unsavedAnswers['A/2'].remarks).toBe('loose');
+  });
+});

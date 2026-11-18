@@ -16,16 +16,17 @@ export default function FieldworkConflict({operation}:{operation:Operation}){
   const [error,setError]=useState('');const [busy,setBusy]=useState(false);
   const run=async(fn:()=>Promise<void>)=>{setBusy(true);setError('');try{await fn();}catch(e:any){setError(e.message);}finally{setBusy(false);}};
   const fields=review?conflictFields(operation.kind,operation.payload,review.server):[];
-  const chooseAll=(choice:Choice)=>setChoices(Object.fromEntries(fields.map(f=>[f.key,choice])));
+  const chooseAll=(choice:Choice)=>setChoices(Object.fromEntries(fields.map(f=>[f.key,f.serverOnly?'server':choice])));
   return <div className="fw-conflict">
     <button disabled={busy} onClick={()=>void run(async()=>{setReview(await loadConflict(operation));setChoices({});})}>{review?'Reload current server version':'Load current versions to resolve'}</button>
     {error&&<p role="alert" className="fw-error">{error}</p>}
     {review&&<>
       <p>Server version {review.version}. {fields.length} difference{fields.length===1?'':'s'} to review.{operation.kind==='checklist'?' Checklist choices apply per checkpoint.':''}</p>
       {fields.length>1&&<div className="fw-actions"><button type="button" onClick={()=>chooseAll('local')}>Keep all local</button><button type="button" onClick={()=>chooseAll('server')}>Use all server</button></div>}
-      {fields.map(f=><fieldset key={f.key} className="fw-choice"><legend>{f.label}</legend><div className="fw-form-grid">
-        <label className="fw-radio"><span><input type="radio" name={operation.id+f.key} checked={choices[f.key]==='local'} onChange={()=>setChoices({...choices,[f.key]:'local'})}/> Keep local</span><pre>{show(f.local)}</pre></label>
-        <label className="fw-radio"><span><input type="radio" name={operation.id+f.key} checked={choices[f.key]==='server'} onChange={()=>setChoices({...choices,[f.key]:'server'})}/> Use server</span><pre>{show(f.server)}</pre></label>
+      {fields.map(f=><fieldset key={f.key} className="fw-choice"><legend>{f.label}</legend>{f.note&&<p className="fw-note">{f.note}</p>}<div className="fw-form-grid">
+        {f.serverOnly?<div className="fw-radio"><span>Your device</span><pre>{show(f.local)}</pre></div>:
+        <label className="fw-radio"><span><input type="radio" name={operation.id+f.key} checked={choices[f.key]==='local'} onChange={()=>setChoices({...choices,[f.key]:'local'})}/> Keep local</span><pre>{show(f.local)}</pre></label>}
+        <label className="fw-radio"><span><input type="radio" name={operation.id+f.key} checked={choices[f.key]==='server'} onChange={()=>setChoices({...choices,[f.key]:'server'})}/> {f.serverOnly?'Accept server':'Use server'}</span><pre>{show(f.server)}</pre></label>
       </div></fieldset>)}
       <button className="primary" disabled={busy} onClick={()=>void run(async()=>{await resolveConflict(operation.id,review,choices);setReview(undefined);})}>Save resolution for synchronization</button>
     </>}

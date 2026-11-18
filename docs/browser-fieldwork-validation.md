@@ -33,12 +33,37 @@ Verified on the disposable local stack (real API + SQL Server container, product
 see the final report of this change for the step list. Not verified: physical iPhone Safari / Android browsers,
 PWA install prompts, storage-quota exhaustion, and Android native builds (no Android SDK in the test environment).
 
+Second round (same day):
+
+- Downloads now include controlled equipment reference documents (equipment, area and project scope; SHA-256 checked
+  on the device; skipped when `EquipmentDocuments:Enabled` is false). Verified in the bundle: hazardous-area plan,
+  common layout, area images, reference document, historical inspection photos and the equipment checklist selection.
+- Unsaved equipment and defect forms are restored after a restart (encrypted workspace draft); nothing is queued
+  until "Save on device". The leave-page warning covers queued changes only, because form input is already saved
+  on the device.
+- Stuck changes: Sync Center shows which change another one is waiting for. A change and everything depending on it
+  can be **set aside** (kept on the device, never sent), downloaded as JSON and restored later. Set-aside changes are
+  excluded from synchronization.
+- Inspections: a draft started without a server inspection now conflicts (instead of overwriting) when another device
+  already answered the same checkpoint; resolution is per checkpoint. If checkpoint wording changed after an
+  inspection was opened, the inspection keeps its server wording (the equipment checklist keeps the new wording);
+  answers to checkpoints no longer on the inspection are kept on the device, not sent.
+- Editing an existing defect no longer re-queues the server's own photo records.
+- Server: a replaced defect photo is deleted only after the fieldwork transaction commits; files stored by a
+  fieldwork request are removed if it rolls back (`FieldworkFileTransaction`).
+- The status line never shows an earlier "All Changes Synced" while changes are waiting.
+- Storage full: a save that does not fit is refused with "Device storage is full. This change was NOT saved." and
+  existing device data is unaffected. Tested by simulating the browser's quota failure (transaction aborted with
+  `QuotaExceededError`), because Chromium's quota emulation did not reliably limit IndexedDB in the test browser.
+- Downloads: a download that finishes after changes were saved for the same project no longer replaces the device
+  copy (it is cancelled with a message); saving stays disabled in the same tab until a download finishes.
+
 Remaining release blockers:
 
 - Validate current iPhone Safari and Android browsers on devices and complete PWA installation checks.
-- Storage-quota exhaustion tests.
-- Recovery of dependent operations after an operator abandons a conflict (currently dependants wait).
-- Review transaction boundaries and external file cleanup on rollback, especially replacement defect photos.
+- Real-device storage pressure and eviction behaviour (only a simulated quota failure was tested).
+- Native Android build verification (no Android SDK in the test environment; no Android code was changed).
+- Decide the 8-hour offline window policy.
 - Authorization of production rollout.
 
 Backend migration generated: `20261116053821_BrowserFieldworkReceipts`. It has not been applied by this work. No live database changes were performed.

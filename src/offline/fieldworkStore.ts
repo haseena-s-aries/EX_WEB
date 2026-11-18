@@ -63,10 +63,14 @@ async function readPrefix<T>(prefix:string):Promise<T[]> {
 /** Single IndexedDB transaction: all rows commit together or none do. Deletes are only used for account-record moves. */
 async function write(rows:(Envelope|Account)[],deletes:string[]=[]) {
   const d=await db();return new Promise<void>((resolve,reject)=>{
-    const tx=d.transaction('vault','readwrite');rows.forEach(row=>tx.objectStore('vault').put(row));deletes.forEach(k=>tx.objectStore('vault').delete(k));
+    const failure=(name?:string)=>new Error(name==='QuotaExceededError'
+      ? 'Device storage is full. This change was NOT saved. Free space or sync existing work, then retry.' : 'Device save failed. Keep this screen open and retry.');
+    const tx=d.transaction('vault','readwrite');
     tx.oncomplete=()=>{fieldworkChanged();resolve();};
-    tx.onabort=tx.onerror=()=>reject(new Error(tx.error?.name==='QuotaExceededError'
-      ? 'Device storage is full. This change was NOT saved. Free space or sync existing work, then retry.' : 'Device save failed. Keep this screen open and retry.'));
+    tx.onabort=tx.onerror=()=>reject(failure(tx.error?.name));
+    // A storage error can also be thrown synchronously; abort so nothing from this save is committed.
+    try{rows.forEach(row=>tx.objectStore('vault').put(row));deletes.forEach(k=>tx.objectStore('vault').delete(k));}
+    catch(error:any){try{tx.abort();}catch{/* already aborted */}reject(failure(error?.name));}
   });
 }
 async function pbkdf2(password:string,salt:Uint8Array,extractable:boolean,usages:KeyUsage[]) {

@@ -17,18 +17,30 @@ async function seed() {
   const mkProject = async (label, surveyorId) => (await api('POST', '/projects', {token: admin, expect: 201, json: {
     projectName: `E2E Fieldwork ${label} ${run}`, jobNo: `E2E-${label}-${run}`, location: 'Local test bench', vesselOrSiteName: 'Synthetic site',
     assignedSurveyorId: surveyorId, assignedQcId: qc.id, clientName: 'Synthetic Client', targetDate: '2027-01-31', sector: 'Synthetic'}})).body;
-  const project = await mkProject('A', surveyor.id);
+  // Project A is created with a hazardous-area plan (multipart), like the New Project form.
+  const planForm = new FormData();
+  for (const [k, v] of Object.entries({ProjectName: `E2E Fieldwork A ${run}`, JobNo: `E2E-A-${run}`, Location: 'Local test bench', VesselOrSiteName: 'Synthetic site',
+    AssignedSurveyorId: surveyor.id, AssignedQcId: qc.id, ClientName: 'Synthetic Client', TargetDate: '2027-01-31', Sector: 'Synthetic'})) planForm.append(k, v);
+  planForm.append('hazardousAreaPlan', new Blob([png(3)], {type: 'image/png'}), 'hazardous-area-plan.png');
+  const project = (await api('POST', '/projects', {token: admin, form: planForm, expect: 201})).body;
   const unassigned = await mkProject('B', other.id);
   const area = (await api('POST', `/projects/${project.id}/areas`, {token: admin, json: {areaName: 'Pump deck'}, expect: 201})).body;
   const form = new FormData(); form.append('Files', new Blob([png(7)], {type: 'image/png'}), 'pump-deck-layout.png');
   await api('POST', `/projects/${project.id}/areas/${area.id}/photos`, {token: admin, form, expect: 201}).catch(async () =>
     api('POST', `/projects/${project.id}/areas/${area.id}/photos`, {token: admin, form}));
+  const layout = new FormData(); layout.append('Files', new Blob([png(5)], {type: 'image/png'}), 'ga-common-layout.png');
+  await api('POST', `/projects/${project.id}/common-layouts`, {token: admin, form: layout, expect: 201}).catch(() => api('POST', `/projects/${project.id}/common-layouts`, {token: admin, form: layout, expect: 200}));
   const sToken = await login(surveyor.email, surveyor.password);
   const equipment = [];
   for (const [tag, type] of [['P-101-MTR', 'Motor'], ['JB-204', 'Junction box']])
     equipment.push((await api('POST', `/surveyor/projects/${project.id}/areas/${area.id}/equipment`, {token: sToken, expect: 201,
       json: {xPercent: 40, yPercent: 40, tagNumber: tag, type, exProtectionType: 'Ex d', isPlacedOnLayout: false, description: `${type} seeded`}})).body);
-  return {admin, surveyor, other, qc, project, unassigned, area, equipment, run, sToken};
+  // Controlled reference document for the motor (requires EquipmentDocuments:Enabled on the disposable API).
+  const doc = new FormData();
+  for (const [k, v] of Object.entries({ProjectId: project.id, EquipmentId: equipment[0].id, Title: `Ex certificate ${run}`, CategoryCode: 'ExCertificate', DocumentNumber: 'IECEx TST 26.0001', Revision: 'B'})) doc.append(k, v);
+  doc.append('File', new Blob([png(9)], {type: 'image/png'}), 'ex-certificate.png');
+  const reference = (await api('POST', '/v1/equipment-documents', {token: admin, form: doc, expect: 201})).body;
+  return {admin, surveyor, other, qc, project, unassigned, area, equipment, run, sToken, reference};
 }
 
 async function apiChecks(fx) {

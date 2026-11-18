@@ -51,6 +51,7 @@ module.exports = async function layoutChecks(browser, fx) {
     await page.click('.fw-launch'); await page.waitForSelector('.fw-root', T);
     const card = page.locator('.fw-panel', {has: page.locator('h2', {hasText: fx.project.projectName.toUpperCase()})});
     await card.getByRole('button', {name: /Download for Offline Use|Update offline copy/}).click();
+    await card.getByRole('button', {name: 'Update offline copy'}).waitFor({timeout: 120000});
     await card.getByText('Available Offline').waitFor({timeout: 120000});
     await context.setOffline(true);
     await card.getByRole('button', {name: 'Open offline fieldwork'}).click();

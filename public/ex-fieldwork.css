@@ -16,3 +16,4 @@ html[data-exsurvey-theme=light] .fw-root{background:#eef6f8;color:#092a3b;color-
 
 html[data-exsurvey-theme=light] .fw-dock{background:#fffffff2;color:#092a3b;border-color:#bfdae2}html[data-exsurvey-theme=light] .fw-sync-now{color:#0b6d80}
 .fw-dock .fw-short{display:none}@media(max-width:600px){.fw-dock .fw-long{display:none}.fw-dock .fw-short{display:inline}.fw-dock .fw-status .fw-long{display:inline;position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}}
+.fw-root .fw-note{border-left:3px solid #ffb648;padding:6px 10px;color:#ffd79a}html[data-exsurvey-theme=light] .fw-root .fw-note{color:#8a5300}.fw-root div.fw-radio{border:1px dashed #23778c;border-radius:10px;padding:10px}.fw-op-subject{font-weight:700}
