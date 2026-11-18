@@ -59,7 +59,10 @@ It resumes the next time the app is opened and unlocked.
 download → offline edits (equipment, checklist, inspection, remarks, defect, photos) → offline reload →
 reconnect with a lost checklist response and an interrupted photo upload (no duplicates) → server
 persistence and photo associations → token expiry pause/resume → password change re-key → two-device
-conflicts → account isolation → layout audit at 320/360/375/390/414/430/768/1024 px.
+conflicts (equipment, checklist, inspection answers, defects with photo replacement) → checkpoint-wording conflict →
+account isolation → download completeness (plans, layouts, reference documents, history photos, checklist
+selection) → unsaved-form recovery → set aside / export / restore of a rejected change → storage full →
+layout audit at 320/360/375/390/414/430/768/1024 px.
 
 It refuses non-loopback targets. Run it **only** against a throwaway database, because it creates
 synthetic users and projects:
@@ -69,9 +72,19 @@ synthetic users and projects:
 2. Start the API on `http://localhost:5235` against that database with a non-Development environment
    name (Development is pinned to LocalDB by design), a local `Jwt__SigningKey` and
    `BootstrapAdmin__Email` / `BootstrapAdmin__Password` for the synthetic admin
-   (defaults expected by the suite: `e2e-admin@example.test` / set `E2E_ADMIN_PASSWORD`).
+   (defaults expected by the suite: `e2e-admin@example.test` / set `E2E_ADMIN_PASSWORD`). Also set
+   `EquipmentDocuments__Enabled=true` (the reference-document scenario uploads one) and, to check that replaced
+   photos are removed from storage, `ProjectPhotoStorage__RootPath=<dir>` with `E2E_STORAGE_ROOT=<same dir>`.
 3. `npm run build && npm run serve:offline-local`
 4. `npm run test:e2e:fieldwork` (optional args: `api`, `browser`, `layout`;
    set `E2E_ARTIFACTS=<dir>` to keep screenshots and layout findings).
 
 The API rate-limits sign-ins to 20 per 5 minutes per address; the suite waits when it is throttled.
+
+## Stuck changes and storage
+
+* Sync Center shows which change another one is waiting for. **Set aside** stops a change (and everything that
+  depends on it) from blocking the queue; it stays encrypted on the device, is never sent, can be downloaded as JSON
+  and restored to the queue later.
+* When device storage is full, a save is refused with "Device storage is full. This change was NOT saved." Nothing
+  already on the device is affected.

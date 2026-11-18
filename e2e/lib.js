@@ -23,7 +23,8 @@ async function step(name, fn) {
     for (const [i, page] of debugPages.entries()) {
       try {
         const text = await page.locator('.fw-root').isVisible() ? await page.locator('.fw-root').innerText() : await page.locator('body').innerText();
-        console.log(`--- page ${i} text ---\n${text.slice(0, 3000)}`);
+        console.log(`--- page ${i} text ---\n${text.slice(0, 6000)}`);
+        console.log(`--- page ${i} web locks ---\n${JSON.stringify(await page.evaluate(() => navigator.locks?.query?.()))}`);
         if (process.env.E2E_ARTIFACTS) await page.screenshot({path: `${process.env.E2E_ARTIFACTS}/failure-${results.length}-${i}.png`, fullPage: false});
       } catch { /* page may be closed */ }
     }

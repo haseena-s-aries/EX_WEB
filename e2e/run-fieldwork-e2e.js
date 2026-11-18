@@ -7,6 +7,7 @@
 const {results} = require('./lib');
 const {seed, apiChecks} = require('./seed-and-api');
 const browserScenarios = require('./browser-fieldwork');
+const extendedScenarios = require('./browser-fieldwork-extended');
 const layoutChecks = require('./mobile-layout');
 let chromium;
 try { ({chromium} = require('playwright')); } catch { console.error('Playwright is required (require("playwright")).'); process.exit(2); }
@@ -19,6 +20,7 @@ try { ({chromium} = require('playwright')); } catch { console.error('Playwright 
   try {
     if (!only.length || only.includes('api')) await apiChecks(fx);
     if (!only.length || only.includes('browser')) await browserScenarios(browser, fx);
+    if (!only.length || only.includes('browser')) await extendedScenarios(browser, fx);
     if (!only.length || only.includes('layout')) await layoutChecks(browser, fx);
   } catch { /* failure already reported */ }
   finally { await browser.close(); }

@@ -2,7 +2,9 @@
 export type ChecklistPoint = {code:string;section:string;itemNumber:number;text:string;protectionApplicability:string};
 export type ConflictKind = 'equipment'|'inspection'|'defect'|'checklist'|'photo';
 export type Choice = 'local'|'server';
-export type ConflictField = {key:string;label:string;local:unknown;server:unknown};
+/** serverOnly: the local value cannot be applied to the server record; the user must accept the server value. */
+export type ConflictField = {key:string;label:string;local:unknown;server:unknown;serverOnly?:boolean;note?:string};
+export type InspectionAnswer = {grades:Record<string,string|null>;remarks:string;comment?:string};
 
 /** Fields the server controls or that are not user-editable never take part in a field choice. */
 const PROTECTED = ['id','projectId','areaId','clientEquipmentId','photos','previousOperationId','sequenceNo','markingNo','registrationStatus','status',
@@ -10,6 +12,23 @@ const PROTECTED = ['id','projectId','areaId','clientEquipmentId','photos','previ
 const same = (a:unknown,b:unknown) => JSON.stringify(a??null)===JSON.stringify(b??null);
 const pointKey = (code:string) => 'checkpoint:'+code;
 const pointView = (p?:ChecklistPoint) => p ? {included:true,text:p.text,category:p.protectionApplicability} : {included:false};
+const answerKey = (code:string) => 'answer:'+code;
+const WORDING = 'checkpointWording';
+
+/** Grades are compared ignoring blank entries, so {V:null} equals {}. */
+export function sameAnswer(a?:InspectionAnswer,b?:InspectionAnswer) {
+  const grades=(x?:InspectionAnswer)=>Object.fromEntries(Object.entries(x?.grades||{}).filter(([,v])=>v!=null&&v!=='').sort());
+  return same(grades(a),grades(b))&&(a?.remarks||'')===(b?.remarks||'')&&(a?.comment||'')===(b?.comment||'');
+}
+
+/** Wording of every checkpoint the local draft answered: local text vs the server inspection's frozen definition. */
+function wording(local:any,server:any) {
+  const answered=Object.keys(local?.answers||{});
+  const mine=Object.fromEntries((local?.points||[]).filter((p:ChecklistPoint)=>answered.includes(p.code)).map((p:ChecklistPoint)=>[p.code,p.text]));
+  const serverPoints=new Map<string,string>((server?.points||[]).map((p:ChecklistPoint)=>[p.code,p.text]));
+  const theirs=Object.fromEntries(answered.filter(c=>c in mine||serverPoints.has(c)).map(c=>[c,serverPoints.get(c)??'(checkpoint not on the server inspection)']));
+  return {mine:Object.fromEntries(Object.keys(theirs).map(c=>[c,mine[c]??theirs[c]])),theirs};
+}
 
 /** Every field whose local and server values differ and therefore needs an explicit choice. */
 export function conflictFields(kind:ConflictKind,local:any,server:any):ConflictField[] {
@@ -20,10 +39,23 @@ export function conflictFields(kind:ConflictKind,local:any,server:any):ConflictF
     return codes.map(code=>({key:pointKey(code),label:`Checkpoint ${code}`,local:pointView(mine.get(code)),server:pointView(theirs.get(code))}))
       .filter(f=>!same(f.local,f.server));
   }
-  const keys=kind==='inspection'?['answers','comments','hold']
+  if(kind==='inspection') {
+    const fields:ConflictField[]=[];
+    const serverAnswers=server?.answers||{};
+    // Only checkpoints answered on this device can conflict; server-only answers are kept as they are.
+    for(const [code,answer] of Object.entries<InspectionAnswer>(local?.answers||{}))
+      if(serverAnswers[code]&&!sameAnswer(answer,serverAnswers[code]))
+        fields.push({key:answerKey(code),label:`Answer ${code}`,local:answer,server:serverAnswers[code]});
+    for(const key of ['comments','hold'])if(!same(local?.[key],server?.[key]))fields.push({key,label:key,local:local?.[key]??null,server:server?.[key]??null});
+    const w=wording(local,server);
+    if(!same(w.mine,w.theirs))fields.push({key:WORDING,label:'Checkpoint wording on this inspection',local:w.mine,server:w.theirs,serverOnly:true,
+      note:'An inspection keeps the checklist wording it was opened with. Your wording change stays on the equipment checklist for future inspections. Answers to checkpoints that are no longer on the server inspection are kept on this device and not sent.'});
+    return fields;
+  }
+  const keys=
     // Only fields the server record actually stores can conflict; display-only keys merged into the
     // device copy (area names, counts, etc.) are not persisted by the save and are ignored.
-    :Object.keys(local||{}).filter(k=>!PROTECTED.includes(k)&&!(kind==='defect'&&k==='equipmentId')&&!!server&&Object.prototype.hasOwnProperty.call(server,k));
+    Object.keys(local||{}).filter(k=>!PROTECTED.includes(k)&&!(kind==='defect'&&k==='equipmentId')&&!!server&&Object.prototype.hasOwnProperty.call(server,k));
   return keys.map(key=>({key,label:key,local:local?.[key]??null,server:server?.[key]??null})).filter(f=>!same(f.local,f.server));
 }
 
@@ -35,6 +67,20 @@ export function applyConflictChoices(kind:ConflictKind,local:any,server:any,choi
   const fields=conflictFields(kind,local,server);
   const missing=fields.filter(f=>!choices[f.key]);
   if(missing.length)throw new Error(`Choose local or server values for ${missing.map(f=>f.label).join(', ')}.`);
+  const refused=fields.filter(f=>f.serverOnly&&choices[f.key]!=='server');
+  if(refused.length)throw new Error(`${refused.map(f=>f.label).join(', ')} can only take the server value.`);
+  if(kind==='inspection') {
+    const next={...local,answers:{...(local?.answers||{})},unsavedAnswers:{...(local?.unsavedAnswers||{})}};
+    for(const f of fields)if(f.key.startsWith('answer:')&&choices[f.key]==='server')next.answers[f.key.slice(7)]=(server.answers||{})[f.key.slice(7)];
+    for(const key of ['comments','hold'])if(choices[key]==='server')next[key]=server?.[key]??null;
+    if(server?.points){
+      // Adopt the server inspection's wording; answers to checkpoints it does not contain are retained, not sent.
+      const serverPoints=new Map<string,ChecklistPoint>(server.points.map((p:ChecklistPoint)=>[p.code,p]));
+      for(const code of Object.keys(next.answers))if(!serverPoints.has(code)){next.unsavedAnswers[code]=next.answers[code];delete next.answers[code];}
+      next.points=(local?.points||[]).map((p:ChecklistPoint)=>serverPoints.get(p.code)??p);
+    }
+    return next;
+  }
   if(kind==='checklist') {
     const theirs=new Map<string,ChecklistPoint>((server?.points||[]).map((p:ChecklistPoint)=>[p.code,p]));
     const mine=new Map<string,ChecklistPoint>((local?.points||[]).map((p:ChecklistPoint)=>[p.code,p]));

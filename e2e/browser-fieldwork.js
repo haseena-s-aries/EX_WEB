@@ -12,6 +12,7 @@ async function device(browser, viewport = {width: 1280, height: 900}) {
   const page = await context.newPage();
   page.on('dialog', d => d.accept().catch(() => {}));
   page.on('pageerror', e => console.log('  [pageerror]', e.message));
+  page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) console.log('  [console]', m.text().slice(0, 300)); });
   debugPages.push(page);
   return {context, page};
 }
@@ -45,6 +46,8 @@ async function tab(page, name) { await page.locator('.fw-tabs button', {hasText:
 async function syncNowInPanel(page) { await page.locator('.fw-tabs button', {hasText: 'Sync Now'}).click(); }
 async function waitMessage(page, text, timeout = 90000) {
   await page.locator('.fw-message', {hasText: text}).waitFor({timeout});
+  // A success message must coincide with an empty queue.
+  if (/Synced|synced/.test(String(text))) await page.locator('.fw-tabs button', {hasText: 'Sync Center (0)'}).waitFor({timeout});
 }
 async function pendingCount(page) {
   const label = await page.locator('.fw-tabs button', {hasText: 'Sync Center'}).innerText();
@@ -53,7 +56,11 @@ async function pendingCount(page) {
 async function download(page, projectName) {
   const card = page.locator('.fw-panel', {has: page.locator('h2', {hasText: projectName})});
   await card.getByRole('button', {name: /Download for Offline Use|Update offline copy/}).click();
+  // Wait for this download to finish (the card may already say "Available Offline" from an earlier copy).
+  await card.getByRole('button', {name: 'Downloading…'}).waitFor({timeout: 5000}).catch(() => {});
+  await card.getByRole('button', {name: 'Downloading…'}).waitFor({state: 'detached', timeout: 120000});
   await card.getByText('Available Offline', {exact: false}).waitFor({timeout: 120000});
+  await card.getByRole('button', {name: 'Update offline copy'}).waitFor({timeout: 120000});
   return card;
 }
 async function openProject(page, projectName, areaName) {
@@ -67,6 +74,17 @@ async function equipmentRow(fx, token, id) {
   const list = (await api('GET', `/surveyor/projects/${fx.project.id}/areas/${fx.area.id}/equipment`, {token, expect: 200})).body;
   return list.find(e => e.id === id);
 }
+/** Submit an in-panel sign-in form; waits out the server's sign-in rate limit once if it is hit. */
+async function submitSignIn(page, scope, password, button) {
+  await scope.getByLabel('Password', {exact: true}).fill(password);
+  await scope.getByRole('button', {name: button}).click();
+  const limited = scope.getByText('Too many sign-in attempts');
+  if (await limited.waitFor({timeout: 5000}).then(() => true, () => false)) {
+    console.log('  sign-in rate limited by the server; waiting 305 s'); await page.waitForTimeout(305000);
+    await scope.getByLabel('Password', {exact: true}).fill(password);
+    await scope.getByRole('button', {name: button}).click();
+  }
+}
 const equipmentCard = (page, tag) => page.locator('section.fw-panel', {has: page.locator('h3', {hasText: tag})});
 async function editEquipment(page, tag, changes) {
   await equipmentCard(page, tag).getByRole('button', {name: 'View / Edit Equipment'}).click();
@@ -75,12 +93,13 @@ async function editEquipment(page, tag, changes) {
   await form.getByRole('button', {name: 'Save on device'}).click();
   await page.locator('.fw-message', {hasText: 'Saved on Device'}).waitFor(T);
 }
-async function editChecklist(page, tag, {text, pass, remarks, photo, save = 'Save Draft'}) {
+async function editChecklist(page, tag, {text, pass, fail, remarks, photo, save = 'Save Draft'}) {
   await equipmentCard(page, tag).getByRole('button', {name: 'Inspection Checklist'}).click();
   const panel = page.locator('section.fw-panel', {has: page.locator('h2', {hasText: 'Inspection Checklist'})});
   const first = panel.locator('article.fw-checkpoint').first();
   if (text !== undefined) await first.getByLabel('Items to Be Checked').fill(text);
   if (pass) await first.getByRole('button', {name: 'P — Pass'}).click();
+  if (fail) await first.getByRole('button', {name: 'F — Fail'}).click();
   if (remarks) await first.getByLabel('Remarks').fill(remarks);
   if (photo) {
     await panel.locator('label', {hasText: 'Photographs / evidence'}).locator('input[type=file]').setInputFiles({name: 'checkpoint.png', mimeType: 'image/png', buffer: photo});
@@ -215,8 +234,7 @@ module.exports = async function browserScenarios(browser, fx) {
     await A.page.locator('.fw-status', {hasText: 'Sign in to resume sync'}).waitFor(T);
     assert.strictEqual(await pendingCount(A.page), 1, 'pending change retained while paused');
     await A.page.unrouteAll({behavior: 'ignoreErrors'});
-    await A.page.locator('.fw-reauth').getByLabel('Password').fill(password);
-    await A.page.locator('.fw-reauth').getByRole('button', {name: 'Sign in and resume sync'}).click();
+    await submitSignIn(A.page, A.page.locator('.fw-reauth'), password, 'Sign in and resume sync');
     await waitMessage(A.page, 'All Changes Synced');
     const t = await sApi();
     assert.strictEqual((await equipmentRow(fx, t, eqBox.id)).manufacturer, 'Token-expiry Mfr');
@@ -234,8 +252,7 @@ module.exports = async function browserScenarios(browser, fx) {
     await tab(A.page, 'Sync Center');
     await syncNowInPanel(A.page);
     await A.page.locator('.fw-reauth').waitFor(T);
-    await A.page.locator('.fw-reauth').getByLabel('Password').fill(next);
-    await A.page.locator('.fw-reauth').getByRole('button', {name: 'Sign in and resume sync'}).click();
+    await submitSignIn(A.page, A.page.locator('.fw-reauth'), next, 'Sign in and resume sync');
     await A.page.getByRole('heading', {name: 'Unlock device work saved under your previous password'}).waitFor(T);
     await A.page.getByLabel('Previous password', {exact: true}).fill('definitely-wrong');
     await A.page.getByRole('button', {name: 'Unlock and re-key to my new password'}).click();
@@ -251,8 +268,7 @@ module.exports = async function browserScenarios(browser, fx) {
     await A.page.waitForSelector('.fw-dock', T);
     await openFieldwork(A.page);
     await A.page.getByRole('heading', {name: 'Unlock device workspace'}).waitFor(T);
-    await A.page.locator('.fw-root').getByLabel('Password').fill(next);
-    await A.page.locator('.fw-root').getByRole('button', {name: 'Unlock', exact: true}).click();
+    await submitSignIn(A.page, A.page.locator('section[aria-labelledby="fw-unlock"]'), next, 'Unlock');
     // The unlocked workspace restores the last saved draft view; the downloaded copy is still listed.
     await equipmentCard(A.page, eqMotor.tagNumber).waitFor(T); // restored work view (status text is transient)
     await tab(A.page, 'Downloaded projects');
@@ -323,3 +339,6 @@ module.exports = async function browserScenarios(browser, fx) {
 
   await A.context.close();
 };
+
+module.exports.helpers = {device, signIn, submitSignIn, shellInstalled, openFieldwork, tab, syncNowInPanel, waitMessage, pendingCount, download, openProject,
+  equipmentCard, editEquipment, editChecklist, equipmentRow, isApiCall, T};
