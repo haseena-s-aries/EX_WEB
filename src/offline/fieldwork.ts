@@ -1,7 +1,8 @@
-import api, {getApiResourceUrl, getAuthToken} from '../api/client';
+import api, {getApiResourceUrl, getAuthToken, setAuthToken} from '../api/client';
 import {canConsolidate, mergeEvidence} from './fieldworkQueueRules';
 import {getSessionProfile} from '../api/profileState';
-import {fieldworkChanged, fieldworkSession, stableId, vaultBlob, vaultGet, vaultList, vaultSave} from './fieldworkStore';
+import {applyConflictChoices, Choice} from './fieldworkConflicts';
+import {establishFieldwork, fieldworkChanged, fieldworkSession, OFFLINE_WINDOW_MS, stableId, vaultBlob, vaultGet, vaultList, vaultSave} from './fieldworkStore';
 
 export type Point = {code:string;section:string;itemNumber:number;text:string;protectionApplicability:string};
 export type Attachment = {id:string;name:string;mime:string;url?:string;owner:string;layoutImageKey?:string;uploadedAt?:string};
@@ -17,11 +18,45 @@ export type Operation = {id:string;projectId:string;entityId:string;kind:'equipm
 type WireRequest = {id:string;url:string;method:'POST'|'PUT';data:any;version?:string;file?:Attachment;fields?:Record<string,string>};
 export const bundles = ()=>vaultList<Bundle>('project');
 export const operations = ()=>vaultList<Operation>('operation');
-export let syncState = {running:false,done:0,total:0,message:'',lastSuccess:''};
+export let syncState = {running:false,done:0,total:0,message:'',lastSuccess:'',
+  /** True while the API session is expired/rejected. Sync is paused; all local work is retained. */
+  authRequired:false};
 export const pendingOperations = async()=> (await operations()).filter(o=>o.status!=='Synced');
+/** JWT expiry in ms, or 0 if unreadable. */
+export function tokenExpiry(token:string|null|undefined) {
+  try {return JSON.parse(atob(String(token).split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).exp*1000||0;} catch {return 0;}
+}
 export async function backendReady() {
-  if(!getAuthToken()||!fieldworkSession()||getSessionProfile()?.id!==fieldworkSession()?.id||getSessionProfile()?.role!=='Surveyor')return false;
-  try {await api.get('/fieldwork/session',{timeout:8000});return true;} catch{return false;}
+  if(!fieldworkSession()||getSessionProfile()?.id!==fieldworkSession()?.id||getSessionProfile()?.role!=='Surveyor')return false;
+  const token=getAuthToken();
+  if(!token||tokenExpiry(token)<=Date.now()+15000){syncState.authRequired=true;fieldworkChanged();return false;}
+  try {await api.get('/fieldwork/session',{timeout:8000});syncState.authRequired=false;return true;}
+  catch(e:any){if(e?.response?.status===401){syncState.authRequired=true;fieldworkChanged();}return false;}
+}
+
+/**
+ * Re-authenticate in place (token expired) without leaving the fieldwork screen or touching local work.
+ * The same account must sign in; a different account is refused so vaults stay isolated.
+ */
+export async function reauthenticate(password:string):Promise<'ready'|'rekey-required'> {
+  const current=fieldworkSession();const profile=getSessionProfile();
+  const email=current?.email||profile?.email;
+  if(!email)throw new Error('Sign in from the login screen.');
+  const {loginUser}=await import('../api/auth');
+  let response;
+  try {response=await loginUser(email,password);}
+  catch(e:any){throw new Error(e?.response?.data?.error||(e?.response?'Sign-in failed. Check your password.':'Still offline. Your work stays on this device; retry when connected.'));}
+  const {accessToken,user}=response.data;
+  if(user.id!==(current?.id||profile?.id))throw new Error('A different account signed in. Synchronization stays paused for the original account.');
+  const expires=tokenExpiry(accessToken);
+  setAuthToken(accessToken);
+  // setAuthToken(null) clears the profile only; restore it for the same user so the workspace keeps working.
+  if(!getSessionProfile()){const {setSessionProfile}=await import('../api/profileState');setSessionProfile({id:user.id,email:user.email,displayName:user.displayName,role:user.role,approvalStatus:'Approved'});}
+  syncState.authRequired=false;
+  // Always re-open the vault with the password just verified online: if the password changed elsewhere,
+  // this detects it and asks for the previous password to re-key (pending work is never dropped).
+  const result=await establishFieldwork({id:user.id,email:user.email,name:user.displayName,role:user.role,token:accessToken,tokenExpires:expires,expires:Date.now()+OFFLINE_WINDOW_MS},password);
+  return result==='rekey-required'?'rekey-required':'ready';
 }
 const categoryBase=(p:string,e:string)=>`/v1/inspection-activities/category-checklist/projects/${p}/equipment/${e}`;
 const equipmentBase=(p:string,a:string)=>`/surveyor/projects/${p}/areas/${a}/equipment`;
@@ -29,7 +64,7 @@ const get=async(url:string,params?:any)=>(await api.get(url,{params,timeout:4500
 
 export async function downloadProject(id:string,progress:(message:string)=>void) {
   const registration=await navigator.serviceWorker?.getRegistration();
-  if(!registration?.active)throw new Error('Install the production offline app shell before downloading fieldwork. This development page cannot guarantee offline reopening.');
+  if(!registration?.active)throw new Error('The offline app shell is not installed yet. Reload this page once while online, then download again. Without it the app cannot reopen offline.');
   if((await pendingOperations()).some(o=>o.projectId===id))throw new Error('Synchronize or resolve this project’s pending work before replacing its download.');
   if(!await backendReady())throw new Error('Connect and sign in to download this project.');
   const owner=fieldworkSession()!.id;
@@ -144,27 +179,25 @@ export async function loadConflict(op:Operation) {
     for(const p of activity.checkpoints){const r=activity.responses.find((r:any)=>r.checkpointDefinitionSnapshotId===p.id);answers[p.questionCode]={grades:r?.gradeResultsJson?JSON.parse(r.gradeResultsJson):{},remarks:r?.observation||'',comment:r?.inspectionComment||''};}
     return {version:activity.rowVersion,server:{answers,comments:activity.equipmentComments||'',hold:activity.isOnHold},activityId:id};
   }
+  if(op.kind==='checklist')
+    return {version:String(state.version),server:{points:(state.server.points||[]) as Point[],source:state.server.source},activityId:undefined};
   const server={...state.server};
   if(op.kind==='equipment')server.equipmentId=server.equipmentCode;
   if(op.kind==='defect'){server.date=server.registerDate;server.grade=server.registerGrade;}
   return {version:state.version,server,activityId:undefined};
 }
 
-export async function resolveConflict(id:string,reviewed:Awaited<ReturnType<typeof loadConflict>>,choices:Record<string,'local'|'server'>) {
+export async function resolveConflict(id:string,reviewed:Awaited<ReturnType<typeof loadConflict>>,choices:Record<string,Choice>) {
   return navigator.locks.request('ex-survey-fieldwork-sync',async()=>{
     const op=await vaultGet<Operation>('operation/'+id);
     if(!op||op.status!=='Conflict')throw new Error('This conflict has already changed. Refresh it.');
     const current=await loadConflict(op);
     if(current.version!==reviewed.version)throw new Error('The server changed again. Reload the comparison before resolving.');
     const original=JSON.parse(JSON.stringify(op));
-    const editable=op.kind==='inspection'?['answers','comments','hold']:Object.keys(op.payload).filter(k=>!['id','projectId','areaId','clientEquipmentId','photos','previousOperationId','sequenceNo','registrationStatus','status','createdByUserId','equipmentId'].includes(k));
-    if(op.kind==='equipment')editable.push('equipmentId');
-    for(const key of editable){
-      if(JSON.stringify(op.payload[key]??null)===JSON.stringify(current.server[key]??null))continue;
-      if(!choices[key])throw new Error(`Choose local or server values for ${key}.`);
-      if(choices[key]==='server')op.payload[key]=current.server[key]??null;
-    }
+    // Throws unless every differing field has an explicit choice; both versions are kept in conflict-history.
+    op.payload=applyConflictChoices(op.kind,op.payload,current.server,choices);
     op.baseVersion=current.version;
+    if(op.kind==='checklist'){op.payload.version=Number(current.version);delete op.payload.previousOperationId;}
     if(op.kind==='inspection'){op.payload.activityId=current.activityId;op.payload.rowVersion=current.version;delete op.payload.previousOperationId;}
     // Keep confirmed upload receipts; new record/checkpoint edits get new request IDs.
     op.requests=Object.fromEntries(Object.entries(op.requests).filter(([k])=>k.startsWith('photo/')&&op.results[k]));
@@ -207,10 +240,12 @@ async function synchronizeOperation(op:Operation) {
   }
   if(op.kind==='checklist'){
     b.checklistVersions??={};
+    // A successor save is based on the version its synchronized predecessor produced, not the stale download.
+    const base=predecessor?b.checklistVersions[op.entityId]??op.payload.version:op.payload.version;
     const r=await send(op,'checklist',()=>({url:`/v1/inspection-activities/category-checklist/projects/${op.projectId}/selection?equipmentId=${op.entityId}`,
-      method:'PUT',data:{codes:op.payload.points.map((point:Point)=>point.code),version:op.payload.version,
+      method:'PUT',data:{codes:op.payload.points.map((point:Point)=>point.code),version:base,
         categoryChanges:Object.fromEntries(op.payload.points.map((point:Point)=>[point.code,point.protectionApplicability])),
-        descriptionChanges:Object.fromEntries(op.payload.points.map((point:Point)=>[point.code,point.text]))}}));
+        descriptionChanges:Object.fromEntries(op.payload.points.map((point:Point)=>[point.code,point.text]))},version:String(base)}));
     b.points[op.entityId]=op.payload.points;b.checklistVersions[op.entityId]=r.result.version;
     await vaultSave([{id:'project/'+b.id,type:'project',value:b}]);
   }
@@ -246,12 +281,31 @@ let activeRun:Promise<void>|undefined;
 export function syncNow(manual=false):Promise<void> {
   if(activeRun)return activeRun;
   const run=async()=>{
-    if(!await backendReady()){syncState.message='Offline or session expired. Changes remain safely on this device.';fieldworkChanged();return;}
+    if(!await backendReady()){
+      syncState.message=syncState.authRequired?'Session expired. Synchronization is paused; sign in again to resume. All changes remain on this device.'
+        :'Offline or server unavailable. Changes remain safely on this device.';
+      fieldworkChanged();return;
+    }
     const owner=fieldworkSession()!.id;
     const all=await operations();const pending=all.filter(o=>o.status!=='Synced');
     // A successful authenticated probe permits retrying authentication failures only.
-    // Assignment/role denials stay quarantined for an authorized resolution.
     for(const op of pending)if(op.status==='Blocked'&&op.errorStatus===401){op.status='Pending';op.nextAttempt=undefined;await saveOp(op);}
+    // Revalidate assignment per project before sending anything. Denied projects are quarantined (never discarded);
+    // a restored assignment releases them automatically.
+    const denied=new Set<string>();
+    for(const projectId of [...new Set(pending.map(o=>o.projectId))]){
+      try{await api.get(`/fieldwork/projects/${projectId}/access`,{timeout:15000});}
+      catch(e:any){
+        const status=e?.response?.status;
+        if(status===401){syncState.authRequired=true;syncState.message='Session expired. Synchronization is paused; sign in again to resume.';fieldworkChanged();return;}
+        if(status===403||status===404){denied.add(projectId);continue;}
+        syncState.message='Server unavailable. Changes remain safely on this device.';fieldworkChanged();return;
+      }
+    }
+    for(const op of pending){
+      if(denied.has(op.projectId)&&op.status!=='Blocked'&&op.status!=='Conflict'){op.status='Blocked';op.errorStatus=403;op.error='Project assignment or permission changed. This work is retained for an authorized resolution.';await saveOp(op);}
+      else if(!denied.has(op.projectId)&&op.status==='Blocked'&&op.errorStatus===403){op.status='Pending';op.error=undefined;op.nextAttempt=undefined;await saveOp(op);}
+    }
     syncState={...syncState,running:true,done:0,total:pending.length,message:'Syncing'};fieldworkChanged();
     try{
       for(const op of pending.sort((a,b)=>a.createdAt.localeCompare(b.createdAt))){
@@ -260,11 +314,12 @@ export function syncNow(manual=false):Promise<void> {
         if(op.dependsOn.some(id=>all.find(o=>o.id===id)?.status!=='Synced'))continue;
         op.status='Syncing';op.lastAttempt=new Date().toISOString();op.attempts++;await saveOp(op);
         try{await synchronizeOperation(op);op.status='Synced';op.error=undefined;syncState.done++;}
-        catch(e:any){const status=e.response?.status;op.errorStatus=status;op.status=status===409?'Conflict':status===401||status===403?'Blocked':'Failed';op.error=e.response?.data?.error||e.message||'Synchronization failed';op.server=e.response?.data?.server;op.nextAttempt=Date.now()+Math.min(300000,1000*2**Math.min(op.attempts,8));}
+        catch(e:any){const status=e.response?.status;op.errorStatus=status;op.status=status===409?'Conflict':status===401||status===403?'Blocked':'Failed';op.error=status===401?'Session expired before the server confirmed this change. It will be retried after you sign in again.':e.response?.data?.error||e.message||'Synchronization failed';op.server=e.response?.data?.server;op.nextAttempt=Date.now()+Math.min(300000,1000*2**Math.min(op.attempts,8));if(status===401)syncState.authRequired=true;}
         await saveOp(op);fieldworkChanged();
-        if(op.status==='Blocked')break;
+        if(op.status==='Blocked'&&op.errorStatus===401)break;
       }
-      const remaining=await pendingOperations();syncState.message=remaining.length?`${remaining.length} changes still need synchronization or attention`:'All Changes Synced';
+      const remaining=await pendingOperations();syncState.message=syncState.authRequired?'Session expired. Synchronization is paused; sign in again to resume. All changes remain on this device.'
+        :remaining.length?`${remaining.length} change${remaining.length===1?'':'s'} still need${remaining.length===1?'s':''} synchronization or attention`:'All Changes Synced';
       if(!remaining.length){syncState.lastSuccess=new Date().toISOString();await vaultSave([{id:'sync-status',type:'metadata',value:{lastSuccess:syncState.lastSuccess}}]);}
     }finally{syncState.running=false;fieldworkChanged();}
   };

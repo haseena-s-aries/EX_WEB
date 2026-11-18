@@ -34,6 +34,12 @@ module.exports = {
       },
     },
     {
+      // Native-only TurboModule spec; web code paths use <input type="file">. Keep this a warning,
+      // as in earlier builds, instead of failing the whole web build.
+      test: /[\\/]node_modules[\\/]@react-native-documents[\\/]picker[\\/]/,
+      parser: {exportsPresence: 'warn'},
+    },
+    {
       test: /\.(png|jpe?g|gif|svg)$/,
       type: 'asset/resource',
     },
@@ -65,10 +71,12 @@ module.exports = {
       apply(compiler) {
         compiler.hooks.thisCompilation.tap('FieldworkOfflineShell', compilation => {
           compilation.hooks.processAssets.tap({name:'FieldworkOfflineShell',stage:webpack.Compilation.PROCESS_ASSETS_STAGE_REPORT}, () => {
-            if(compiler.options.mode !== 'production') return;
-            const assets = Object.keys(compilation.assets).filter(name => !name.endsWith('.map') && name !== 'web.config');
-            const revision = require('crypto').createHash('sha256').update(assets.map(name => compilation.assets[name].source()).join('')).digest('hex').slice(0,16);
-            const worker = fs.readFileSync(path.resolve(__dirname,'public/fieldwork-worker.js'),'utf8').replace('__REVISION__',revision).replace('__ASSETS__',JSON.stringify(assets));
+            // Development emits a network-first worker so the local offline workflow can be tested
+            // without a production deployment; hot-update files are never precached.
+            const mode = compiler.options.mode === 'production' ? 'production' : 'development';
+            const assets = Object.keys(compilation.assets).filter(name => !name.endsWith('.map') && name !== 'web.config' && !name.includes('hot-update'));
+            const revision = (mode === 'development' ? 'dev-' : '') + require('crypto').createHash('sha256').update(assets.map(name => compilation.assets[name].source()).join('')).digest('hex').slice(0,16);
+            const worker = fs.readFileSync(path.resolve(__dirname,'public/fieldwork-worker.js'),'utf8').replace('__REVISION__',revision).replace('__ASSETS__',JSON.stringify(assets)).replace('__MODE__',mode);
             compilation.emitAsset('fieldwork-worker.js',new webpack.sources.RawSource(worker));
           });
         });

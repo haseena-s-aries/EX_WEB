@@ -1,10 +1,33 @@
 import React,{useState} from 'react';
 import {loadConflict,Operation,resolveConflict} from '../offline/fieldwork';
+import {Choice,conflictFields} from '../offline/fieldworkConflicts';
+
+const show=(value:unknown)=>{
+  if(value&&typeof value==='object'&&'included' in (value as any)){
+    const v=value as any;return v.included?`${v.text}\nCategory: ${v.category}`:'Not included on this checklist';
+  }
+  return JSON.stringify(value??null,null,2);
+};
+
+/** Field-by-field (checkpoint-by-checkpoint for checklists) resolution. Nothing is applied until every difference has a choice. */
 export default function FieldworkConflict({operation}:{operation:Operation}){
   const [review,setReview]=useState<Awaited<ReturnType<typeof loadConflict>>>();
-  const [choices,setChoices]=useState<Record<string,'local'|'server'>>({});
+  const [choices,setChoices]=useState<Record<string,Choice>>({});
   const [error,setError]=useState('');const [busy,setBusy]=useState(false);
   const run=async(fn:()=>Promise<void>)=>{setBusy(true);setError('');try{await fn();}catch(e:any){setError(e.message);}finally{setBusy(false);}};
-  const keys=operation.kind==='inspection'?['answers','comments','hold']:Object.keys(operation.payload).filter(k=>!['id','projectId','areaId','clientEquipmentId','photos','previousOperationId','sequenceNo','registrationStatus','status','createdByUserId',...(operation.kind==='defect'?['equipmentId']:[])].includes(k));
-  return <div><button disabled={busy} onClick={()=>void run(async()=>{setReview(await loadConflict(operation));setChoices({});})}>Load current versions to resolve</button>{error&&<p role="alert">{error}</p>}{review&&<>{keys.filter(k=>JSON.stringify(operation.payload[k]??null)!==JSON.stringify(review.server[k]??null)).map(k=><fieldset key={k}><legend>{k}</legend><div className="fw-form-grid"><label><input type="radio" name={operation.id+k} checked={choices[k]==='local'} onChange={()=>setChoices({...choices,[k]:'local'})}/>Keep local<pre>{JSON.stringify(operation.payload[k]??null,null,2)}</pre></label><label><input type="radio" name={operation.id+k} checked={choices[k]==='server'} onChange={()=>setChoices({...choices,[k]:'server'})}/>Use server<pre>{JSON.stringify(review.server[k]??null,null,2)}</pre></label></div></fieldset>)}<button disabled={busy} onClick={()=>void run(async()=>{await resolveConflict(operation.id,review,choices);setReview(undefined);})}>Save resolution for synchronization</button></>}</div>;
+  const fields=review?conflictFields(operation.kind,operation.payload,review.server):[];
+  const chooseAll=(choice:Choice)=>setChoices(Object.fromEntries(fields.map(f=>[f.key,choice])));
+  return <div className="fw-conflict">
+    <button disabled={busy} onClick={()=>void run(async()=>{setReview(await loadConflict(operation));setChoices({});})}>{review?'Reload current server version':'Load current versions to resolve'}</button>
+    {error&&<p role="alert" className="fw-error">{error}</p>}
+    {review&&<>
+      <p>Server version {review.version}. {fields.length} difference{fields.length===1?'':'s'} to review.{operation.kind==='checklist'?' Checklist choices apply per checkpoint.':''}</p>
+      {fields.length>1&&<div className="fw-actions"><button type="button" onClick={()=>chooseAll('local')}>Keep all local</button><button type="button" onClick={()=>chooseAll('server')}>Use all server</button></div>}
+      {fields.map(f=><fieldset key={f.key} className="fw-choice"><legend>{f.label}</legend><div className="fw-form-grid">
+        <label className="fw-radio"><span><input type="radio" name={operation.id+f.key} checked={choices[f.key]==='local'} onChange={()=>setChoices({...choices,[f.key]:'local'})}/> Keep local</span><pre>{show(f.local)}</pre></label>
+        <label className="fw-radio"><span><input type="radio" name={operation.id+f.key} checked={choices[f.key]==='server'} onChange={()=>setChoices({...choices,[f.key]:'server'})}/> Use server</span><pre>{show(f.server)}</pre></label>
+      </div></fieldset>)}
+      <button className="primary" disabled={busy} onClick={()=>void run(async()=>{await resolveConflict(operation.id,review,choices);setReview(undefined);})}>Save resolution for synchronization</button>
+    </>}
+  </div>;
 }

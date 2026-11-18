@@ -1,6 +1,7 @@
 import {restoreBrowserSession} from '../api/restoreBrowserSession';
 import {readBrowserSession} from '../api/browserSession';
-﻿import {establishFieldwork, unlockFieldwork, lockFieldwork} from '../offline/fieldworkStore';
+﻿import {establishFieldwork, unlockFieldwork, lockFieldwork, OFFLINE_WINDOW_MS} from '../offline/fieldworkStore';
+import {browserFieldworkEnabled} from '../offline/fieldworkConfig';
 import {pendingOperations} from '../offline/fieldwork';
 import {setSessionProfile} from '../api/profileState';
 // import ManagerQcReviewScreen from '../screens/ManagerQcReviewScreen';
@@ -823,6 +824,7 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
       <Text accessibilityRole="header" style={{color: '#00d9ee', fontSize: 28, fontWeight: '700'}}>Ex-Survey</Text>
       <Text accessibilityLiveRegion="polite" style={{color: '#eaf7fc', fontSize: 16, textAlign: 'center'}}>{authState === 'error' ? 'Unable to verify your session. Check your connection and retry.' : 'Restoring your secure workspace…'}</Text>
       {authState === 'error' && <TouchableOpacity accessibilityRole="button" onPress={() => setRestoreAttempt(v => v + 1)} style={{padding: 16, borderRadius: 10, backgroundColor: '#00d9ee'}}><Text style={{color: '#031b29', fontWeight: '700'}}>Retry</Text></TouchableOpacity>}
+      {authState === 'error' && browserFieldworkEnabled() && <TouchableOpacity accessibilityRole="button" onPress={() => {setAuthState('unauthenticated'); setActiveScreen('Login');}} style={{padding: 16, borderRadius: 10, borderWidth: 1, borderColor: '#00d9ee'}}><Text style={{color: '#00d9ee', fontWeight: '700'}}>Sign in to offline fieldwork</Text></TouchableOpacity>}
     </View>;
   }
   const registrationEnabled = typeof window === 'undefined' ||
@@ -866,11 +868,15 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
           try {
             const res = await loginUser(email, password);
             const {accessToken, user} = res.data;
-            if(user.role === 'Surveyor' && (globalThis as any).EX_SURVEY_CONFIG?.browserFieldworkEnabled) {
+            if(user.role === 'Surveyor' && browserFieldworkEnabled()) {
               const tokenExpiry = JSON.parse(atob(accessToken.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).exp * 1000;
-              try { await establishFieldwork({id:user.id,email:user.email,name:user.displayName,role:user.role,token:accessToken,expires:Math.min(tokenExpiry,Date.now()+8*60*60*1000)},password); }
+              // The offline window is independent of the 1-hour API token: sync pauses at token expiry, local work continues.
+              try {
+                const vault = await establishFieldwork({id:user.id,email:user.email,name:user.displayName,role:user.role,token:accessToken,tokenExpires:tokenExpiry,expires:Date.now()+OFFLINE_WINDOW_MS},password);
+                if(vault === 'rekey-required') alert('Your password has changed. Device fieldwork saved under your previous password is kept safely. Open Fieldwork / Sync and enter your previous password once to unlock it.');
+              }
               catch(error:any) {alert('Online sign-in succeeded. Offline workspace: '+error.message);}
-            }
+            } else lockFieldwork();
 
 
             setAuthToken(accessToken);
@@ -892,7 +898,7 @@ const [currentUser, setCurrentUser] = useState<{name: string; role: string; id?:
             setScreen('Dashboard');
           } catch (err: any) {
             const data = err?.response?.data;
-            if(!err?.response && (globalThis as any).EX_SURVEY_CONFIG?.browserFieldworkEnabled) {
+            if(!err?.response && browserFieldworkEnabled()) {
               try {
                 const saved = await unlockFieldwork(email,password);
                 setAuthToken(saved.token);
