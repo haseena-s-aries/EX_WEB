@@ -1,3 +1,4 @@
+import {browserFieldworkEnabled} from './src/offline/fieldworkConfig';
 import React from 'react';
 import FieldworkLauncher from './src/components/FieldworkWorkspace.web';
 import {AppRegistry} from 'react-native';
@@ -13,6 +14,8 @@ if (rootTag) {
 }
 
 AppRegistry.runApplication(appName, {rootTag});
-if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator && window.isSecureContext) {
+// Production builds always install the shell. Development installs its network-first worker only when
+// browser fieldwork is enabled for this (loopback) host, so local offline testing works without production sync.
+if ((process.env.NODE_ENV === 'production' || browserFieldworkEnabled()) && 'serviceWorker' in navigator && window.isSecureContext) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./fieldwork-worker.js').catch(error => console.error('Offline shell could not be installed',error)));
 }

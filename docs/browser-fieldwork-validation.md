@@ -6,17 +6,40 @@ Implemented foundations: encrypted per-account IndexedDB storage, atomic local d
 
 Verified on 16 November 2026: TypeScript compilation, backend build, and existing frontend regression suite (203 tests in 46 suites). These tests do not establish complete offline acceptance.
 
-Outstanding release blockers:
+## 18 November 2026 — local enablement and acceptance work
 
-- Implement authorized field-by-field conflict resolution and recovery of dependent operations.
-- Support successive queued revisions without stale base versions; currently a second pending save for the same entity is rejected.
-- Verify all required reference documents, historical photographs, checklist applicability and assigned plans in downloaded bundles.
-- Complete durable autosave and navigation guards for equipment/defect forms, beyond inspection drafts.
-- Verify expired-session and reassignment recovery, password-change vault recovery and account switching during requests.
-- Audit every existing mobile screen and drawer at the requested viewport widths; generic CSS safeguards alone are insufficient.
-- Execute real offline reload, lost-response, interrupted-upload, concurrent-device and storage-quota tests.
-- Validate current iPhone Safari and Android browsers and complete PWA installation checks.
+Rollout switch: `browserFieldworkEnabled: 'local'` enables browser fieldwork only on loopback hosts.
+Production remains disabled. See `docs/browser-fieldwork-local-testing.md`.
+
+Fixed:
+
+- Checklist saves (`InspectionActivities.SaveCategorySelection`) are now in the idempotent fieldwork allowlist with
+  equipment scope, project assignment, request hashing, receipt replay and an integer version check (409 returns the
+  current server checklist).
+- Checklist conflicts load from `GET api/fieldwork/projects/{projectId}/records/checklist/{equipmentId}` and resolve
+  checkpoint-by-checkpoint; both versions are retained (append-only server snapshots, local conflict history).
+- A queued checklist save following a synchronized one now uses the predecessor's server version; unchanged
+  checklists are no longer re-saved on every inspection draft.
+- Vault format v2: a random data key wrapped by the password-derived key. Existing v1 vaults upgrade in place on
+  unlock. A password change re-keys with the previous password; nothing is re-encrypted or deleted. If the previous
+  password is unknown the old vault can be set aside (kept) and recovered later.
+- Token expiry pauses synchronization (local work continues within the 8-hour offline window) with in-place sign-in;
+  assignment is revalidated per project before every sync (`GET api/fieldwork/projects/{projectId}/access`).
+- Pre-existing backend defect: `GET api/surveyor/equipment/{id}` failed (untranslatable EF ordering) and blocked every
+  project download.
+- Locked workspace after refresh offers unlock instead of a dead end; offline reload offers offline sign-in.
+
+Verified on the disposable local stack (real API + SQL Server container, production bundle on localhost, Chromium):
+see the final report of this change for the step list. Not verified: physical iPhone Safari / Android browsers,
+PWA install prompts, storage-quota exhaustion, and Android native builds (no Android SDK in the test environment).
+
+Remaining release blockers:
+
+- Validate current iPhone Safari and Android browsers on devices and complete PWA installation checks.
+- Storage-quota exhaustion tests.
+- Recovery of dependent operations after an operator abandons a conflict (currently dependants wait).
 - Review transaction boundaries and external file cleanup on rollback, especially replacement defect photos.
+- Authorization of production rollout.
 
 Backend migration generated: `20261116053821_BrowserFieldworkReceipts`. It has not been applied by this work. No live database changes were performed.
 

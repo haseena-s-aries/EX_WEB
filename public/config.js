@@ -10,8 +10,9 @@
       ? 'http://localhost:5235/api'
       : 'https://localhost:7288/api';
   window.EX_SURVEY_CONFIG = {
-    // Disabled until offline recovery and conflict-resolution acceptance tests pass.
-    browserFieldworkEnabled: false,
+    // 'local' enables browser fieldwork ONLY on loopback hosts (localhost/127.0.0.1) for local testing.
+    // Production hosts stay disabled. Use true only after separate production authorization.
+    browserFieldworkEnabled: 'local',
     // Set registrationEnabled to false to hide public registration links.
     apiBaseUrl: isLocal ? localApi : 'https://139.5.189.155:338/api',
   };
